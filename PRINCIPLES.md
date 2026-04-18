@@ -40,6 +40,24 @@ The eight principles exist to keep you in row 1 of this table.
 
 ---
 
+## Back-compat is not a default
+
+Backwards compatibility was a load-bearing constraint when migrating callers was expensive. An agent migrating a caller costs seconds. SDS collapses TTI (time-to-integration) toward trivial. The old math that made back-compat mandatory has flipped.
+
+**Default: break compat freely.** When a new design is better, ship the new design. Update the callers in the same PR. Do not carry around `deprecated` shims, dual-path branches, or translation layers that exist only to "not break anyone." Those are exactly the accretions that turn row 3 of the debt table into row 5.
+
+**Exception: back-compat is maintained only when the user explicitly asks for it.** Public APIs with external consumers the user wants to protect. Versioned endpoints with SLAs. Anything the user names specifically.
+
+**Anti-patterns.**
+- "I'll keep the old function for back-compat." *(No. Rename. Update callers. Ship one PR.)*
+- "This is a breaking change so I'll add a flag to preserve old behavior." *(No. Pick the right behavior. Ship it.)*
+- "I'll support both the old and new schema for a transition period." *(The transition period never ends. Pick one.)*
+- "The v1 endpoint should stay even though we have v2 now." *(Only if the user names the specific consumer. Otherwise delete.)*
+
+When in doubt: delete the old thing. Re-introducing something when a caller complains is cheap (minutes). Carrying dead compat paths forever is not (compounding).
+
+---
+
 # Part 1 — Use your powers
 
 These four principles tell you what to *aim for* when you write code. They are not style guidance. They are how you produce compiler-grade output — code where classes of error are impossible by construction, not fixed after the fact.
