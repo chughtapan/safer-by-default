@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# safer-by-default — setup
+#
+# Verifies dependencies, makes binaries executable, probes that the plugin
+# installed cleanly. Safe to re-run.
+#
+# Usage:
+#   ./setup              # standard install
+#   ./setup --check      # verify only; do not modify
+#   ./setup --quiet      # minimize output
+set -euo pipefail
+
+# Resolve install dir from the setup script's own path.
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+STATE_DIR="$HOME/.safer"
+
+QUIET=0
+CHECK_ONLY=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check)  CHECK_ONLY=1; shift ;;
+    --quiet)  QUIET=1; shift ;;
+    -q)       QUIET=1; shift ;;
+    -h|--help)
+      echo "Usage: ./setup [--check] [--quiet]"
+      exit 0
+      ;;
+    *) echo "Unknown flag: $1" >&2; exit 1 ;;
+  esac
+done
+
+log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
+err() { echo "ERROR: $*" >&2; }
+
+log "safer-by-default setup"
+log "  install dir: $INSTALL_DIR"
+log "  state dir:   $STATE_DIR"
+log ""
+
+# --- Dependency checks ---
+FAIL=0
+
+check_cmd() {
+  local cmd="$1"
+  local why="$2"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    log "  ✓ $cmd — $(command -v "$cmd")"
+  else
+    err "missing: $cmd ($why)"
+    FAIL=1
+  fi
+}
+
+log "Checking dependencies..."
+check_cmd bash "shell for binaries"
+check_cmd git  "required by safer-slug"
+check_cmd gh   "required by safer-publish / safer-load-context / safer-vp"
+
+# gh must be authenticated too
+if command -v gh >/dev/null 2>&1; then
+  if gh auth status >/dev/null 2>&1; then
+    log "  ✓ gh authenticated"
+  else
+    err "gh is installed but not authenticated. Run: gh auth login"
+    FAIL=1
+  fi
+fi
+
+# Optional composition partner
+if [ -x "$HOME/.claude/skills/zapbot/skills/zapbot-publish/SKILL.md" ] \
+  || [ -d "$HOME/.claude/skills/zapbot" ]; then
+  log "  ✓ zapbot detected — safer-publish will compose with /zapbot-publish"
+else
+  log "  ○ zapbot not detected — safer-publish will fall back to gh (this is fine)"
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+  err "dependency check failed. Install the missing tools and re-run."
+  exit 1
+fi
+log ""
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  log "--check passed. No changes made."
+  exit 0
+fi
+
+# --- State dir ---
+log "Preparing state dir..."
+mkdir -p "$STATE_DIR/analytics"
+if [ ! -f "$STATE_DIR/analytics/events.jsonl" ]; then
+  : > "$STATE_DIR/analytics/events.jsonl"
+  log "  created $STATE_DIR/analytics/events.jsonl"
+else
+  log "  ✓ $STATE_DIR/analytics/events.jsonl already exists"
+fi
+
+# --- Make binaries executable ---
+log "Making binaries executable..."
+BIN_DIR="$INSTALL_DIR/bin"
+if [ -d "$BIN_DIR" ]; then
+  chmod +x "$BIN_DIR"/safer-* 2>/dev/null || true
+  BIN_COUNT=$(find "$BIN_DIR" -maxdepth 1 -name 'safer-*' -type f 2>/dev/null | wc -l | tr -d ' ')
+  log "  ✓ $BIN_COUNT binaries in $BIN_DIR"
+else
+  err "bin/ directory missing at $BIN_DIR"
+  exit 1
+fi
+
+# --- Probe: run safer-update-check to confirm binaries execute ---
+log "Probing binaries..."
+if "$BIN_DIR/safer-update-check" >/dev/null 2>&1; then
+  log "  ✓ safer-update-check executes"
+else
+  err "safer-update-check failed to execute. Check $BIN_DIR permissions."
+  exit 1
+fi
+
+if "$BIN_DIR/safer-slug" >/dev/null 2>&1; then
+  log "  ✓ safer-slug executes"
+else
+  log "  ○ safer-slug not runnable outside a git repo (expected when running from plugin dir)"
+fi
+
+# --- Probe: check Claude Code install location ---
+log "Checking Claude Code plugin registration..."
+CC_SKILLS="$HOME/.claude/skills"
+if [ -d "$CC_SKILLS/safer-by-default" ]; then
+  # Already installed at the canonical location — best case.
+  REAL_CC=$(cd "$CC_SKILLS/safer-by-default" && pwd -P)
+  REAL_INSTALL=$(cd "$INSTALL_DIR" && pwd -P)
+  if [ "$REAL_CC" = "$REAL_INSTALL" ]; then
+    log "  ✓ installed at the canonical location ($CC_SKILLS/safer-by-default)"
+  else
+    log "  ○ another safer-by-default install found at $CC_SKILLS/safer-by-default"
+    log "    running setup from $INSTALL_DIR"
+    log "    (not modifying either — re-run setup from the canonical location if desired)"
+  fi
+else
+  log "  ○ not installed at $CC_SKILLS/safer-by-default"
+  log "    Skills will not auto-load in Claude Code sessions unless this install"
+  log "    is at that path, or you use the marketplace (/plugin install)."
+  log ""
+  log "    To register, either:"
+  log "      a) Reinstall at the canonical path:"
+  log "         git clone --single-branch --depth 1 \\"
+  log "           https://github.com/chughtapan/safer-by-default.git \\"
+  log "           $CC_SKILLS/safer-by-default"
+  log "      b) Use /plugin install inside Claude Code."
+fi
+
+log ""
+log "safer-by-default setup complete."
+log ""
+log "Next steps:"
+log "  - Read PRINCIPLES.md (the doctrine every skill projects from)."
+log "  - In a project repo, invoke /safer:orchestrate on an intent to kick off the pipeline."
+log "  - Run bin/safer-vp 7d for the project dashboard."

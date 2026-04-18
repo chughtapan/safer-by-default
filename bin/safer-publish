@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# safer-publish — publish an artifact to GitHub. Composition:
+#   1. If zapbot is installed and --kind is epic or issue with a plan file,
+#      the skill invoking safer-publish should prefer /zapbot-publish directly.
+#      This binary is the mechanical path and always uses gh.
+#   2. Otherwise, use gh issue create / gh issue comment / gh pr comment.
+#
+# Args:
+#   --kind <epic|issue|comment|pr-comment>    required
+#   --title <title>                           required for epic, issue
+#   --body-file <path>                        body source (for all kinds)
+#   --body <text>                             inline body (for short comments)
+#   --labels <comma,separated>                labels (epic, issue)
+#   --parent <n>                              parent epic number (sub-issues; stored in body)
+#   --issue <n>                               target issue (comment)
+#   --pr <n>                                  target PR (pr-comment)
+#   --repo <o/r>                              override repo
+# Output: URL of the created/updated artifact.
+# Exit: 0 on success, 1 on gh/validation failure.
+set -uo pipefail
+
+KIND=""
+TITLE=""
+BODY_FILE=""
+BODY=""
+LABELS=""
+PARENT=""
+ISSUE=""
+PR=""
+REPO=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --kind)      KIND="$2"; shift 2 ;;
+    --title)     TITLE="$2"; shift 2 ;;
+    --body-file) BODY_FILE="$2"; shift 2 ;;
+    --body)      BODY="$2"; shift 2 ;;
+    --labels)    LABELS="$2"; shift 2 ;;
+    --parent)    PARENT="$2"; shift 2 ;;
+    --issue)     ISSUE="$2"; shift 2 ;;
+    --pr)        PR="$2"; shift 2 ;;
+    --repo)      REPO="$2"; shift 2 ;;
+    *)           shift ;;
+  esac
+done
+
+[ -z "$KIND" ] && { echo "ERROR: --kind required" >&2; exit 1; }
+
+if [ -n "$BODY_FILE" ] && [ ! -f "$BODY_FILE" ]; then
+  echo "ERROR: --body-file not found: $BODY_FILE" >&2
+  exit 1
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "ERROR: gh not installed" >&2
+  exit 1
+fi
+
+REPO_FLAG=()
+[ -n "$REPO" ] && REPO_FLAG=(--repo "$REPO")
+
+# Build body arg array
+body_args=()
+if [ -n "$BODY_FILE" ]; then
+  body_args=(--body-file "$BODY_FILE")
+elif [ -n "$BODY" ]; then
+  body_args=(--body "$BODY")
+fi
+
+# If this is an issue/epic with a --parent, prepend the parent reference to the body
+TMP_BODY=""
+if [ "$KIND" = "issue" ] && [ -n "$PARENT" ]; then
+  TMP_BODY=$(mktemp)
+  {
+    echo "Parent: #$PARENT"
+    echo ""
+    if [ -n "$BODY_FILE" ]; then
+      cat "$BODY_FILE"
+    elif [ -n "$BODY" ]; then
+      echo "$BODY"
+    fi
+  } > "$TMP_BODY"
+  body_args=(--body-file "$TMP_BODY")
+  trap 'rm -f "$TMP_BODY"' EXIT
+fi
+
+label_args=()
+if [ -n "$LABELS" ]; then
+  IFS=',' read -ra LBL_ARR <<< "$LABELS"
+  for L in "${LBL_ARR[@]}"; do label_args+=(--label "$L"); done
+fi
+
+case "$KIND" in
+  epic|issue)
+    [ -z "$TITLE" ] && { echo "ERROR: --title required for $KIND" >&2; exit 1; }
+    OUT=$(gh issue create "${REPO_FLAG[@]}" --title "$TITLE" "${body_args[@]}" "${label_args[@]}" 2>&1)
+    RC=$?
+    ;;
+  comment)
+    [ -z "$ISSUE" ] && { echo "ERROR: --issue required for comment" >&2; exit 1; }
+    OUT=$(gh issue comment "$ISSUE" "${REPO_FLAG[@]}" "${body_args[@]}" 2>&1)
+    RC=$?
+    ;;
+  pr-comment)
+    [ -z "$PR" ] && { echo "ERROR: --pr required for pr-comment" >&2; exit 1; }
+    OUT=$(gh pr comment "$PR" "${REPO_FLAG[@]}" "${body_args[@]}" 2>&1)
+    RC=$?
+    ;;
+  *)
+    echo "ERROR: unknown --kind: $KIND (expected epic|issue|comment|pr-comment)" >&2
+    exit 1
+    ;;
+esac
+
+if [ $RC -eq 0 ]; then
+  echo "$OUT"
+  exit 0
+fi
+echo "ERROR: gh command failed: $OUT" >&2
+exit 1
