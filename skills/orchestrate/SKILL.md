@@ -186,14 +186,24 @@ Epic body template:
 
 <the user's intent, verbatim or lightly clarified>
 
+## Context
+
+- **Project:** <name> (<https://github.com/OWNER/REPO>)
+- **Motivation:** <one sentence, in the user's own words if they stated it — why this matters now>
+- **Prior artifacts:** <bullet list of full URLs to every spec, issue, comment, PR, or doc this epic depends on. If none, write "none.">
+
+This section is the cold-start reader's anchor. A teammate opening this epic with zero session context must be able to start from here alone.
+
 ## Decomposition
 
 | # | Modality | Depends on | Acceptance | Sub-issue |
 |---|---|---|---|---|
-| 1 | spec | — | SPEC.md published, acceptance criteria explicit | #TBD |
-| 2 | architect | 1 | design doc + interface stubs published | #TBD |
-| 3 | implement-senior | 2 | draft PR opened, tests green | #TBD |
-| 4 | verify | 3 | verify comment on PR, ship verdict | #TBD |
+| 1 | spec | — | SPEC.md published as a comment on this epic; goals, non-goals, and explicit acceptance criteria present; `safer:spec` label; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
+| 2 | architect | 1 | Design doc published as sub-issue body; modules named with file paths; public interfaces typed; stub files pushed to branch; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
+| 3 | implement-senior | 2 | Draft PR opened with `[impl-senior]` title prefix; all stubs replaced with bodies; `safer-diff-scope` reports `senior`; lint/typecheck/tests green locally; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
+| 4 | verify | 3 | Verify comment posted on PR #M naming each acceptance criterion and its ship/hold verdict; CI green; state `done` | <https://github.com/OWNER/REPO/issues/NNN> |
+
+Every external reference in this body is a full URL, not a bare `#N`. A reader on another repo or in a fresh session cannot resolve `#N` alone.
 
 ## Status
 
@@ -202,9 +212,22 @@ Epic body template:
 ## Orchestrator session
 
 `<SESSION>`
+
+## Next step
+
+- **First dispatch:** sub-issue <https://github.com/OWNER/REPO/issues/NNN> (row #1, modality `<MODALITY>`).
+- **Teammate:** `<teammate-name>` on team `<team-name>` — or `TBD` if not yet spawned.
+- **Gating artifact:** <what must land on that sub-issue before row #2 dispatches>.
 ```
 
 Record the parent epic's issue number.
+
+**Body rules (apply when filling the template above).**
+
+1. **Context is required, not optional.** The `## Context` section exists so a cold-start reader does not need the conversation history. If you cannot state the project, the motivation, and the prior artifacts in three bullets, you do not yet have enough context to orchestrate — ask the user.
+2. **Every acceptance cell answers "what artifact, in what state, makes this row done."** One-line stubs like "tests green" are insufficient. Name the artifact type (PR, comment, sub-issue body, label), the location, and the state transition that closes the row.
+3. **Every external reference is a full URL.** `#5`, `PR #12`, "see the spec" are all invalid. Write `<https://github.com/OWNER/REPO/issues/5>`. This applies to sub-issues, prior artifacts, linked PRs, and any other cross-reference in the body. A bare `#N` breaks the moment the reader is in a different repo or session.
+4. **The `## Next step` section is mandatory.** The epic is only useful if the next action is explicit. Name the first sub-issue to dispatch (by URL), its modality, and the teammate (or `TBD`) that will pick it up.
 
 ### Phase 4 — Create sub-issues
 
