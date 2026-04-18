@@ -92,7 +92,7 @@ If any required binary (`safer-slug`, `safer-telemetry-log`, `safer-update-check
 - Classifying intent; deciding whether to orchestrate at all.
 - Decomposing intent into sub-tasks.
 - Creating a parent epic issue and sub-issues on GitHub with correct labels.
-- Invoking modality skills — in-session via the Skill tool, or out-of-session via `Agent` subagent dispatch.
+- Invoking modality skills — in-session via the Skill tool, or out-of-session via a team (TeamCreate + Agent with `team_name`).
 - Reading GitHub state via `gh` to track progress.
 - Transitioning sub-issue labels as work progresses (`safer-transition-label`).
 - Re-triaging when a downstream modality escalates.
@@ -239,13 +239,15 @@ For each sub-issue in dependency order:
 
 Two paths:
 
-- **In-session** — invoke the modality skill via the Skill tool (e.g., `Skill(skill="safer:architect", args="#<sub-issue>")`). Use this when the modality is lightweight or when you want the output in your own context.
-- **Subagent** — dispatch via the `Agent` tool with a self-contained prompt. Use this when (a) the modality is heavy and you want to protect your context, or (b) you are dispatching multiple modalities in parallel (only legal when they have no dependency between them).
+- **In-session** — invoke the modality skill via the `Skill` tool (e.g., `Skill(skill="safer:architect", args="#<sub-issue>")`). Use this when the modality is lightweight and you want the output in your own context.
+- **Teammate** — dispatch via a team. First `TeamCreate` a team for the epic if one does not exist, then `Agent` with `team_name` and a `name` per teammate. Use this when (a) the modality is heavy and you want to protect your context, (b) you are dispatching multiple modalities in parallel (only legal when they have no dependency between them), or (c) you want the teammates to coordinate via a shared task list and SendMessage.
 
-Subagent prompt template:
+**Never dispatch via `Agent` without `team_name`.** Standalone subagents are fire-and-forget; teammates are the unit of orchestration. Teams provide shared task lists, peer DM, idle notifications to the team lead, and persistent config at `~/.claude/teams/<team-name>/`.
+
+Teammate prompt template:
 
 ```
-You are invoking the /safer:<MODALITY> skill.
+You are a teammate on team `<team-name>` invoking the /safer:<MODALITY> skill.
 
 Context:
 - Parent epic: <URL>
@@ -261,8 +263,8 @@ When you finish, your final output MUST include one of these status markers:
 DONE, DONE_WITH_CONCERNS, ESCALATED, BLOCKED, NEEDS_CONTEXT.
 
 Publish your artifact back to your sub-issue (comment, PR, or label change per
-the modality's publication rule). Do not return to me until the sub-issue is
-published.
+the modality's publication rule). Use TaskUpdate to mark your task complete
+and SendMessage to notify the team lead.
 ```
 
 **Step 5b — Wait for the artifact.**
