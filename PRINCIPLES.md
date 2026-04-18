@@ -1,5 +1,7 @@
 # PRINCIPLES — safer-by-default
 
+*This document is read by agents at session start; humans read it to understand the plugin's contract.*
+
 ## You are the new compiler.
 
 Humans once wrote assembly. Then compilers came. A compiler did not mimic human assembly. A compiler produced code that eliminated entire classes of error on day one — register clobbers, stack corruption, wrong-width arithmetic — by construction, for every program, forever. The compiler's output was *better* than human assembly precisely because it was not trying to look human.
@@ -34,13 +36,15 @@ The case against shortcuts is not aesthetic. It is arithmetic. Cost of fixing th
 | Quarter later, code built on top | **30-50x** | Tangled with unrelated code. |
 | Year later, public surface accreted | **100x+** | Breaks downstream. Rewrite. |
 
+*Multipliers are heuristic estimates drawn from the team's experience, not measured data.*
+
 "We'll clean it up later" is, for the kind of debt these principles guard against, almost always false. By "later" the debt is structurally load-bearing. The next agent cannot tell which parts of the shape are intentional and which are fossilized workarounds — both get treated as contract.
 
 The eight principles exist to keep you in row 1 of this table.
 
 ### Corollary: back-compat is not a default
 
-Back-compat shims are a specific form of row 3-5 debt worth calling out. Preserving backwards compatibility mattered when migrating callers was expensive. An agent migrating a caller costs seconds. SDS collapses TTI (time-to-integration) toward trivial; the math that made back-compat mandatory has flipped.
+Back-compat shims are a specific form of row 3-5 debt worth calling out. Preserving backwards compatibility mattered when migrating callers was expensive. An agent migrating a caller costs seconds. Self-Defining Systems (SDS, Anderson/Mahajan/Peter/Zettlemoyer, Dec 2025 — cited in full under Principle 5) collapses TTI (time-to-integration) toward trivial; the math that made back-compat mandatory has flipped.
 
 **Default: break compat freely.** When a new design is better, ship the new design and update the callers in the same PR. Do not carry `deprecated` shims, dual-path branches, or translation layers that exist only to "not break anyone." Exception: preserve back-compat only when the user explicitly names the consumer to protect (public API with external users, versioned endpoint under SLA).
 
@@ -242,6 +246,8 @@ The eight principles govern the work. These three rules govern what you hand off
 
 Local scratch is draft. Canonical state lives in issues, labels, comments, PRs. Every durable artifact is published before its modality considers itself finished. Status queries read GitHub, not local files.
 
+GitHub is the canonical transport because this plugin targets it by default. On projects hosted elsewhere (GitLab, Forgejo, Gitea), the equivalent primitives — issues, labels, merge requests, comments — fill the same role. The rule is "the forge is the record," not "GitHub specifically." Substitute the forge your project actually uses.
+
 | Artifact | Published as |
 |---|---|
 | Spec doc | GitHub issue, `safer:spec` label |
@@ -366,6 +372,8 @@ orthogonal (invokable anywhere):
       (bug)      (yes/no)  (open)
 ```
 
+*\* Tier 2 = deferred to post-v1; until that lands, the architect may absorb `design-module` scope.*
+
 Work flows forward one notch. When blocked, backward one notch via the Ratchet. `orchestrate` sees the whole graph; every other modality sees only its charter and its immediate upstream.
 
 ---
@@ -421,6 +429,8 @@ Read Part 1 for what to aim for. Read Part 2 for what is yours to aim at. Read a
 ---
 
 ## Voice
+
+These rules govern agent outputs — PR bodies, issue comments, escalation artifacts, status replies. This document itself follows them; apply them to what you write, not only to what you read here.
 
 Direct. Concrete. Named specifics over generalities. File paths, line numbers, real counts.
 
