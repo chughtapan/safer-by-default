@@ -70,6 +70,8 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Example.** Instead of writing a test that asserts `orderId !== userId`, brand both: `type OrderId = string & { __brand: "OrderId" }`, `type UserId = string & { __brand: "UserId" }`. The compiler now rejects every site that would confuse them. The test is redundant because the confusion is unrepresentable.
 
+**Corollary.** *Tests exist for constraints the type system could not encode.* Move the encodable ones into types first; the residue is what testing is for.
+
 ---
 
 ## 2. Validate at every boundary — *Schemas where data enters; types inside*
