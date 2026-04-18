@@ -115,8 +115,8 @@ Every row below is a fork where the agent will feel pulled toward the human-era 
 | Non-critical UI surface | Broad Playwright coverage "to be safe" | Component-level tests; skip E2E (Principle 6: scope the ladder to <N critical flows) |
 | Coverage threshold as a CI gate | `jest --coverage --coverageThreshold` set to 80% | Report coverage as a diagnostic artifact; never gate CI on a percentage (Goodhart; Inozemtseva & Holmes ICSE 2014) |
 | Coverage report flags a gap in a module | Write tests until the number moves | Investigate: dead code? missing path? unreachable branch? Act on the cause, not the metric |
-| Mutation testing on a critical module (auth, billing, parsing) | Skip, or run it everywhere | `@stryker-mutator/core` + `@stryker-mutator/typescript-checker`, opt-in per glob of named critical modules |
-| Mutation testing repo-wide | Run Stryker over every file | Scope Stryker to the critical-module glob only; compute budget is a Principle 6 constraint |
+| Mutation testing on a critical module (auth, billing, parsing) | Skip, or treat the tool as opt-in | Stryker is installed by default at setup time; scope its glob to the named critical modules (or to full `src/**` if none is named yet) |
+| Mutation testing repo-wide | Run Stryker over every file without filter | Scope Stryker to the critical-module glob when one exists; fall back to full `src/**` only when no critical module has been named — compute budget is a Principle 6 constraint |
 
 The compression math: each full version costs seconds more to type. Each one removes one class of runtime bug. The shortcut's savings compound into next-session debt; the full version's savings compound into no-bug-ever.
 

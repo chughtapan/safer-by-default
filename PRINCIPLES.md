@@ -74,7 +74,7 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Example.** Instead of writing a test that asserts `orderId !== userId`, brand both: `type OrderId = string & { __brand: "OrderId" }`, `type UserId = string & { __brand: "UserId" }`. The compiler now rejects every site that would confuse them. The test is redundant because the confusion is unrepresentable.
 
-**Corollary.** *Tests exist for constraints the type system could not encode.* Move the encodable ones into types first; the residue is what testing is for.
+**Corollary.** *Tests exist for constraints the type system could not encode.* Move the encodable ones into types first; the residue is what testing is for. The testing *tooling* (fast-check, testcontainers, Stryker, Playwright) is installed by default at setup time; the residual question is *what* to test with each, not *whether* to install the tool.
 
 ---
 
