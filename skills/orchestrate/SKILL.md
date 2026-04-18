@@ -478,7 +478,74 @@ Record the returned job id on the parent epic (comment) so the next operator can
    - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
 
 5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`).
-6. **Auto-dispatch next sub-task.** If capacity exists (fewer active teammates than the configured cap) and the next sub-issue in dependency order has upstream deps at `done`, run **Step 5c.3 and Step 5c.4**: create the sub-issue now if the decomposition row still says `#TBD`, then dispatch a teammate via `TeamCreate` + `Agent` with `team_name` per Step 5a. Never standalone subagent; never in-session `Skill`.
+6. **Auto-dispatch pending work (work-queue scan).** The prior steps react to state the loop already knows about. Step 6 is the proactive scan: enumerate pending sub-issues across every repo this team serves, filter out the ones that are already in flight, prioritize what is left, and dispatch up to the per-tick cap. Without this step the orchestrator idles between user prompts even when work is queued. Step 6 is mandatory once a team is installed.
+
+**Step 6a — enumerate pending work.** Scan every repo this team watches (`~/.claude/teams/<team-name>/config.json` carries `repos: []`; fall back to the current repo if the field is absent). For each, list open sub-issues whose labels name a dispatchable modality:
+
+```bash
+for repo in $(jq -r '.repos[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/null || echo "$REPO"); do
+  gh issue list --repo "$repo" --state open --limit 200 \
+    --json number,title,labels,url,body \
+    --jq '.[] | select(.labels | map(.name) | any(test("^safer:(implement-(junior|senior|staff)|verify|spike|research|spec)$")))'
+done > /tmp/orch-queue.jsonl
+```
+
+Filter the queue in-process:
+
+- Drop any row whose title or body references a teammate already in `config.json` `.members[].name` (already in flight).
+- Drop any row that already has the idempotency marker (`<!-- orchestrate:dispatched teammate=<name> at=<iso> -->`) comment posted within the last 30 minutes (re-entrance guard against a team-lead crash mid-tick).
+- Drop any row whose parent epic (from `## Parent` or `Parent: #N` in the body) has a linked open PR authored by the dispatching team (somebody is on it).
+
+The surviving rows are the candidate queue. Record the count (`queue_len`) for the log line in 6b.
+
+**Step 6b — compute capacity.** Pane ceiling is 20 (empirical; tmux throws around 24 on default kernels). Count live panes once per tick:
+
+```bash
+live_panes=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null | wc -l)
+pane_ceiling=20
+spare=$(( pane_ceiling - live_panes ))
+per_tick_cap=3
+budget=$(( spare < per_tick_cap ? spare : per_tick_cap ))
+```
+
+If `budget <= 0`: log `at capacity: panes=$live_panes, queue_len=$queue_len, skip dispatch`. Skip to the next tick. The cap of 3 new dispatches per tick is hard — do not raise it even when `spare > 3`, so a single tick never over-saturates the team.
+
+**Step 6c — prioritize pending.** Sort the surviving candidates by tier, then by parent-epic decomposition order within a tier. The four tiers, highest first:
+
+1. **Blocker-level** — sub-issue is on a parent epic's critical path AND is currently at label `review`. These gate downstream dispatches; unblocking them has the highest leverage.
+2. **Spike or verify** — these unblock downstream implementation (spike answers a go/no-go; verify finalizes a PR).
+3. **Implement-\*** — ordered by the parent epic's decomposition table (not arbitrary).
+4. **Research** — long-running, rarely merge-blocking.
+
+Within a tier, break ties by oldest `createdAt`. Do not invent additional heuristics; the four tiers are the ceiling of complexity for this step.
+
+**Step 6d — dispatch one teammate per candidate, up to `budget`.** For each candidate in priority order, look up the modality from the `safer:<modality>` label and dispatch using the inline template for that modality (see *Per-modality dispatch prompt templates* below). Each dispatch:
+
+- Uses `TeamCreate` (if the team does not exist) + `Agent` with `team_name` and a unique teammate `name` (e.g., `<modality>-<issue-number>`).
+- Fills the template placeholders `{ISSUE_URL}`, `{PARENT_URL}`, `{ACCEPTANCE}`, `{BRANCH_HINT}` from the sub-issue body.
+- Passes `"source": "orchestrate-auto-dispatch"` in the teammate prompt header so the audit trail is visible.
+- Never uses standalone `Agent` without `team_name`. Never invokes the modality via in-session `Skill`.
+
+Stop iterating the moment any of these fire: `budget` reaches 0, the Agent tool returns `"no space for new pane"` (ceiling hit mid-tick), or the candidate queue is empty.
+
+**Step 6e — assign tracking (idempotency).** Immediately after each successful dispatch, post the idempotency marker as a sub-issue comment:
+
+```bash
+gh issue comment "$N" --repo "$REPO" --body "<!-- orchestrate:dispatched teammate=$TEAMMATE_NAME at=$(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
+```
+
+Next tick's Step 6a filter checks for this marker and skips. The 30-minute window is deliberate: if a teammate crashed before producing an artifact, the sub-issue is eligible for re-dispatch on the next tick past that window.
+
+**Failure modes Step 6 handles (fail-closed).** Every case below is a skip, not a fix.
+
+- **Pane ceiling hit mid-dispatch.** Catch `"no space for new pane"` from the Agent tool. Log `pane_ceiling_hit: queued=<remaining>`. Break the dispatch loop; the remaining queue defers to the next tick.
+- **Sub-issue already has an open PR.** Skip. The implementer is already working; re-dispatching would fork.
+- **Sub-issue has a teammate in `config.json`.** Skip. Same reason.
+- **Idempotency marker posted within the last 30 minutes.** Skip.
+- **Label-to-modality mismatch.** If the sub-issue carries two `safer:*` modality labels, or a `safer:*` label not in the catalog, log `label_modality_mismatch: issue=#N labels=<list>` and skip. Never guess a modality.
+- **`safer:implement-staff` without a `plan-approved` parent epic.** Skip. Staff-tier work requires an architect sign-off; auto-dispatching without one is a Ratchet violation.
+- **`safer:verify` on a PR that is not `MERGEABLE state=CLEAN`.** Skip. Verify runs against a known-green PR; running it earlier produces noise that has to be re-run anyway.
+- **Parent epic is missing or closed.** Skip. A sub-issue with no live parent is an orchestration artifact to be cleaned up by a human, not auto-dispatched.
 
 **What the loop MUST NEVER do.**
 
@@ -500,6 +567,162 @@ Default is `*/2 * * * *` (every 2 minutes) and you should not change it without 
 | Single-modality task | no loop; orchestrate is the wrong skill |
 
 **Cancel.** Keep the job id from `CronCreate`. To stop the loop: `CronDelete({ jobId: "<id>" })`. Also run this in Phase 7 at close-out (see below).
+
+### Per-modality dispatch prompt templates
+
+Step 6d dispatches by filling the template that matches the sub-issue's `safer:<modality>` label. Every template is a copy-pasteable block. Every template carries the `source: orchestrate-auto-dispatch` header so a post-hoc audit can separate auto-dispatched work from human-driven dispatches. Every template ends with the mandatory status-marker instruction.
+
+Placeholders every template uses:
+- `{ISSUE_URL}` — full URL of the sub-issue being dispatched.
+- `{PARENT_URL}` — full URL of the parent epic.
+- `{ACCEPTANCE}` — the `Acceptance:` line verbatim from the sub-issue body.
+- `{BRANCH_HINT}` — suggested branch name (`<modality-short>/<issue-number>-<slug>`), or empty if the modality does not produce a branch.
+
+#### implement-junior
+
+```
+source: orchestrate-auto-dispatch
+You are a teammate on team `{TEAM}` invoking `/safer:implement-junior`.
+
+Sub-issue: {ISSUE_URL}
+Parent epic: {PARENT_URL}
+Branch: {BRANCH_HINT}
+
+Read PRINCIPLES.md and skills/implement-junior/SKILL.md at the plugin root.
+Read the sub-issue and parent epic before touching code.
+
+Acceptance: {ACCEPTANCE}
+
+Scope is ONE module. If you need to touch a second module, stop and escalate.
+Open a draft PR titled `[impl-junior] ...`. Move the sub-issue to `review`.
+Emit a status marker (DONE / DONE_WITH_CONCERNS / ESCALATED / BLOCKED / NEEDS_CONTEXT)
+on your final output and SendMessage the team lead with the PR URL.
+```
+
+#### implement-senior
+
+```
+source: orchestrate-auto-dispatch
+You are a teammate on team `{TEAM}` invoking `/safer:implement-senior`.
+
+Sub-issue: {ISSUE_URL}
+Parent epic: {PARENT_URL}
+Branch: {BRANCH_HINT}
+
+Read PRINCIPLES.md and skills/implement-senior/SKILL.md at the plugin root.
+Load the architect plan the parent epic references. No plan, escalate.
+
+Acceptance: {ACCEPTANCE}
+
+Scope is cross-module WITHIN the plan. Do not introduce new modules, new public
+surface outside the plan, or new deps. `safer-diff-scope --head HEAD` must report
+`senior`. Open a draft PR titled `[impl-senior] ...` with a plan-anchor table.
+Status marker + SendMessage the team lead with the PR URL.
+```
+
+#### implement-staff
+
+```
+source: orchestrate-auto-dispatch
+You are a teammate on team `{TEAM}` invoking `/safer:implement-staff`.
+
+Sub-issue: {ISSUE_URL}
+Parent epic: {PARENT_URL}
+Branch: {BRANCH_HINT}
+
+PRECONDITION: the parent epic carries label `plan-approved`. If not, STOP and
+escalate — staff-tier work without architect sign-off is a Ratchet violation.
+
+Read PRINCIPLES.md and skills/implement-staff/SKILL.md at the plugin root.
+Read the approved spec + architect plan the parent epic references.
+
+Acceptance: {ACCEPTANCE}
+
+You may introduce new modules, new public interfaces, and new deps — all of
+which must trace to the approved plan. Open a draft PR titled `[impl-staff] ...`.
+Status marker + SendMessage the team lead with the PR URL.
+```
+
+#### verify
+
+```
+source: orchestrate-auto-dispatch
+You are a teammate on team `{TEAM}` invoking `/safer:verify`.
+
+Sub-issue: {ISSUE_URL}
+Parent epic: {PARENT_URL}
+
+PRECONDITION: the PR under test is `MERGEABLE state=CLEAN`. If not, STOP;
+this tick's auto-dispatch should not have picked you up.
+
+Read PRINCIPLES.md and skills/verify/SKILL.md at the plugin root.
+
+Acceptance: {ACCEPTANCE}
+
+Run the repo test suite and lint. Post a ship/hold verdict as a PR comment
+naming each acceptance criterion. Do NOT apply fixes — hand back if anything
+fails. Status marker + SendMessage the team lead with the verdict URL.
+```
+
+#### spike
+
+```
+source: orchestrate-auto-dispatch
+You are a teammate on team `{TEAM}` invoking `/safer:spike`.
+
+Sub-issue: {ISSUE_URL}
+Parent epic: {PARENT_URL}
+Branch: {BRANCH_HINT}  (throwaway — do NOT merge)
+
+Read PRINCIPLES.md and skills/spike/SKILL.md at the plugin root.
+
+Acceptance: {ACCEPTANCE}
+
+Answer one feasibility question with throwaway code. Publish a go/no-go
+writeup as a sub-issue comment. The branch stays unmerged. Status marker
++ SendMessage the team lead with the writeup URL.
+```
+
+#### research
+
+```
+source: orchestrate-auto-dispatch
+You are a teammate on team `{TEAM}` invoking `/safer:research`.
+
+Sub-issue: {ISSUE_URL}
+Parent epic: {PARENT_URL}
+
+Read PRINCIPLES.md and skills/research/SKILL.md at the plugin root.
+
+Acceptance: {ACCEPTANCE}
+
+Run an iterative hypothesis loop; post one comment per iteration on the
+sub-issue as your research ledger. Produce no code. Status marker +
+SendMessage the team lead with the ledger URL when the loop converges
+or the budget runs out.
+```
+
+#### spec
+
+```
+source: orchestrate-auto-dispatch
+You are a teammate on team `{TEAM}` invoking `/safer:spec`.
+
+Sub-issue: {ISSUE_URL}
+Parent epic: {PARENT_URL}
+
+Read PRINCIPLES.md and skills/spec/SKILL.md at the plugin root.
+
+Acceptance: {ACCEPTANCE}
+
+Produce a spec with goals, non-goals, invariants, and explicit acceptance
+criteria. No architecture, no libraries, no code. Publish as a comment on
+the parent epic (or sub-issue body per the skill's publication rule).
+Transition the sub-issue to `review`. Status marker + SendMessage the
+team lead with the spec URL.
+```
+
+Templates are intentionally terse. They do not replicate the full modality charter; they point the teammate at `SKILL.md` and carry the scope contract that differs per modality. If a template grows beyond ~25 lines, the modality has shifted; revisit the template rather than expanding it in-place.
 
 ### Phase 6 — Backtrack
 
