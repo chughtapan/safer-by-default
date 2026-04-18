@@ -314,6 +314,99 @@ Then cascade forward per modality lifecycle:
 - `implement-*` → `plan-approved` → `implementing` (the PR is merged) → `verifying` (verify sub-task runs) → `done`.
 - `investigate` / `spike` / `research` → `plan-approved` → `done` (these produce writeups, not code).
 
+Once accepted, run the four steps below in order. These are the canonical gate-and-dispatch procedure; the Phase 5d auto-monitor calls into them (step 5 → Step 5c.1–5c.2; step 6 → Step 5c.3–5c.4).
+
+**Step 5c.1 — Post the gating comment and close the sub-issue.**
+
+The gating comment is human-visible proof of the state transition. Never close a sub-issue without it; a silent close strands the next reader.
+
+```bash
+# $N = current sub-issue, $NEXT_N = next sub-issue number (or "TBD" if not yet created),
+# $NEXT_MOD = next modality, $PARENT = parent epic number.
+gh issue comment "$N" --body "Gated: acceptance met. Transitioning to \`plan-approved\` and closing.
+
+Next: #${NEXT_N} (\`safer:${NEXT_MOD}\`) — see parent epic #${PARENT} decomposition table."
+gh issue close "$N" --reason completed
+```
+
+**Step 5c.2 — Update the parent epic's Progress section.**
+
+After every sub-issue close, rewrite the `## Progress` section at the end of the parent epic body. This keeps the epic the single source of truth a cold-start reader can open and understand without scrolling through comments.
+
+Shape:
+- Markdown checkbox list: `- [x]` for closed sub-issues, `- [ ]` for open.
+- Each row: sub-issue number linked (full URL) + short title + one-line status note.
+- Trailing line: `Last updated: <ISO8601>` (UTC, from `date -u +%Y-%m-%dT%H:%M:%SZ`).
+
+Procedure: read the current body, strip any existing `## Progress` section, append the rebuilt one, write it back. Copy-paste template:
+
+```bash
+# $PARENT = parent epic number; $REPO = owner/name from preamble.
+TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+gh issue view "$PARENT" --json body -q .body > /tmp/epic-body.md
+
+# Strip prior Progress section (everything from "## Progress" to EOF).
+awk '/^## Progress$/{exit} {print}' /tmp/epic-body.md > /tmp/epic-body.trimmed
+
+# Rebuild Progress from the decomposition rows on the parent epic.
+# For each sub-issue referenced in the decomposition table, emit a checkbox row.
+{
+  echo ""
+  echo "## Progress"
+  echo ""
+  gh issue list --repo "$REPO" --search "in:body #${PARENT}" \
+    --state all --json number,title,url,state \
+    --jq '.[] | "- [\(if .state=="CLOSED" then "x" else " " end)] [#\(.number)](\(.url)) \(.title) — \(.state|ascii_downcase)"'
+  echo ""
+  echo "Last updated: ${TS}"
+} >> /tmp/epic-body.trimmed
+
+gh issue edit "$PARENT" --body-file /tmp/epic-body.trimmed
+```
+
+If the decomposition table has richer status notes ("PR #42 merged", "verify green"), prefer those over the raw GitHub state. The jq form above is the fallback when no richer note is available.
+
+**Step 5c.3 — Create the next sub-issue if the decomposition row is `#TBD`.**
+
+Read the parent epic's decomposition table. Find the row whose `Depends on` column is the just-closed sub-issue. If its `Sub-issue` column is `#TBD` (or blank), create that sub-issue now using the same title/body template Phase 4 used for prior rows, then edit the parent body to replace `#TBD` with the new issue's URL.
+
+```bash
+# $NEXT_MOD, $NEXT_TITLE, $NEXT_ACCEPTANCE, $NEXT_DEPS come from the decomposition row.
+NEXT_URL=$(gh issue create \
+  --title "[safer:${NEXT_MOD}] ${NEXT_TITLE}" \
+  --body "$(cat <<EOF
+Parent: #${PARENT}
+Modality: ${NEXT_MOD}
+Depends on: ${NEXT_DEPS}
+Acceptance: ${NEXT_ACCEPTANCE}
+
+## Status
+\`planning\`
+EOF
+)" \
+  --label "safer:${NEXT_MOD},planning")
+NEXT_N=$(basename "$NEXT_URL")
+# Replace the #TBD placeholder in the parent epic body with the real URL.
+sed -i "0,/#TBD/s|#TBD|${NEXT_URL}|" /tmp/epic-body.trimmed
+gh issue edit "$PARENT" --body-file /tmp/epic-body.trimmed
+```
+
+If the row does not exist at all (the decomposition table is shorter than the work actually required), escalate via Phase 6 — this is the `Plan gap` case. Do not invent new rows.
+
+**Step 5c.4 — Dispatch the next teammate.**
+
+Use `TeamCreate` + `Agent` with `team_name` per Phase 5a. Never standalone subagent; never in-session `Skill`. The teammate prompt is the Phase 5a template with the newly-created sub-issue URL filled in.
+
+Capacity check: if the team roster already holds the configured max active teammates, skip the dispatch and leave the sub-issue in `planning`. The next auto-monitor tick retries once a seat frees up.
+
+**Guardrails for the whole 5c.1–5c.4 sequence.**
+
+- Never auto-close a sub-issue whose artifact is missing or ambiguous. The artifact must be a specific comment, PR, or label change already published on the sub-issue. "Teammate said DONE in chat" is not an artifact.
+- Never skip the human-visible gating comment in 5c.1. The comment is what proves the gate fired; without it, a future reader cannot reconstruct the decision.
+- Never auto-dispatch in 5c.4 without an available teammate pane. Over-cap is how the loop starts killing work it should not touch.
+- Never invent decomposition rows in 5c.3. `#TBD` means "orchestrator knew this row would exist"; no row means "something is wrong with the decomposition" — route through Phase 6.
+- If the auto-monitor calls any of these steps and any guardrail fails, the step is skipped and deferred to the next human-driven tick. Ambiguity is skipped, not resolved.
+
 If rejected:
 - State the specific failure against the acceptance criterion.
 - Transition `review` → `planning` (the modality revises).
@@ -365,8 +458,8 @@ Record the returned job id on the parent epic (comment) so the next operator can
    - Never delete or kill a teammate whose sub-issue is still `planning`, `implementing`, `review`, or `verifying`.
    - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
 
-5. **Auto-gate clean PRs.** If a draft PR has tests green and its sub-issue's acceptance artifact is a review-ready comment (not a PR-side review), post the transition: `safer-transition-label --issue $N --from review --to plan-approved` and mark the PR ready. Skip if tests red or if the acceptance artifact requires human judgment.
-6. **Auto-dispatch next sub-task.** If capacity exists (fewer active teammates than the configured cap) and the next sub-issue in dependency order has label `planning` with all upstream deps at `done`, dispatch per Step 5a.
+5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`).
+6. **Auto-dispatch next sub-task.** If capacity exists (fewer active teammates than the configured cap) and the next sub-issue in dependency order has upstream deps at `done`, run **Step 5c.3 and Step 5c.4**: create the sub-issue now if the decomposition row still says `#TBD`, then dispatch a teammate via `TeamCreate` + `Agent` with `team_name` per Step 5a. Never standalone subagent; never in-session `Skill`.
 
 **What the loop MUST NEVER do.**
 
