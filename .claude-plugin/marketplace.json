@@ -1,0 +1,31 @@
+{
+  "name": "safer-by-default",
+  "owner": {
+    "name": "Tapan Chugh"
+  },
+  "metadata": {
+    "description": "Modality-based Claude Code skills that recalibrate agents toward compiler-grade craft and scope discipline."
+  },
+  "plugins": [
+    {
+      "name": "safer-by-default",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "13 skills (orchestrate, spec, architect, implement-{junior,senior,staff}, investigate, spike, research, review-senior, verify, typescript, setup) plus 10 bin/ utilities. Composes with eslint-plugin-agent-code-guard (lint floor) and zapbot (publish).",
+      "author": {
+        "name": "Tapan Chugh"
+      },
+      "homepage": "https://github.com/chughtapan/safer-by-default",
+      "repository": "https://github.com/chughtapan/safer-by-default",
+      "license": "MIT",
+      "keywords": [
+        "claude-code",
+        "claude-skills",
+        "agent-discipline",
+        "scope-discipline",
+        "typescript",
+        "eslint"
+      ]
+    }
+  ]
+}
