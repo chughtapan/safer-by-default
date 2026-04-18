@@ -72,7 +72,7 @@ echo "  ok  gh authenticated; $REPO accessible"
 # --- 1. Ensure required labels exist ---
 echo "── orchestrate-pipeline: ensure labels ──"
 LABELS_TO_ENSURE=(
-  "safer:architect" "safer:investigate"
+  "safer:architect" "safer:investigate" "safer:implement-junior"
   "planning" "review" "plan-approved" "done" "triaged"
 )
 for L in "${LABELS_TO_ENSURE[@]}"; do
@@ -181,6 +181,71 @@ for pair in "planning:review" "review:done"; do
     FAILED=$((FAILED + 1))
   fi
 done
+
+# --- 5b. Step 5 → Step 6 auto-dispatch handoff (enumerate + marker filter) ---
+# sbd#66/H1 acceptance: the auto-gate step (5) hands off to the work-queue scan
+# (6); cover that seam live against gh. Creates a pending implement-junior
+# sub-issue, runs Step 6a's enumerate query, confirms the row appears, posts
+# the Step 6d idempotency marker as a comment, re-runs the filter and confirms
+# the row is now dropped.
+echo "── orchestrate-pipeline: step 5 → step 6 auto-dispatch enumerate + filter ──"
+SUB3_OUT=$("$BIN/safer-publish" \
+  --kind issue \
+  --title "[safer:implement-junior] integration sub-3 $TS_SUFFIX" \
+  --body "Integration test sub-3. Parent: #$EPIC_NUM
+Acceptance: enumerate finds this issue; marker filter drops it." \
+  --parent "$EPIC_NUM" \
+  --labels "safer:implement-junior,planning" \
+  --repo "$REPO")
+SUB3=$(echo "$SUB3_OUT" | grep -oE '[0-9]+$')
+if [ -z "$SUB3" ]; then
+  echo "  FAIL: sub-3 parse: $SUB3_OUT"
+  FAILED=$((FAILED + 1))
+else
+  CREATED_ISSUES+=("$SUB3")
+  echo "  ok  created sub-3 #$SUB3 (safer:implement-junior, planning)"
+  PASSED=$((PASSED + 1))
+
+  # Step 6a enumerate: exactly the jq the skill snippet pins.
+  MODALITY_REGEX='^safer:(implement-(junior|senior|staff)|verify|spike|research|spec)$'
+  ENUM_JSON=$(gh issue list --repo "$REPO" --state open --limit 200 \
+    --json number,title,labels,url,body \
+    --jq ".[] | select(.labels | map(.name) | any(test(\"$MODALITY_REGEX\"))) | .number" \
+    2>/dev/null | grep -x "$SUB3" || true)
+  if [ "$ENUM_JSON" = "$SUB3" ]; then
+    echo "  ok  step 6a enumerate picks up pending sub-3"
+    PASSED=$((PASSED + 1))
+  else
+    echo "  FAIL: step 6a enumerate did not return #$SUB3"
+    FAILED=$((FAILED + 1))
+  fi
+
+  # Step 6d: post the idempotency marker as a comment (simulating a dispatch
+  # reservation). Step 6a filter should then drop the candidate.
+  MARKER_BODY="<!-- orchestrate:dispatched teammate=impl-junior-$SUB3 at=$(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
+  if gh issue comment "$SUB3" --repo "$REPO" --body "$MARKER_BODY" >/dev/null 2>&1; then
+    echo "  ok  step 6d marker posted on sub-3"
+    PASSED=$((PASSED + 1))
+  else
+    echo "  FAIL: could not post step 6d marker"
+    FAILED=$((FAILED + 1))
+  fi
+
+  # Step 6a marker filter: per-candidate comment scan. Pins the fix for I1 —
+  # reading --json body missed comment-based markers; per-candidate
+  # --json comments catches them.
+  FRESH_MARKER=$(gh issue view "$SUB3" --repo "$REPO" --json comments \
+    --jq '.comments[].body
+      | capture("<!-- orchestrate:dispatched teammate=[A-Za-z0-9_-]+ at=(?<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z) -->")
+      | .ts' 2>/dev/null | sort | tail -1)
+  if [ -n "$FRESH_MARKER" ]; then
+    echo "  ok  step 6a filter finds marker on sub-3 (would skip re-dispatch)"
+    PASSED=$((PASSED + 1))
+  else
+    echo "  FAIL: step 6a filter could not read marker via --json comments"
+    FAILED=$((FAILED + 1))
+  fi
+fi
 
 # --- 6. Telemetry ---
 echo "── orchestrate-pipeline: emit telemetry ──"
