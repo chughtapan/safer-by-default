@@ -74,7 +74,21 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Example.** Instead of writing a test that asserts `orderId !== userId`, brand both: `type OrderId = string & { __brand: "OrderId" }`, `type UserId = string & { __brand: "UserId" }`. The compiler now rejects every site that would confuse them. The test is redundant because the confusion is unrepresentable.
 
-**Corollary.** *Tests exist for constraints the type system could not encode.* Move the encodable ones into types first; the residue is what testing is for.
+### Corollary: tests are the residual, and the residual has a shape
+
+*Tests exist for constraints the type system could not encode.* Move the encodable constraints into types first; the residue is what testing is for. That is the easy part. The shape of the residue is what doctrine has to name.
+
+**1. If the function has a nameable algebraic property, the residual is a property, not an example.** Roundtrip, idempotence, invariant, oracle agreement — these are the four shapes to look for. A `fast-check` property is cheap to write in the agent era; an example test that asserts one hand-picked input is a compression of the same information, with lower coverage. Default to the property when a property exists.
+
+**2. Coverage percentage is a diagnostic, never a CI gate.** Inozemtseva & Holmes (ICSE 2014) showed that coverage % correlates poorly with mutation-detection ability once you control for test count. Gating CI on 80% coverage is Goodhart-broken — it optimizes for line execution, not for the tests being tests. Report coverage as a comment or artifact; act on the *cause* of a gap (dead code, missing path, unreachable branch), not on the number.
+
+**3. Mutation testing is the meta-check on the residual.** Coverage answers "did any test touch this line." Mutation answers "does any test fail when this line's behavior changes." For a critical module (auth, billing, parsing, crypto, webhook signing), Stryker + `@stryker-mutator/typescript-checker` is the only check that distinguishes a test from a decoration. Gate CI on it for the critical glob. Scope outside that glob is a Principle 6 (compute budget) call per repo.
+
+**4. If tests exist, CI runs them.** A test file that CI never executes is decoration. A repo that runs `lint` in CI but not `test` is shipping a test suite that has not been verified to pass since the last developer ran it locally. The minimum floor for any repo with a test suite is a CI job that executes it.
+
+**5. Mocks at the integration boundary are a lie.** This is Principle 2 applied to the test layer. An integration test that mocks the database is asserting that your code works against your mock, not against the real thing. Use `testcontainers` or the real dependency; reserve mocks for unit tests where the dependency is outside the boundary under test.
+
+**Per-repo judgement, not universal default.** Installing every tool everywhere is the mirror-image error of installing nothing. A linter does not need `testcontainers`. A Docker-less CI does not need Playwright. Every repo with pure functions needs `fast-check`; every repo with a critical module needs Stryker gating CI; every repo with a DB/cache/queue needs `testcontainers` against the real client. The default is "ask what this repo actually has," not "install all five."
 
 ---
 
