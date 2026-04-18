@@ -103,6 +103,20 @@ Every row below is a fork where the agent will feel pulled toward the human-era 
 | Test double for an external service | `vi.mock("./stripe")` in integration test | Real stripe test mode, or a contract test against a recorded cassette |
 | Positive integer | `function (n: number)` with runtime check | `function (n: PositiveInt)` where `PositiveInt` is branded |
 | Non-empty array | `arr: T[]` with `if (arr.length === 0)` guard | `arr: NonEmptyArray<T>` |
+| Pure function with a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement) | One example-based happy-path test | Happy path + `fast-check` property encoding the invariant |
+| Pure function with no nameable algebraic property | "Write a property test; think of something" | Example tests covering boundary and each error path; skip property-based |
+| Parser or handler accepting untrusted external input | Example tests for three known-bad inputs | Example tests + `fast-check` property + `Jazzer.js` via `@jazzer.js/jest-runner` when the threat model includes adversarial input |
+| Parser with no adversarial threat model | Reach for `Jazzer.js` anyway | Example tests + `fast-check`; skip the fuzzer (Principle 6: compute is budget) |
+| Test for code that reads a real database | `vi.mock("pg")` or an in-memory stand-in | `testcontainers-node` + `@testcontainers/postgresql`, shared-per-suite lifecycle, dynamic ports |
+| Test for code that reads a real cache or queue | In-memory fake for redis/kafka/rabbitmq | `testcontainers-node` + `@testcontainers/redis` (or matching module); fake only behind a schema-checked contract |
+| Two services in the same repo cross a shape boundary | Hand-written DTO types duplicated on both sides | Generate JSON Schema from the Zod/Effect schema; gate CI on `json-schema-diff` against the last-published schema |
+| Cross-service boundary where a consumer is external or under SLA | Best-effort schema doc in a README | `@pact-foundation/pact` (Pact V4) contract test published to the broker |
+| Critical UI flow (auth, checkout, primary CRUD) | "Unit test the React component" | Playwright E2E scoped to that flow; retry policy; screenshot diff off by default |
+| Non-critical UI surface | Broad Playwright coverage "to be safe" | Component-level tests; skip E2E (Principle 6: scope the ladder to <N critical flows) |
+| Coverage threshold as a CI gate | `jest --coverage --coverageThreshold` set to 80% | Report coverage as a diagnostic artifact; never gate CI on a percentage (Goodhart; Inozemtseva & Holmes ICSE 2014) |
+| Coverage report flags a gap in a module | Write tests until the number moves | Investigate: dead code? missing path? unreachable branch? Act on the cause, not the metric |
+| Mutation testing on a critical module (auth, billing, parsing) | Skip, or run it everywhere | `@stryker-mutator/core` + `@stryker-mutator/typescript-checker`, opt-in per glob of named critical modules |
+| Mutation testing repo-wide | Run Stryker over every file | Scope Stryker to the critical-module glob only; compute budget is a Principle 6 constraint |
 
 The compression math: each full version costs seconds more to type. Each one removes one class of runtime bug. The shortcut's savings compound into next-session debt; the full version's savings compound into no-bug-ever.
 
