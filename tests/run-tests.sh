@@ -11,7 +11,26 @@ total_failed=0
 failing_suites=()
 
 shopt -s nullglob
-for t in "$HERE"/test-bin/test-*.sh; do
+
+# Collect suites to run. Unit tests under tests/test-bin/ always run.
+# Integration tests under tests/test-integration/ hit real GitHub, so they
+# are opt-in via SAFER_RUN_INTEGRATION=1 (or the --integration flag).
+run_integration="${SAFER_RUN_INTEGRATION:-0}"
+for arg in "$@"; do
+  case "$arg" in
+    --integration) run_integration=1 ;;
+  esac
+done
+
+suites=("$HERE"/test-bin/test-*.sh)
+if [ "$run_integration" = "1" ]; then
+  suites+=("$HERE"/test-integration/test-*.sh)
+else
+  echo "(integration tests skipped; set SAFER_RUN_INTEGRATION=1 or pass --integration to include them)"
+  echo ""
+fi
+
+for t in "${suites[@]}"; do
   name=$(basename "$t" .sh)
   echo "── $name ──"
   chmod +x "$t" 2>/dev/null || true
