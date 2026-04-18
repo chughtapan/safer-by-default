@@ -4,12 +4,13 @@ version: 0.1.0
 description: |
   Read any published artifact (spec, design doc, PR body, issue comment,
   investigation writeup) with NO prior session context and report on how a
-  cold-start consumer would feel picking it up. Scores five axes (clarity,
-  completeness, actionability, trust, friction) with evidence, emits a
-  SHIP / REVISE / REJECT verdict, and publishes the report back to the
-  artifact's GitHub thread. Use when an artifact is about to be handed off
-  and you want a portability check before the next modality runs. Do NOT
-  use to rewrite the artifact; this is a reading modality, not a writing one.
+  cold-start consumer would feel picking it up. Scores four numeric axes
+  (clarity, completeness, actionability, trust) plus a friction list with
+  evidence, emits a SHIP / REVISE / REJECT verdict, and publishes the report
+  back to the artifact's GitHub thread. Use when an artifact is about to be
+  handed off and you want a portability check before the next modality runs.
+  Do NOT use to rewrite the artifact; this is a reading modality, not a
+  writing one.
 triggers:
   - dogfood this artifact
   - cold start check
@@ -292,15 +293,33 @@ Key property: `PROMPT_EOF` is quoted, so the heredoc does not interpolate any lo
 
 Invoke the `Agent` tool with the prompt. The subagent runs cold. The skill waits for its structured report.
 
-Invocation pattern (exact mechanics depend on the harness's Agent tool):
+Concrete invocation (copy-pasteable — read `$PROMPT` into the `prompt` parameter before calling):
 
 ```
-Agent(prompt=<contents of $PROMPT>, description="Dogfood cold-start read of $ARTIFACT_REF")
+Agent(
+  description="Dogfood cold-start read",
+  subagent_type="general-purpose",
+  prompt="<contents of file at $PROMPT, read with the Read tool and inlined here>"
+)
 ```
+
+Mechanics:
+1. Read the prompt file into a string: `PROMPT_TEXT=$(cat "$PROMPT")` (or use the Read tool on `$PROMPT`).
+2. Pass that string as the `prompt` parameter to a single `Agent` tool call. No other parameters are set; no session history, parent epic, or extra files are attached.
+3. The `description` stays generic ("Dogfood cold-start read") so it leaks no project-specific context into the subagent's bootstrap.
 
 The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file. The subagent is the only reader of the artifact text. That is the architectural enforcement.
 
-Capture the subagent's final reply. It should contain exactly the output-schema markdown between two fences, or the raw markdown with no fencing. Extract the block that starts with `# Dogfood report`.
+Capture the subagent's final reply into `$REPORT_FILE`:
+
+```bash
+REPORT_FILE=$(mktemp)
+# Write the subagent's final reply (the text returned by the Agent tool call) to $REPORT_FILE.
+# The reply should contain the output-schema markdown (either between two fences, or raw).
+# Extract the block starting with "# Dogfood report" and write it to $REPORT_FILE.
+```
+
+`$REPORT_FILE` is the canonical handle used by Phases 5 and 6. Do not re-read the subagent's reply from memory after this point; Phases 5 and 6 operate on the file.
 
 If the subagent returns something that does not match the schema, re-invoke once with a reminder: "Your previous reply did not match the output schema. Emit only the schema block, no prose around it." Do not re-invoke more than once; two failed schema attempts is a "subagent could not produce a valid report" signal and escalates.
 
@@ -342,6 +361,8 @@ esac
 
 The `--file` path prints to stdout unconditionally. Optional orchestrator hand-off only happens if `SAFER_PARENT_ISSUE` is set in the environment, which the orchestrator supplies.
 
+> **`SAFER_PARENT_ISSUE`** is set by `/safer:orchestrate` when it invokes this skill as a sub-task; it holds the orchestrator's parent issue number so the dogfood report can be cross-posted there. When dogfood is invoked standalone (not from orchestrate), the variable is empty and the cross-post is skipped.
+
 ### Phase 7 - Close out
 
 Emit the end event and report the status marker:
@@ -364,7 +385,7 @@ Each stop rule fires on a specific condition. When fired, produce the escalation
 
 1. **Artifact is empty.** The issue body, PR description, or file is empty or whitespace-only. Status: `BLOCKED`. Cause: `ARTIFACT_EMPTY`. Report to caller: the artifact did not carry text; there is nothing to dogfood.
 2. **Artifact is not resolvable.** `gh issue view` or `gh pr view` returns an error, or the file path does not exist. Status: `BLOCKED`. Cause: `ARTIFACT_MISSING`. Include the resolver error in the escalation body.
-3. **Subagent reports prior context leak.** The subagent's friction log includes "the artifact does not carry the context a reader needs" or an equivalent. That is the iron rule firing and is a normal `REVISE` or `REJECT` outcome, not an escalation. No stop rule fires; publish the report.
+3. **Subagent reports prior context leak.** The subagent's friction log includes "the artifact does not carry the context a reader needs" or an equivalent. That is the iron rule firing and is a normal `REVISE` or `REJECT` outcome, not an escalation. No stop rule fires; publish the report. Note: `REVISE` and `REJECT` are normal-completion verdicts for this skill — they map to `DONE_WITH_CONCERNS` (see Completion status), not to `ESCALATED`. The dogfood run itself succeeded; the artifact failed the rubric, and the caller routes the artifact back to its upstream author.
 4. **Subagent could not produce a valid report.** Two invocations failed schema validation. Status: `ESCALATED`. Cause: `SUBAGENT_SCHEMA_FAILURE`. Attach both attempts to the escalation artifact.
 5. **Input argument missing or conflicting.** No `--issue`, `--pr`, or `--file`, or more than one of them set. Status: `NEEDS_CONTEXT`. Cause: `INVALID_INVOCATION`. Ask the caller for a single unambiguous input.
 6. **Implementation instinct.** The skill is about to read the artifact's surrounding project to "help the subagent." That is the Brake firing. Stop, discard whatever extra context was gathered, and dispatch the subagent with the original payload only.
@@ -473,6 +494,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` to Voice. The subagent's report is terse, concrete, and evidence-first. Every score is a number with a quoted phrase or a location. Every friction entry is a specific location and a specific reason. No "this might be improved by," no "I think the clarity could be higher."
+See `PRINCIPLES.md`, Voice section. The subagent's report is terse, concrete, and evidence-first. Every score is a number with a quoted phrase or a location. Every friction entry is a specific location and a specific reason. No "this might be improved by," no "I think the clarity could be higher."
 
 The next agent reading this report is the upstream modality's author, revising. They need to know where to cut and what to add, not to be flattered about what worked. The author is a junior; write for them.
