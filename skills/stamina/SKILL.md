@@ -38,6 +38,75 @@ Read `PRINCIPLES.md` at the plugin root before invoking. Projection onto this mo
 
 Shape sibling: `skills/review-senior/SKILL.md` and `skills/dogfood/SKILL.md`. Stamina is a dispatcher over them, not a superset.
 
+## Dispatch modes
+
+Stamina has two invocation modes depending on whether the invoker can spawn sub-teammates. Resolve the mode before Phase 1.
+
+- **Mode A — standalone or team-lead.** Invoker is the user, an orchestrator, or a team-lead. The `Agent` tool accepts `name` / `team_name` / `mode` parameters. Stamina fans out directly: one `Agent` call per dispatched reviewer, as documented in Phase 2 below. This is the default; all subsequent phase instructions assume it.
+
+- **Mode B — in-team teammate.** Stamina was itself dispatched as a teammate (e.g., a team-lead ran `Agent({ name: "stamina-...", team_name: "..." })`). The harness disables `name` / `team_name` / `mode` on the `Agent` tool for non-lead teammates, so stamina cannot spawn sub-reviewers. Fan-out is impossible from inside the team. Escalate the dispatch plan back to the team-lead via `SendMessage` and stop; the team-lead spawns the reviewers and reports consensus back to the original caller.
+
+### Detection
+
+Do not branch on invocation metadata. Branch on observed tool behavior:
+
+1. Resolve the dispatch set per Phase 1 as usual.
+2. Attempt the first reviewer dispatch (Phase 2 shape, one `Agent` call with `team_name`).
+3. If `Agent` returns a rejection containing the string `teammates cannot spawn teammates` (or the functional equivalent: any refusal tied to `name` / `team_name` / `mode` unavailability in this context), switch to Mode B immediately. Do not retry. Do not strip `team_name` and retry without it; an un-named dispatch loses the telemetry and aggregation handles stamina relies on.
+4. Otherwise (the call dispatched), continue Phase 2 for the remaining reviewers.
+
+The detection is one-shot. Once you are in Mode B for this invocation, all remaining reviewers route through the team-lead; do not re-probe per reviewer.
+
+### Mode B — escalation to team-lead
+
+In Mode B, stamina produces no consolidated GitHub comment and does not transition labels. Those artifacts are the team-lead's responsibility after it completes the fan-out stamina described. Stamina's deliverable in Mode B is the escalation message plus a status marker.
+
+Send exactly one message, shape below. Copy-pasteable template:
+
+```
+SendMessage({
+  to: "team-lead",
+  summary: "stamina Mode B: team-lead must dispatch N reviewers",
+  message: """
+STATUS: ESCALATED (stamina Mode B — in-team teammate cannot spawn sub-teammates)
+
+Target: <PR or sub-issue URL>
+Mode: <plan|pr>
+N: <N> (source: <table|user-override>; ceiling: <4|3 degraded>)
+
+Dispatch plan (team-lead: spawn each via Agent + team_name, in parallel):
+
+1. Role: <acceptance-vs-diff>
+   Skill: </safer:review-senior>
+   Prompt: |
+     <verbatim Phase-2 prompt, self-contained: target URL, acceptance criteria,
+      role, status-marker requirement>
+
+2. Role: <cold-start-read>
+   Skill: </safer:dogfood>
+   Prompt: |
+     <verbatim Phase-2 prompt>
+
+<... one entry per reviewer, up to N ...>
+
+Consensus rule: apply the Phase-4 aggregation table verbatim (All DONE → DONE;
+All DONE/DONE_WITH_CONCERNS with ≥1 concern → DONE_WITH_CONCERNS; any
+ESCALATED or CHANGES_REQUESTED → ESCALATED; any BLOCKED → BLOCKED; any
+NEEDS_CONTEXT at ceiling → NEEDS_CONTEXT).
+
+Publication: one consolidated comment on <target URL> using the Phase-5 shape.
+Label transition (plan mode only): review → plan-approved on DONE.
+
+Independence rule: reject any dispatch that repeats skill+model. Cross-model
+channel is /codex.
+
+Stamina stops here. Team-lead owns dispatch, collection, aggregation, publish.
+  """
+})
+```
+
+After sending, report `ESCALATED` on the last line of your reply with cause `STAMINA_MODE_B_IN_TEAM`. Do not attempt partial fan-out. Do not write the consolidated comment yourself.
+
 ## Iron rule
 
 > **Stamina routes; it does not review.**
