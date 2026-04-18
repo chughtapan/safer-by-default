@@ -343,14 +343,35 @@ Record the returned job id on the parent epic (comment) so the next operator can
 1. **Team roster.** Read `~/.claude/teams/<team-name>/config.json` with `jq` to list teammates and their `isActive` flag. Example: `jq -r '.members[] | "\(.name)\t\(.isActive)\t\(.paneId // "-")"' ~/.claude/teams/<team-name>/config.json`.
 2. **Review-ready sub-issues.** `gh issue list --label review --json number,title,url,labels` for this repo. Any hit is a candidate for Step 5c.
 3. **Open PRs.** `gh pr list --json number,url,isDraft,mergeable,statusCheckRollup` to see which draft PRs are green.
-4. **Idle-done shutdown.** For every teammate where BOTH `isActive == false` AND their assigned sub-issue is in state `done` or `abandoned` (or closed), terminate the pane directly: `tmux kill-pane -t <paneId>`. The `shutdown_request` protocol is unreliable; kill is the reliable path.
+4. **Auto-shutdown + auto-delete idle done teammates.** For every teammate where BOTH `isActive == false` AND their assigned sub-issue is in a terminal state (`done`, `abandoned`, or the issue is closed), do both of the following. The `shutdown_request` protocol is unreliable — teammates' system prompts frequently do not handle it — so direct pane kill plus roster rewrite is the reliable path.
+
+   **(a) Kill the pane** to free tmux capacity:
+
+   ```bash
+   tmux kill-pane -t <paneId>
+   ```
+
+   **(b) Remove the teammate from the roster** so the config reflects reality:
+
+   ```bash
+   jq --arg name "<teammate-name>" \
+      '.members |= map(select(.name != $name))' \
+      ~/.claude/teams/<team-name>/config.json > /tmp/team.tmp \
+      && mv /tmp/team.tmp ~/.claude/teams/<team-name>/config.json
+   ```
+
+   Guardrails (the loop enforces these before touching anything):
+   - Never delete `team-lead` from the roster. Never kill the team-lead pane.
+   - Never delete or kill a teammate whose sub-issue is still `planning`, `implementing`, `review`, or `verifying`.
+   - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
+
 5. **Auto-gate clean PRs.** If a draft PR has tests green and its sub-issue's acceptance artifact is a review-ready comment (not a PR-side review), post the transition: `safer-transition-label --issue $N --from review --to plan-approved` and mark the PR ready. Skip if tests red or if the acceptance artifact requires human judgment.
 6. **Auto-dispatch next sub-task.** If capacity exists (fewer active teammates than the configured cap) and the next sub-issue in dependency order has label `planning` with all upstream deps at `done`, dispatch per Step 5a.
 
 **What the loop MUST NEVER do.**
 
-- Kill the team-lead pane.
-- Kill a teammate whose `isActive == true` or whose sub-issue is not terminal. Both conditions, or it does not kill.
+- Kill the team-lead pane, or delete `team-lead` from the roster.
+- Kill or delete a teammate whose `isActive == true`, or whose sub-issue is not terminal. Both conditions must hold, or the loop leaves them.
 - Merge a PR with failing tests, failing CI, or unresolved review comments.
 - Gate a sub-issue whose acceptance criteria require judgment the loop cannot encode (design review, spec approval, any criterion the modality's `review` step delegates to `/safer:review-senior`).
 - Write code, edit files, or run `/safer:<modality>` skills in-session. Dispatch via teammate only.
