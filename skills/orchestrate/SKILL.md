@@ -319,6 +319,54 @@ If rejected:
 - Transition `review` → `planning` (the modality revises).
 - Do not revise the artifact yourself.
 
+### Step 5d — Auto-monitor loop
+
+Teammates complete asynchronously. Polling every sub-issue by hand is how orchestrate drifts into idle sit-and-wait. Install a recurring check instead.
+
+**Why.** Without a loop, the team lead either spins waiting for prompts or wakes up only when the user nudges. Both defeat the point of orchestration. The loop is how orchestrate earns the "scrum master who reads `gh issue list`" framing at runtime.
+
+**Install.** Use `CronCreate` with a session-only job (`recurring: true`, `durable: false`). Default cadence is every 5 minutes:
+
+```
+CronCreate({
+  schedule: "*/5 * * * *",
+  recurring: true,
+  durable: false,
+  prompt: "<loop body — see below>"
+})
+```
+
+Record the returned job id on the parent epic (comment) so the next operator can cancel it.
+
+**Loop body.** Each tick does exactly the checks below, in order. The loop writes no code and makes no decisions that are not already encoded in an artifact.
+
+1. **Team roster.** Read `~/.claude/teams/<team-name>/config.json` with `jq` to list teammates and their `isActive` flag. Example: `jq -r '.members[] | "\(.name)\t\(.isActive)\t\(.paneId // "-")"' ~/.claude/teams/<team-name>/config.json`.
+2. **Review-ready sub-issues.** `gh issue list --label review --json number,title,url,labels` for this repo. Any hit is a candidate for Step 5c.
+3. **Open PRs.** `gh pr list --json number,url,isDraft,mergeable,statusCheckRollup` to see which draft PRs are green.
+4. **Idle-done shutdown.** For every teammate where BOTH `isActive == false` AND their assigned sub-issue is in state `done` or `abandoned` (or closed), terminate the pane directly: `tmux kill-pane -t <paneId>`. The `shutdown_request` protocol is unreliable; kill is the reliable path.
+5. **Auto-gate clean PRs.** If a draft PR has tests green and its sub-issue's acceptance artifact is a review-ready comment (not a PR-side review), post the transition: `safer-transition-label --issue $N --from review --to plan-approved` and mark the PR ready. Skip if tests red or if the acceptance artifact requires human judgment.
+6. **Auto-dispatch next sub-task.** If capacity exists (fewer active teammates than the configured cap) and the next sub-issue in dependency order has label `planning` with all upstream deps at `done`, dispatch per Step 5a.
+
+**What the loop MUST NEVER do.**
+
+- Kill the team-lead pane.
+- Kill a teammate whose `isActive == true` or whose sub-issue is not terminal. Both conditions, or it does not kill.
+- Merge a PR with failing tests, failing CI, or unresolved review comments.
+- Gate a sub-issue whose acceptance criteria require judgment the loop cannot encode (design review, spec approval, any criterion the modality's `review` step delegates to `/safer:review-senior`).
+- Write code, edit files, or run `/safer:<modality>` skills in-session. Dispatch via teammate only.
+
+If any check above is ambiguous, the loop skips that action and leaves it for the next human-driven tick. Ambiguity is not a bug; acting on ambiguity is.
+
+**Tuning the interval.**
+
+| Epic shape | Interval |
+|---|---|
+| Active epic, multiple teammates in flight | `*/5 * * * *` (5 min) |
+| Low-churn epic, mostly waiting on CI | `*/30 * * * *` (30 min) or hourly |
+| Single-modality task | no loop; orchestrate is the wrong skill |
+
+**Cancel.** Keep the job id from `CronCreate`. To stop the loop: `CronDelete({ jobId: "<id>" })`. Also run this in Phase 7 at close-out (see below).
+
 ### Phase 6 — Backtrack
 
 When a sub-task reports `ESCALATED` / `BLOCKED` / `NEEDS_CONTEXT`, do not rescue. Read the escalation artifact, classify the cause, and route:
@@ -341,10 +389,11 @@ Update the decomposition table on the parent epic to reflect the re-triage. Emit
 
 When every sub-issue is in state `done` or `abandoned`:
 
-1. Run `safer-vp 7d` (or the appropriate window) — this produces a markdown dashboard with modality funnel, calibration, scope reverts, stop-rule fires, per-sub-task latency.
-2. Post the dashboard as a comment on the parent epic.
-3. Transition the parent from `triaged` to `completed`; close the issue.
-4. Emit the final telemetry event:
+1. **Cancel the auto-monitor loop.** If Step 5d installed a cron, run `CronDelete({ jobId: "<id>" })` now. Session-only jobs expire after 7d on their own, but an epic that closes early should not leave the loop polling a done project.
+2. Run `safer-vp 7d` (or the appropriate window) — this produces a markdown dashboard with modality funnel, calibration, scope reverts, stop-rule fires, per-sub-task latency.
+3. Post the dashboard as a comment on the parent epic.
+4. Transition the parent from `triaged` to `completed`; close the issue.
+5. Emit the final telemetry event:
 
 ```bash
 safer-telemetry-log --event-type safer.skill_end \
@@ -352,7 +401,7 @@ safer-telemetry-log --event-type safer.skill_end \
   --outcome success --duration-s "$(($(date +%s) - $_TEL_START))" 2>/dev/null || true
 ```
 
-5. Report status `DONE` to the caller.
+6. Report status `DONE` to the caller.
 
 ---
 
