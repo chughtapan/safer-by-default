@@ -235,6 +235,64 @@ Second, about the database layer:
 
 Regardless of the answers, these four rules stay on: `bare-catch`, `record-cast`, `no-manual-enum-cast`, `no-hardcoded-secrets`.
 
+### Step 4b: Ask about testing dependencies
+
+Testing is a craft dimension of the principles, not a separate modality. Principle 1's corollary: *tests exist for constraints the type system could not encode.* The right test shape depends on what the code does. This step installs the libraries that match the shapes this repo actually has, and records the choices in the setup log.
+
+Ask four `AskUserQuestion` prompts, in order. Record each answer (A/B/C) and the resulting install command (or "skipped") for the Step 11 receipt.
+
+**Question 1 — fast-check (always recommended).**
+
+> `fast-check` is the TypeScript property-based tester. It is the default tool when a function has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement). Install as a dev dependency?
+> - A) Yes, install now. (Recommended default.)
+> - B) Skip; already installed or I will install later.
+
+If A: `$PM add -D fast-check`. If B: record skipped.
+
+**Question 2 — testcontainers-node (ask when DB/cache/queue present).**
+
+Detect DB/cache/queue clients in `package.json` to pre-answer the prompt:
+
+```bash
+TC_HINT=""
+for dep in pg postgres mysql2 mongodb redis ioredis kafkajs amqplib; do
+  grep -q "\"$dep\"" package.json 2>/dev/null && TC_HINT="$TC_HINT $dep"
+done
+echo "TC_HINT:$TC_HINT"
+```
+
+> `testcontainers-node` runs a real Postgres/Redis/Kafka in Docker for integration tests (principle 2: mocks at the integration boundary are a lie). Detected clients:$TC_HINT. Install?
+> - A) Yes, install `testcontainers` + `@testcontainers/postgresql` (or `-redis`, `-mongodb`, `-kafka` to match detected clients).
+> - B) No; Docker is unavailable in CI, or I use a different harness.
+> - C) No such dependency in this repo.
+
+If A: install `testcontainers` plus the specific `@testcontainers/<service>` modules that match detected clients (one `$PM add -D` command). If B or C: record skipped.
+
+**Question 3 — Stryker mutation testing (ask when critical modules exist).**
+
+> Stryker runs mutation tests; `@stryker-mutator/typescript-checker` filters type-ill-formed mutants via `tsc` (direct synergy with principle 1). Recommended only for critical modules (auth, billing, parsing, crypto). Does this repo have such a module?
+> - A) Yes; install `@stryker-mutator/core` + `@stryker-mutator/typescript-checker` and I will scope it to a glob later.
+> - B) No; skip.
+> - C) Already installed.
+
+If A: `$PM add -D @stryker-mutator/core @stryker-mutator/typescript-checker`. If B or C: record skipped.
+
+**Question 4 — Playwright (ask when a critical UI flow exists).**
+
+> Playwright runs end-to-end browser tests. Recommended only for critical UI flows (signup, checkout, main workflow). Does this repo own such a flow?
+> - A) Yes; install `@playwright/test`.
+> - B) No UI, or UI is tested elsewhere; skip.
+> - C) Already installed.
+
+If A: `$PM add -D @playwright/test`. If B or C: record skipped.
+
+**Record.** Carry the four answers into the Step 11 receipt under a `Testing deps:` line. Every answer is either an install command that ran, or the word `skipped`.
+
+**Anti-patterns.**
+- *"I'll install all four to save the user a step."* No. Stryker and Playwright have real install-time cost (browsers, mutation engine) and are opt-in.
+- *"I'll skip fast-check if the user does not ask."* No. fast-check is the default; the prompt exists so the user can override, not so you can omit.
+- *"I'll pick `@testcontainers/postgresql` without detecting."* No. Install only the modules that match detected clients.
+
 ### Step 5: Plan the configuration shape
 
 You will write `eslint.config.js` once, in Step 7, after Step 6 installs the companion rules. Hold the shape in your head for now.
@@ -451,6 +509,10 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Effect rules:           on | off
   Kysely rules:           on | off
   Companion rules:        no-magic-numbers, no-unused-vars, no-duplicate-string
+  Testing deps:           fast-check=<installed|skipped>
+                          testcontainers=<installed <modules>|skipped>
+                          stryker=<installed|skipped>
+                          playwright=<installed|skipped>
   tsconfig strict:        N errors before, M errors after
   Probe:                  passed
   Lint baseline:          V violations across R rules
@@ -522,6 +584,7 @@ This skill never commits. `git add` and `git commit` are the user's decision.
 - [ ] Plugin and parser are installed.
 - [ ] Integration-tests glob is decided.
 - [ ] Stack questions (Effect, query builder) are answered.
+- [ ] Testing-deps questions (fast-check, testcontainers, Stryker, Playwright) are answered; each resolves to an install command or `skipped`.
 - [ ] Companion rules are installed.
 - [ ] `eslint.config.(js|mjs)` is written (or explicitly skipped on the already-installed branch).
 - [ ] Five tsconfig strict flags are set; pre and post error counts are reported.
