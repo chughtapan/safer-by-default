@@ -490,15 +490,29 @@ for repo in $(jq -r '.repos[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/n
 done > /tmp/orch-queue.jsonl
 ```
 
-Filter the queue in-process:
+Filter the queue in-process. The first two filters are body-only and cheap; the marker filter requires a per-candidate `gh issue view --json comments` call (the marker is a comment, not in the issue body) and should run last so we only pay for survivors:
 
 - Drop any row whose title or body references a teammate already in `config.json` `.members[].name` (already in flight).
-- Drop any row that already has the idempotency marker (`<!-- orchestrate:dispatched teammate=<name> at=<iso> -->`) comment posted within the last 30 minutes (re-entrance guard against a team-lead crash mid-tick).
 - Drop any row whose parent epic (from `## Parent` or `Parent: #N` in the body) has a linked open PR authored by the dispatching team (somebody is on it).
+- For each surviving candidate, fetch comments and scan for the idempotency marker. The marker is `<!-- orchestrate:dispatched teammate=<name> at=<iso> -->`; drop the candidate if any comment matches and its `at=` timestamp is within the last 30 minutes (re-entrance guard against a team-lead crash mid-tick):
+
+  ```bash
+  window_start=$(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+              || date -u -v-30M +%Y-%m-%dT%H:%M:%SZ)
+  marker_ts=$(gh issue view "$N" --repo "$repo" --json comments \
+    --jq '.comments[].body
+      | capture("<!-- orchestrate:dispatched teammate=[A-Za-z0-9_-]+ at=(?<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z) -->")
+      | .ts' \
+    | sort | tail -1)
+  if [ -n "$marker_ts" ] && [ "$marker_ts" \> "$window_start" ]; then
+    # marker is fresh — skip this candidate
+    continue
+  fi
+  ```
 
 The surviving rows are the candidate queue. Record the count (`queue_len`) for the log line in 6b.
 
-**Step 6b — compute capacity.** Pane ceiling is 20 (empirical; tmux throws around 24 on default kernels). Count live panes once per tick:
+**Step 6b — compute capacity.** Pane ceiling is set to 20 based on an empirical observation that tmux starts rejecting splits as the pane count approaches that range on default kernels; `"no space for new pane"` from the Agent tool is the authoritative safety net if the ceiling is ever wrong in a given environment. Count live panes once per tick:
 
 ```bash
 live_panes=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null | wc -l)
@@ -519,22 +533,44 @@ If `budget <= 0`: log `at capacity: panes=$live_panes, queue_len=$queue_len, ski
 
 Within a tier, break ties by oldest `createdAt`. Do not invent additional heuristics; the four tiers are the ceiling of complexity for this step.
 
-**Step 6d — dispatch one teammate per candidate, up to `budget`.** For each candidate in priority order, look up the modality from the `safer:<modality>` label and dispatch using the inline template for that modality (see *Per-modality dispatch prompt templates* below). Each dispatch:
-
-- Uses `TeamCreate` (if the team does not exist) + `Agent` with `team_name` and a unique teammate `name` (e.g., `<modality>-<issue-number>`).
-- Fills the template placeholders `{ISSUE_URL}`, `{PARENT_URL}`, `{ACCEPTANCE}`, `{BRANCH_HINT}` from the sub-issue body.
-- Passes `"source": "orchestrate-auto-dispatch"` in the teammate prompt header so the audit trail is visible.
-- Never uses standalone `Agent` without `team_name`. Never invokes the modality via in-session `Skill`.
-
-Stop iterating the moment any of these fire: `budget` reaches 0, the Agent tool returns `"no space for new pane"` (ceiling hit mid-tick), or the candidate queue is empty.
-
-**Step 6e — assign tracking (idempotency).** Immediately after each successful dispatch, post the idempotency marker as a sub-issue comment:
+Executable reference (feed `<tier>\t<created_at_epoch>\t<issue_number>` on stdin):
 
 ```bash
-gh issue comment "$N" --repo "$REPO" --body "<!-- orchestrate:dispatched teammate=$TEAMMATE_NAME at=$(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
+# tier: 1=blocker(review on critical path), 2=spike|verify, 3=implement-*, 4=research
+priority_sort() {
+  sort -k1,1n -k2,2n | cut -f3
+}
 ```
 
-Next tick's Step 6a filter checks for this marker and skips. The 30-minute window is deliberate: if a teammate crashed before producing an artifact, the sub-issue is eligible for re-dispatch on the next tick past that window.
+**Step 6d — post marker first, then dispatch (order matters).** For each candidate in priority order, up to `budget`, dispatch using the inline template that matches its `safer:<modality>` label (see *Per-modality dispatch prompt templates* below). The marker MUST be posted before the `Agent` call so a concurrent next tick reading comments in Step 6a sees it and skips; if we dispatched first, a slow Agent spawn (>2 min) plus the cron interval could re-dispatch the same issue.
+
+For each candidate:
+
+1. **Post the idempotency marker first** (reserves the sub-issue for this dispatch):
+
+   ```bash
+   TEAMMATE_NAME="<modality>-<issue-number>"
+   MARKER_BODY="<!-- orchestrate:dispatched teammate=$TEAMMATE_NAME at=$(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
+   # gh issue comment prints the comment URL on success; parse the comment id
+   # out of the `#issuecomment-<id>` fragment so step 3 can delete it on rollback.
+   MARKER_URL=$(gh issue comment "$N" --repo "$repo" --body "$MARKER_BODY" 2>/dev/null) \
+     || { echo "marker post failed; skip"; continue; }
+   MARKER_ID="${MARKER_URL##*issuecomment-}"
+   ```
+
+2. **Dispatch the teammate.** Use `TeamCreate` (if the team does not exist) + `Agent` with `team_name` and the unique teammate `name`. Fill template placeholders per the schema in *Per-modality dispatch prompt templates*. Pass `source: orchestrate-auto-dispatch` in the prompt header so the audit trail is visible. Never standalone `Agent` without `team_name`; never invoke the modality via in-session `Skill`.
+
+3. **On dispatch failure, delete the marker** so the next tick is free to retry. The Agent tool returning `"no space for new pane"`, a `TeamCreate` error, or any other dispatch error must roll back the reservation:
+
+   ```bash
+   gh api --method DELETE "repos/$repo/issues/comments/$MARKER_ID" >/dev/null 2>&1 || true
+   ```
+
+   Then break the dispatch loop (the ceiling was hit, or team state is bad); the remaining queue defers to the next tick.
+
+The 30-minute freshness window in Step 6a is deliberate: if an Agent process crashed *after* posting the marker but *before* producing an artifact, the sub-issue is eligible for re-dispatch on the next tick past that window. Markers older than 30 minutes with no resulting PR are treated as stale reservations.
+
+Stop iterating the moment any of these fire: `budget` reaches 0, the Agent tool returns `"no space for new pane"` (ceiling hit mid-tick; marker was already rolled back in step 3 above), or the candidate queue is empty.
 
 **Failure modes Step 6 handles (fail-closed).** Every case below is a skip, not a fix.
 
@@ -572,11 +608,23 @@ Default is `*/2 * * * *` (every 2 minutes) and you should not change it without 
 
 Step 6d dispatches by filling the template that matches the sub-issue's `safer:<modality>` label. Every template is a copy-pasteable block. Every template carries the `source: orchestrate-auto-dispatch` header so a post-hoc audit can separate auto-dispatched work from human-driven dispatches. Every template ends with the mandatory status-marker instruction.
 
-Placeholders every template uses:
-- `{ISSUE_URL}` — full URL of the sub-issue being dispatched.
-- `{PARENT_URL}` — full URL of the parent epic.
-- `{ACCEPTANCE}` — the `Acceptance:` line verbatim from the sub-issue body.
-- `{BRANCH_HINT}` — suggested branch name (`<modality-short>/<issue-number>-<slug>`), or empty if the modality does not produce a branch.
+**Placeholder schema.** Every template draws from this fixed set — no template may introduce a placeholder outside it, and every placeholder below has one definition used consistently across all seven templates:
+
+| Placeholder | Source | Notes |
+|---|---|---|
+| `{TEAM}` | `~/.claude/teams/<team-name>/config.json` → `name` | the team the dispatching orchestrator runs under; the dispatched teammate joins this team |
+| `{ISSUE_URL}` | sub-issue `url` from `gh issue list --json url` | full URL including host |
+| `{PARENT_URL}` | parent epic URL resolved from `Parent: #N` or `## Parent` in the sub-issue body | full URL; empty only if the epic is missing (which is itself a Step 6 skip case) |
+| `{ACCEPTANCE}` | the `Acceptance:` line verbatim from the sub-issue body | if the sub-issue has no such line, skip the candidate — Step 6 never synthesizes acceptance |
+| `{BRANCH_HINT}` | derived; see format below | empty string for modalities that produce no branch (`verify`, `research`, `spec`) |
+
+`{BRANCH_HINT}` format: `<modality-short>/<issue-number>-<slug>` where
+
+- `<modality-short>` is one of `junior`, `senior`, `staff`, `verify`, `spike`, `research`, `spec` — the final token of the `safer:<modality>` label (drop the `implement-` prefix).
+- `<issue-number>` is the sub-issue number with no `#` prefix.
+- `<slug>` is the sub-issue title lowercased, non-alphanumerics collapsed to `-`, trimmed of leading/trailing `-`, and truncated to 40 characters. Example: sub-issue `#66` titled `[impl-senior] orchestrate: Step 6 work-queue scan` becomes `senior/66-impl-senior-orchestrate-step-6-work`.
+
+For `verify`, `research`, and `spec`, `{BRANCH_HINT}` is the empty string; their templates omit the `Branch: ...` line entirely.
 
 #### implement-junior
 
