@@ -278,6 +278,63 @@ Anti-patterns: *"See the plan" where the plan is in a scratchpad.* *"As discusse
 
 ---
 
+## Durability — the stamina rule
+
+One reviewer on a high-blast-radius artifact is one data point. A data point is
+not a consensus. Durability says: leverage-class artifacts are not `done` until
+they have survived independent critique along orthogonal dimensions.
+
+Stamina is not "more passes is better." It is **N heterogeneous passes, where
+N is set by blast radius × reversibility, capped at 4 plus user approval.**
+
+### Budget
+
+| Blast radius \ Reversibility | High (easy revert) | Medium | Low (hard revert) |
+|---|---|---|---|
+| Internal only | N=1 | N=2 | N=3 |
+| Internal cross-module | N=2 | N=2 | N=3 |
+| Public surface (exported API, CLI, schema) | N=3 | N=3 | N=4 |
+| User-visible behavior | N=3 | N=3 | N=4 |
+| Destructive / irreversible | N=4 | N=4 | N=4 + user |
+
+N counts *review passes*, not commits, not rounds of author iteration.
+`/safer:verify` is one pass; it counts toward N but does not set it.
+
+### Independence
+
+Two passes with the same role on the same model count as one pass. Passes must
+differ in role (acceptance-vs-diff, structural-diff, adversarial, security,
+simplification, cold-start-read) or in model (`/codex` is the cross-model
+channel). "I ran `/safer:review-senior` three times" is N=1.
+
+### Floor and ceiling
+
+Floor **N=1.** Low-blast-radius work ships on the existing single-reviewer path.
+Stamina adds zero overhead below the threshold. Turning stamina on for a typo
+is waste.
+
+Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost
+and the risk of rubber-stamp agreement is larger than the risk of missed bugs.
+N>4 requires explicit user approval recorded at dispatch. "One more pass to be
+safe" is procrastination dressed as rigor; do not ship it.
+
+### Enforcement
+
+`/safer:stamina` is the dispatch mechanism. It is invoked from
+`/safer:orchestrate` Phase 5c when the artifact's blast radius crosses the
+threshold. It is never self-invoked by the authoring modality — that is
+Principle 5 self-polishing.
+
+### Anti-patterns
+
+- *"I'll run the full review family on this typo fix."* Floor is N=1. Stamina below threshold erodes signal for every future high-blast-radius change.
+- *"Three reviewers approved; that's N=3."* Three runs of the same skill on the same model is N=1. Independence is the active ingredient.
+- *"The migration is urgent; skip to N=1."* The urgency is the reason for N=4, not against it. Row 5 shipped wrong is 30-100x cost per the debt multiplier.
+- *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
+- *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
+
+---
+
 ## The modality pipeline
 
 ```

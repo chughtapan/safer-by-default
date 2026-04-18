@@ -298,8 +298,12 @@ Poll the sub-issue until one of:
 
 **Step 5c — Review the artifact.**
 
-- For code-producing sub-tasks (`implement-*`): invoke `/safer:review-senior` on the PR.
-- For design-producing sub-tasks (`spec`, `architect`, `design-module`): read the artifact and judge it against the acceptance criteria. Ask the user if any criterion is ambiguous.
+- For code-producing sub-tasks (`implement-*`):
+  - **If `safer-diff-scope --pr $PR` reports tier ≥ `senior` OR `public_surface_changed > 0` OR the sub-issue modality is `implement-staff`:** invoke `/safer:stamina --pr <PR>`. Stamina routes to the review family and gates on consensus; do not also invoke `/safer:review-senior` standalone.
+  - **Else:** invoke `/safer:review-senior` on the PR (existing single-reviewer path).
+- For design-producing sub-tasks (`spec`, `architect`, `design-module`):
+  - **If the sub-issue modality is `spec` or `architect` (high-blast-radius by default):** invoke `/safer:stamina --plan <sub-issue-URL>`.
+  - **Else:** read the artifact and judge it against the acceptance criteria. Ask the user if any criterion is ambiguous.
 - For exploration sub-tasks (`investigate`, `spike`, `research`): read the writeup; judge against acceptance.
 - For verify sub-tasks: the sub-task itself is the review. Trust its verdict.
 
