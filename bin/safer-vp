@@ -67,11 +67,10 @@ if command -v gh >/dev/null 2>&1 && [ "$REPO" != "unknown" ]; then
   echo "In flight (open issues by state label)"
   HAD_ANY=0
   for LABEL in planning review plan-approved implementing verifying; do
-    # gh counts via JSON length
-    COUNT=$(gh issue list --repo "$REPO" --state=open --label "$LABEL" --json number --limit 100 2>/dev/null \
-      | grep -cE '"number"' || echo 0)
-    COUNT=$(echo "$COUNT" | tr -d ' ')
-    if [ "$COUNT" != "0" ]; then
+    COUNT=$(gh issue list --repo "$REPO" --state=open --label "$LABEL" --json number --jq 'length' --limit 100 2>/dev/null || echo 0)
+    COUNT=$(printf '%s' "$COUNT" | tr -cd '0-9')
+    [ -z "$COUNT" ] && COUNT=0
+    if [ "$COUNT" -gt 0 ]; then
       printf '  %-18s %s\n' "$LABEL:" "$COUNT"
       HAD_ANY=1
     fi
