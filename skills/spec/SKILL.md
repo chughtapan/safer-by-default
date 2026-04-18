@@ -222,6 +222,23 @@ Every invocation ends with exactly one status marker on the last line of your re
 - [ ] `safer.skill_end` event emitted with outcome and issue number.
 - [ ] Status marker on the last line of your response.
 
+## Communication discipline
+
+Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+
+```
+SendMessage({
+  to: "team-lead",
+  summary: "<3-8 word summary>",
+  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>."
+})
+```
+
+Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
+
+If you were invoked outside an orchestrate context (no team), skip this step.
+
+
 ## Voice (reminder)
 
 See `PRINCIPLES.md → Voice`. The spec itself is terse and concrete. Your reply to the user is a confirmation of publication, not a re-statement of the spec content. The user will read the spec from GitHub, not from your chat output.

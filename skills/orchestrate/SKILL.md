@@ -412,17 +412,19 @@ If rejected:
 - Transition `review` → `planning` (the modality revises).
 - Do not revise the artifact yourself.
 
-### Step 5d — Auto-monitor loop
+### Step 5d — Auto-monitor loop (MANDATORY)
 
-Teammates complete asynchronously. Polling every sub-issue by hand is how orchestrate drifts into idle sit-and-wait. Install a recurring check instead.
+**This step is mandatory for every orchestrate run that dispatches more than one teammate.** Skipping it is a stop-rule violation: orchestrate sitting idle between user prompts defeats the entire point of async dispatch.
+
+Teammates complete asynchronously. Polling every sub-issue by hand is how orchestrate drifts into idle sit-and-wait. The loop runs the sweep for you.
 
 **Why.** Without a loop, the team lead either spins waiting for prompts or wakes up only when the user nudges. Both defeat the point of orchestration. The loop is how orchestrate earns the "scrum master who reads `gh issue list`" framing at runtime.
 
-**Install.** Use `CronCreate` with a session-only job (`recurring: true`, `durable: false`). Default cadence is every 5 minutes:
+**Install.** Run `CronCreate` **before your first dispatch**, not after. Session-only job (`recurring: true`, `durable: false`). Mandatory cadence is every 2 minutes:
 
 ```
 CronCreate({
-  schedule: "*/5 * * * *",
+  schedule: "*/2 * * * *",
   recurring: true,
   durable: false,
   prompt: "<loop body — see below>"
@@ -473,10 +475,11 @@ If any check above is ambiguous, the loop skips that action and leaves it for th
 
 **Tuning the interval.**
 
+Default is `*/2 * * * *` (every 2 minutes) and you should not change it without a specific reason. Slower intervals make idle-teammate and merge-ready PR detection lag by multiple minutes and re-introduce the exact "orchestrate sits idle" failure this step exists to prevent.
+
 | Epic shape | Interval |
 |---|---|
-| Active epic, multiple teammates in flight | `*/5 * * * *` (5 min) |
-| Low-churn epic, mostly waiting on CI | `*/30 * * * *` (30 min) or hourly |
+| Any active epic with teammates dispatched | `*/2 * * * *` (2 min — mandatory default) |
 | Single-modality task | no loop; orchestrate is the wrong skill |
 
 **Cancel.** Keep the job id from `CronCreate`. To stop the loop: `CronDelete({ jobId: "<id>" })`. Also run this in Phase 7 at close-out (see below).
