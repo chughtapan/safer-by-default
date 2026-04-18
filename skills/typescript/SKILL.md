@@ -165,6 +165,79 @@ Invalid suppressions:
 
 "Fix later" is not a reason. A bare `eslint-disable-next-line` without a rule name silences every rule on that line; the plugin treats that as a rule violation in itself.
 
+## Invocation contract
+
+This skill is picked up in-context by the `implement-*` and `review-senior` skills. The contract:
+
+- **`implement-junior` / `implement-senior` / `implement-staff`** load this skill whenever a `.ts` or `.tsx` file is about to be edited or created. The decision table above is the lookup they consult before writing any new construct.
+- **`review-senior`** loads this skill whenever the diff under review touches `.ts` or `.tsx` files. The decision table becomes the rubric for flagging human-era shortcuts as review concerns.
+- **`/safer:spike`** suppresses this skill inside a `spike/<slug>` branch; the suppression ends when the branch ends.
+- **`/safer:setup`** is what installs the lint floor this skill points at. If `eslint-plugin-agent-code-guard` is not present in the target repo, invoke `/safer:setup` first. This skill relies on the lint floor; it is the ceiling.
+
+This skill does not open its own preamble, does not emit telemetry, and does not transition labels. The invoking modality owns the session.
+
+## Concrete before and after examples
+
+The decision table compressed. Expanded versions of the most frequent forks.
+
+**Parsing an HTTP response.**
+
+Before:
+```ts
+async function getUser(id: string): Promise<User> {
+  const r = await fetch(`/api/users/${id}`);
+  return (await r.json()) as User;
+}
+```
+
+After:
+```ts
+const getUser = (id: UserId): Effect.Effect<User, FetchError | DecodeError> =>
+  Effect.gen(function* () {
+    const r = yield* Effect.tryPromise({
+      try: (signal) => fetch(`/api/users/${id}`, { signal }),
+      catch: (cause) => new FetchError({ cause }),
+    });
+    const body = yield* Effect.tryPromise({
+      try: () => r.json(),
+      catch: (cause) => new DecodeError({ cause }),
+    });
+    return yield* Schema.decodeUnknown(User)(body);
+  });
+```
+
+The before has one `async`, one cast, and zero error types. The after has three typed errors, one schema boundary, and a cancellable `fetch`. Cost: eight extra lines for an agent; hours of debugging saved.
+
+**Exhaustive switch over a union.**
+
+Before:
+```ts
+type Status = "pending" | "active" | "done";
+function icon(s: Status): string {
+  switch (s) {
+    case "pending": return "pending";
+    case "active":  return "active";
+    case "done":    return "done";
+  }
+}
+```
+
+After:
+```ts
+type Status = "pending" | "active" | "done";
+const absurd = (x: never): never => { throw new Error(`unreachable: ${x}`); };
+function icon(s: Status): string {
+  switch (s) {
+    case "pending": return "pending";
+    case "active":  return "active";
+    case "done":    return "done";
+    default:        return absurd(s);
+  }
+}
+```
+
+Add a fourth value to `Status` and the after version turns `absurd(s)` into a compile error at this call site. The before version silently returns `undefined`.
+
 ## When not to invoke
 
 This skill is suspended or does not apply in the following contexts:

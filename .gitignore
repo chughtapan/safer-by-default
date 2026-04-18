@@ -1,0 +1,12 @@
+# vim swap files
+*.swp
+*.swo
+
+# editor backup files
+*~
+
+# macOS
+.DS_Store
+
+# Local state (never committed; user-specific)
+~/.safer/
