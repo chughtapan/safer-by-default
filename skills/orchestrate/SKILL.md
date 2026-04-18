@@ -438,15 +438,17 @@ Record the returned job id on the parent epic (comment) so the next operator can
 1. **Team roster.** Read `~/.claude/teams/<team-name>/config.json` with `jq` to list teammates and their `isActive` flag. Example: `jq -r '.members[] | "\(.name)\t\(.isActive)\t\(.paneId // "-")"' ~/.claude/teams/<team-name>/config.json`.
 2. **Review-ready sub-issues.** `gh issue list --label review --json number,title,url,labels` for this repo. Any hit is a candidate for Step 5c.
 3. **Open PRs.** `gh pr list --json number,url,isDraft,mergeable,statusCheckRollup` to see which draft PRs are green.
-4. **Auto-shutdown + auto-delete idle done teammates.** For every teammate where BOTH `isActive == false` AND their assigned sub-issue is in a terminal state (`done`, `abandoned`, or the issue is closed), do both of the following. The `shutdown_request` protocol is unreliable — teammates' system prompts frequently do not handle it — so direct pane kill plus roster rewrite is the reliable path.
+4. **Auto-shutdown + auto-delete idle done teammates.** Two paths run on every tick. The `shutdown_request` protocol is unreliable — teammates' system prompts frequently do not handle it — so direct pane kill plus roster rewrite is the reliable path.
 
-   **(a) Kill the pane** to free tmux capacity:
+   **First, compute the authoritative list of live panes.** This is the one command the loop depends on getting right:
 
    ```bash
-   tmux kill-pane -t <paneId>
+   ALIVE=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null | sort -u)
    ```
 
-   **(b) Remove the teammate from the roster** so the config reflects reality:
+   **Do NOT** use `tmux list-panes -a | awk '{print $NF}'` to harvest pane IDs. `tmux list-panes -a` prints the literal string `(active)` as the last whitespace-separated field on any pane that is currently the active pane in its window. `awk '{print $NF}'` on that output returns `(active)`, NOT the pane id, and the resulting set silently drops every active pane — producing false "dead" verdicts on the panes the loop most needs to protect. Use `-F '#{pane_id}'`. Always.
+
+   **Path (a): dead-pane cleanup.** For every teammate (other than `team-lead`), if their `tmuxPaneId` is NOT in `$ALIVE` (`echo "$ALIVE" | grep -qx "<paneId>"` returns false), their process is already gone. Remove them from the roster; no kill command needed:
 
    ```bash
    jq --arg name "<teammate-name>" \
@@ -455,9 +457,20 @@ Record the returned job id on the parent epic (comment) so the next operator can
       && mv /tmp/team.tmp ~/.claude/teams/<team-name>/config.json
    ```
 
+   **Path (b): done-teammate cleanup.** For every teammate whose pane IS alive but whose assigned sub-issue is in a terminal state (`done`, `abandoned`, closed) OR whose assigned PR is merged, kill the pane and rewrite the roster:
+
+   ```bash
+   tmux kill-pane -t <paneId>
+   jq --arg name "<teammate-name>" \
+      '.members |= map(select(.name != $name))' \
+      ~/.claude/teams/<team-name>/config.json > /tmp/team.tmp \
+      && mv /tmp/team.tmp ~/.claude/teams/<team-name>/config.json
+   ```
+
    Guardrails (the loop enforces these before touching anything):
    - Never delete `team-lead` from the roster. Never kill the team-lead pane.
-   - Never delete or kill a teammate whose sub-issue is still `planning`, `implementing`, `review`, or `verifying`.
+   - Path (b) requires BOTH pane-alive AND sub-issue-terminal. Neither alone is enough.
+   - Path (a) requires only pane-missing from `$ALIVE`. A teammate whose work is incomplete but whose process died is still removed — their pane is gone either way, and the work needs to be re-dispatched.
    - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
 
 5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`).
