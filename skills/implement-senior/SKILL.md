@@ -346,6 +346,23 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 - [ ] `safer.skill_end` event emitted.
 - [ ] Status marker on the last line of your response.
 
+## Communication discipline
+
+Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+
+```
+SendMessage({
+  to: "team-lead",
+  summary: "<3-8 word summary>",
+  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>."
+})
+```
+
+Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
+
+If you were invoked outside an orchestrate context (no team), skip this step.
+
+
 ## Voice (reminder)
 
 See `PRINCIPLES.md → Voice`. Your PR body is terse, concrete, and plan-anchored. The plan-anchor table is the reviewer's fastest path to confidence; do not bury it.

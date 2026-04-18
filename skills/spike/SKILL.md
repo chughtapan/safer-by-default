@@ -348,6 +348,23 @@ The branch is not a PR. Do not open a PR. PRs signal intent to merge; spike bran
 
 If any box is unchecked, the status is not `DONE`.
 
+## Communication discipline
+
+Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+
+```
+SendMessage({
+  to: "team-lead",
+  summary: "<3-8 word summary>",
+  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>."
+})
+```
+
+Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
+
+If you were invoked outside an orchestrate context (no team), skip this step.
+
+
 ## Voice (reminder)
 
 See `PRINCIPLES.md` voice section. The verdict is terse. Numbers over adjectives. The evidence block speaks for the code. No AI filler. End with the status marker.
