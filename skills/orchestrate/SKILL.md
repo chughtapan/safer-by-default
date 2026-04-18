@@ -31,10 +31,10 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root before continuing. This skill is the projection of the principles onto **project-level coordination**. Specifically:
 
-- **Principle 1 (Junior Dev Rule)** — you classify the work before anyone does it. You never do it.
-- **Principle 3 (Budget Gate)** — you assign the modality. The modality enforces its own scope.
-- **Principle 5 (Ratchet)** — when a downstream modality escalates, you route upstream. You do not rescue.
-- **Principle 6 (Paper Trail)** — every piece of state you create lives on GitHub.
+- **Principle 5 (Junior Dev Rule)** — you classify the work before anyone does it. You never do it.
+- **Principle 6 (Budget Gate)** — you assign the modality. The modality enforces its own scope.
+- **Principle 8 (Ratchet)** — when a downstream modality escalates, you route upstream. You do not rescue.
+- **Artifact discipline → GitHub is the record** — every piece of state you create lives on GitHub, not in local files.
 
 ## Iron law
 
@@ -427,7 +427,7 @@ Post the artifact as a comment on the blocked sub-issue and cross-link on the pa
 | Escalation artifacts | Comments on blocked sub-issues | — |
 | Final VP dashboard | Comment on parent epic | — |
 
-Nothing orchestrate produces lives outside GitHub (Principle 6).
+Nothing orchestrate produces lives outside GitHub (see Artifact discipline → GitHub is the record).
 
 ---
 
