@@ -454,6 +454,23 @@ Nothing dogfood produces lives outside GitHub unless the input is a local file a
 
 If any box is unchecked, the status is not final; reopen the phase.
 
+## Communication discipline
+
+Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+
+```
+SendMessage({
+  to: "team-lead",
+  summary: "<3-8 word summary>",
+  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>."
+})
+```
+
+Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
+
+If you were invoked outside an orchestrate context (no team), skip this step.
+
+
 ## Voice (reminder)
 
 See `PRINCIPLES.md` to Voice. The subagent's report is terse, concrete, and evidence-first. Every score is a number with a quoted phrase or a location. Every friction entry is a specific location and a specific reason. No "this might be improved by," no "I think the clarity could be higher."
