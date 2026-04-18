@@ -237,10 +237,9 @@ For each sub-issue in dependency order:
 
 **Step 5a — Invoke the modality.**
 
-Two paths:
+Dispatch via a team. First `TeamCreate` a team for the epic if one does not exist, then `Agent` with `team_name` and a `name` per teammate.
 
-- **In-session** — invoke the modality skill via the `Skill` tool (e.g., `Skill(skill="safer:architect", args="#<sub-issue>")`). Use this when the modality is lightweight and you want the output in your own context.
-- **Teammate** — dispatch via a team. First `TeamCreate` a team for the epic if one does not exist, then `Agent` with `team_name` and a `name` per teammate. Use this when (a) the modality is heavy and you want to protect your context, (b) you are dispatching multiple modalities in parallel (only legal when they have no dependency between them), or (c) you want the teammates to coordinate via a shared task list and SendMessage.
+**Never invoke a modality in-session.** The `Skill` tool executes in your own context. That means orchestrate is doing the work, which is the Iron Rule violation this skill exists to prevent. Modalities run as teammates.
 
 **Never dispatch via `Agent` without `team_name`.** Standalone subagents are fire-and-forget; teammates are the unit of orchestration. Teams provide shared task lists, peer DM, idle notifications to the team lead, and persistent config at `~/.claude/teams/<team-name>/`.
 
