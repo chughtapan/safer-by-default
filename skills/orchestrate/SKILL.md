@@ -36,7 +36,7 @@ Read `PRINCIPLES.md` at the plugin root before continuing. This skill is the pro
 - **Principle 8 (Ratchet)** — when a downstream modality escalates, you route upstream. You do not rescue.
 - **Artifact discipline → GitHub is the record** — every piece of state you create lives on GitHub, not in local files.
 
-## Iron law
+## Iron rule
 
 > **You never implement. If you find yourself about to write code, your stop rule has already fired.**
 
