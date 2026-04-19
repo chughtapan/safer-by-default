@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 — bin/ packaging fix
+
+Package `bin/` directory in plugin distribution to fix telemetry propagation (sbd#101).
+
 ## 0.1.0 — Initial
 
 First cut of the safer-by-default Claude Code plugin.
