@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 — safer-docs-reader skill
+
+New `safer-docs-reader` skill (opus orchestrator + 4 haiku persona sub-agents: install-operator, cold-start-junior, security-skeptic, cli-ergonomics-auditor). Audits a docs artifact and publishes persona-aggregated feedback. Plus doctrine-triangle updates to orchestrate/review-senior/verify (read-reviewer-body, pane-monitor, HOLD-vs-APPROVE), CC-time-estimates PRINCIPLES subsection, `safer:deferred` label, investigate-first triage rule.
+
 ## 0.1.1 — bin/ packaging fix
 
 Package `bin/` directory in plugin distribution to fix telemetry propagation (sbd#101).
