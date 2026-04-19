@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+SKILLS_DIR="$CODEX_HOME/skills"
+PLUGIN_LINK="$SKILLS_DIR/safer-by-default"
+BIN_LINK_DIR="${SAFER_CODEX_BIN_DIR:-$HOME/.local/bin}"
+STATE_DIR="${SAFER_STATE_DIR:-$HOME/.safer}"
+MARKER="<!-- safer-by-default codex wrapper -->"
+
+QUIET=0
+CHECK_ONLY=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check) CHECK_ONLY=1; shift ;;
+    --quiet|-q) QUIET=1; shift ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: ./setup-codex [--check] [--quiet]
+
+Installs Codex compatibility wrappers for the safer-by-default skill bundle.
+EOF
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown flag: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
+warn() { echo "WARN: $*" >&2; }
+err() { echo "ERROR: $*" >&2; }
+
+resolved_path() (
+  local target="$1"
+  local dir
+  local link
+  local base
+
+  while [ -L "$target" ]; do
+    dir="$(cd "$(dirname "$target")" && pwd -P)"
+    link="$(readlink "$target")"
+    case "$link" in
+      /*) target="$link" ;;
+      *)  target="$dir/$link" ;;
+    esac
+  done
+
+  if [ -d "$target" ]; then
+    cd "$target" && pwd -P
+    return 0
+  fi
+
+  dir="$(cd "$(dirname "$target")" && pwd -P)"
+  base="$(basename "$target")"
+  printf '%s/%s\n' "$dir" "$base"
+)
+
+check_cmd() {
+  local cmd="$1"
+  local why="$2"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    log "  ✓ $cmd — $(command -v "$cmd")"
+  else
+    warn "missing: $cmd ($why)"
+  fi
+}
+
+ensure_dir() {
+  local path="$1"
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    [ -d "$path" ] || warn "missing directory: $path"
+    return 0
+  fi
+  mkdir -p "$path"
+}
+
+ensure_plugin_link() {
+  if [ -L "$PLUGIN_LINK" ] || [ -d "$PLUGIN_LINK" ]; then
+    local current
+    current="$(resolved_path "$PLUGIN_LINK")"
+    if [ "$current" = "$(resolved_path "$INSTALL_DIR")" ]; then
+      log "  ✓ plugin root linked at $PLUGIN_LINK"
+      return 0
+    fi
+    err "$PLUGIN_LINK already points elsewhere: $current"
+    return 1
+  fi
+
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    warn "missing plugin link: $PLUGIN_LINK"
+    return 0
+  fi
+
+  ln -s "$INSTALL_DIR" "$PLUGIN_LINK"
+  log "  ✓ linked plugin root to $PLUGIN_LINK"
+}
+
+write_wrapper() {
+  local skill_name="$1"
+  local wrapper_dir="$SKILLS_DIR/safer-$skill_name"
+  local wrapper_file="$wrapper_dir/SKILL.md"
+  local display_name="safer:$skill_name"
+
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    if [ -f "$wrapper_file" ] && grep -Fq "$MARKER" "$wrapper_file"; then
+      log "  ✓ wrapper present: $display_name"
+    else
+      warn "missing wrapper: $display_name ($wrapper_file)"
+    fi
+    return 0
+  fi
+
+  if [ -e "$wrapper_dir" ] && { [ ! -f "$wrapper_file" ] || ! grep -Fq "$MARKER" "$wrapper_file"; }; then
+    err "refusing to overwrite non-generated wrapper at $wrapper_dir"
+    return 1
+  fi
+
+  mkdir -p "$wrapper_dir"
+  cat > "$wrapper_file" <<EOF
+---
+name: "$display_name"
+description: "Codex compatibility wrapper for the safer-by-default '$skill_name' skill installed locally."
+---
+
+$MARKER
+
+# $display_name
+
+This wrapper forwards to the local \`safer-by-default\` repo.
+
+Before acting:
+1. Read \`../safer-by-default/PRINCIPLES.md\`.
+2. Read \`../safer-by-default/skills/$skill_name/SKILL.md\`.
+3. Treat \`../safer-by-default\` as the plugin root.
+4. Treat \`AskUserQuestion\` in the upstream instructions as a concise user question or Codex user-input request.
+5. Treat upstream tool labels (\`Bash\`, \`Read\`, \`Write\`, \`Edit\`, \`Grep\`, \`Glob\`) as the closest available Codex tools.
+6. Prefer \`safer-*\` binaries from \`PATH\`; if missing, use \`../safer-by-default/bin/<command>\` directly.
+
+Use this skill when the user explicitly asks for \`$display_name\` or for the safer-by-default \`$skill_name\` workflow.
+EOF
+  log "  ✓ installed wrapper: $display_name"
+}
+
+link_bin() {
+  local source_file="$1"
+  local bin_name
+  local dest_file
+  local current
+
+  bin_name="$(basename "$source_file")"
+  dest_file="$BIN_LINK_DIR/$bin_name"
+
+  if [ -L "$dest_file" ] || [ -f "$dest_file" ]; then
+    current="$(resolved_path "$dest_file")"
+    if [ "$current" = "$(resolved_path "$source_file")" ]; then
+      log "  ✓ binary linked: $bin_name"
+      return 0
+    fi
+    err "$dest_file already exists and points elsewhere: $current"
+    return 1
+  fi
+
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    warn "missing binary link: $dest_file"
+    return 0
+  fi
+
+  ln -s "$source_file" "$dest_file"
+  log "  ✓ linked binary: $dest_file"
+}
+
+log "safer-by-default Codex setup"
+log "  install dir:  $INSTALL_DIR"
+log "  codex home:   $CODEX_HOME"
+log "  skills dir:   $SKILLS_DIR"
+log "  bin link dir: $BIN_LINK_DIR"
+log ""
+
+log "Checking recommended dependencies..."
+check_cmd bash "required by safer-* helper scripts"
+check_cmd git "required by safer-slug and repo-aware workflows"
+check_cmd gh "required by GitHub-backed safer workflows"
+check_cmd bun "used by the TypeScript bootstrap flow in some repos"
+if command -v gh >/dev/null 2>&1; then
+  if gh auth status >/dev/null 2>&1; then
+    log "  ✓ gh authenticated"
+  else
+    warn "gh is installed but not authenticated. GitHub-backed skills will not complete until you run: gh auth login"
+  fi
+fi
+log ""
+
+log "Preparing directories..."
+ensure_dir "$SKILLS_DIR"
+ensure_dir "$BIN_LINK_DIR"
+ensure_dir "$STATE_DIR/analytics"
+if [ "$CHECK_ONLY" -eq 0 ] && [ ! -f "$STATE_DIR/analytics/events.jsonl" ]; then
+  : > "$STATE_DIR/analytics/events.jsonl"
+  log "  ✓ created $STATE_DIR/analytics/events.jsonl"
+fi
+log ""
+
+log "Registering plugin root..."
+ensure_plugin_link
+log ""
+
+log "Installing skill wrappers..."
+for skill_dir in "$INSTALL_DIR"/skills/*; do
+  [ -d "$skill_dir" ] || continue
+  [ -f "$skill_dir/SKILL.md" ] || continue
+  write_wrapper "$(basename "$skill_dir")"
+done
+log ""
+
+log "Linking safer binaries..."
+for source_file in "$INSTALL_DIR"/bin/safer-*; do
+  [ -f "$source_file" ] || continue
+  link_bin "$source_file"
+done
+log ""
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  log "--check complete."
+else
+  log "Codex setup complete."
+  log "Restart Codex to pick up the new skills."
+fi
