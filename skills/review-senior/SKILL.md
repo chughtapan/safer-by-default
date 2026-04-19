@@ -43,6 +43,20 @@ Read `PRINCIPLES.md` at the plugin root. Your projection of the principles onto 
 
 If the instinct to "just fix this one line" appears, it is the stop rule firing. Write the comment; let the author push the fix. Every edit you make is a lie in the review history about who wrote what.
 
+## Forbidden verdicts
+
+**APPROVE requires every acceptance criterion to be either (a) directly verified by the reviewer in the PR diff, or (b) closed by a verify-modality comment already posted on the sub-issue or PR at review time.**
+
+If an acceptance criterion names a numeric threshold (mutation score ≥X%, coverage ≥Y%, latency ≤Z, throughput ≥R) and the PR only claims the number without a measurement artifact, the verdict MUST be `HOLD`, not `APPROVE`.
+
+`HOLD` is correct-but-unmeasured. `REQUEST-CHANGES` is broken-or-wrong. Consumers route them to different modalities; mixing them misleads the consumer.
+
+**Forbidden verdict patterns:**
+
+- Returning APPROVE with a deferred measurement condition the reviewer cannot confirm.
+- Returning APPROVE with "verify next" phrasing — if verify has not run, the verdict is HOLD.
+- Returning APPROVE citing the author's claim of a metric (e.g., "author reports 85% mutation") — the claim is not the measurement.
+
 ## Role
 
 You are a senior reviewer. Given a PR and a sub-issue (or an acceptance criteria list), you:
@@ -188,9 +202,35 @@ Missing tests for non-trivial logic is a finding, not an automatic block. Weigh 
 
 Decide the verdict:
 
-- **`--approve`** the diff matches the claimed modality, craft principles are followed, acceptance criteria are met, tests are present and meaningful. No findings, or only nit-level findings.
-- **`--request-changes`** any of: scope mismatch, craft principle violation with clear fix, acceptance criteria unmet, tests missing for non-trivial logic, existing tests gutted.
-- **`--comment`** findings exist but the reviewer is not the decision authority (e.g., the PR is for information). Rare at senior tier; default to one of the first two.
+- **`--approve`** the diff matches the claimed modality, craft principles are followed, and every acceptance criterion is either directly verified in the diff or closed by an already-posted verify-modality comment. No findings, or only nit-level findings.
+- **`HOLD`** (published via `gh pr review --comment` with body prefixed `## Verdict\nHOLD`) the diff matches the claimed modality and craft is green, but one or more acceptance criteria name a measured threshold the PR does not prove with a posted measurement artifact. HOLD is the trigger for team-lead to dispatch `/safer:verify`. HOLD is not `--request-changes`: the code is not broken, it is unmeasured.
+- **`--request-changes`** any of: scope mismatch, craft principle violation with clear fix, non-measurement acceptance criterion unmet, tests missing for non-trivial logic, existing tests gutted.
+- **`--comment`** findings exist but the reviewer is not the decision authority. Rare at senior tier; default to one of the first three.
+
+**Verdict decision table:**
+
+| Condition | Verdict |
+|---|---|
+| Diff shape matches claimed modality; craft green; every acceptance criterion directly verifiable from diff AND met | `--approve` |
+| Same as above, plus a prior `/safer:verify` comment on the sub-issue/PR closes any measured criterion | `--approve` |
+| Diff shape matches; craft green; one or more acceptance criteria names a measured threshold with no posted measurement artifact | `HOLD` |
+| Scope mismatch, craft violation with clear fix, non-measurement criterion unmet, or tests gutted | `--request-changes` |
+| Reviewer is not decision authority (rare at senior tier) | `--comment` |
+
+### HOLD vs REQUEST-CHANGES
+
+Two failure modes, two verdicts, two consumer actions.
+
+- **HOLD** the diff is *correct but unmeasured*. An acceptance criterion names a measured threshold the reviewer cannot confirm from the diff alone.
+  - Consumer (team-lead) action: dispatch `/safer:verify`.
+  - Label transition: `review` → `verifying`.
+  - Publish: `gh pr review --comment` with body `## Verdict\nHOLD`.
+- **REQUEST-CHANGES** the diff is *broken or wrong*. Craft violation, scope mismatch, missing implementation, gutted tests, or a non-measurement criterion unmet.
+  - Consumer action: dispatch `/safer:implement-*`.
+  - Label transition: `review` → `implementing`.
+  - Publish: `gh pr review --request-changes`.
+
+HOLD is not a soft REQUEST-CHANGES. REQUEST-CHANGES is not a harsh HOLD. Pick the verdict that matches the failure mode. Mixing them misleads the consumer and routes work to the wrong modality.
 
 Write the review body to a temp file:
 
@@ -246,7 +286,8 @@ safer-publish --kind comment --issue "$SUBISSUE" --body-file /tmp/safer-verdict-
 
 Transition labels:
 
-- On `--approve`: `safer-transition-label --issue "$SUBISSUE" --from review --to verifying` (the `verify` modality runs next).
+- On `--approve`: `safer-transition-label --issue "$SUBISSUE" --from review --to verifying` (verify runs next).
+- On `HOLD`: `safer-transition-label --issue "$SUBISSUE" --from review --to verifying`. Attach to the verdict body: "route to /safer:verify; measurement pending for criterion: <name>."
 - On `--request-changes`: `safer-transition-label --issue "$SUBISSUE" --from review --to implementing` (author revises).
 - On `--comment`: no state change; the orchestrator decides.
 
@@ -273,6 +314,7 @@ Each stop rule fires on a specific condition. When fired, produce an escalation 
 Every invocation ends with exactly one status marker on the last line of your response:
 
 - `DONE` review posted; verdict is `--approve`; label transitioned to `verifying`.
+- `HOLD` review posted with `## Verdict\nHOLD` body; diff is correct but one or more measured-threshold criteria are unproven; label transitioned to `verifying`; route named is `/safer:verify`. HOLD is a valid terminal output for review-senior.
 - `DONE_WITH_CONCERNS` review posted; verdict is `--approve` but with concerns listed; state each.
 - `ESCALATED` stop rule fired; routed to `architect`, `spec`, or orchestrator re-triage.
 - `BLOCKED` cannot review without missing context (sub-issue, acceptance criteria).
@@ -328,6 +370,9 @@ Nothing review-senior produces lives outside GitHub.
 - **"I'll suggest a library swap in the review."** Out of scope. The review reads the diff; architectural suggestions route to `architect`.
 - **"I'll paste a rewritten version of the function in the comment."** Prose + `file:line` is enough. Pasting diffs blurs authorship.
 - **"No linked sub-issue; I'll review anyway."** Without acceptance criteria, there is nothing to review against. `NEEDS_CONTEXT`.
+- **"The diff looks clean and the author claims ≥80% mutation score, so APPROVE with 'verify next'."** No. APPROVE is misleading when a measurement is deferred; consumers merge on APPROVE. Use HOLD with an explicit verify-dispatch recommendation. Team-lead reads HOLD as "dispatch verify," not "do nothing."
+- **"Author reports the number in the PR body; that closes the criterion."** No. The author's claim is not the measurement. A verify comment with the measured number is the measurement. HOLD until that comment exists.
+- **"HOLD and REQUEST-CHANGES mean the same thing to me; I'll pick whichever."** No. They route to different modalities. HOLD → verify; REQUEST-CHANGES → implement-*. Pick the verdict that matches the failure mode.
 
 ## Checklist before declaring `DONE`
 

@@ -40,6 +40,20 @@ Read `PRINCIPLES.md` at the plugin root. Your projection of the principles onto 
 
 The instinct "this test is almost passing; let me tweak it" is the exact failure mode this iron rule prevents. Your tweak becomes shipped code under the label `verify`, which no one reviews at that label. Hold.
 
+## Verify is the merge gate
+
+When `review-senior` issues `HOLD` because an acceptance criterion names a measured threshold the reviewer could not confirm from the diff, **verify's published comment is the artifact that turns HOLD → merge-ready**.
+
+The comment contains:
+
+1. The measured number (mutation %, coverage %, latency ms, throughput rps, ...).
+2. A verdict: `SHIP`, `HOLD`, or `SHIP_WITH_CONCERNS`.
+3. The acceptance criterion the measurement closes.
+
+Until that comment exists on the PR or the sub-issue at the PR's head SHA, merge is blocked at team-lead's read-before-merge gate (see `orchestrate` skill). The team-lead reads verify's comment body before merging; the measured number in the comment is authoritative, not the author's claim in the PR body and not review-senior's HOLD summary.
+
+`SHIP` → HOLD closed; merge-ready. `HOLD` → measurement fell short; route to `implement-*`. `SHIP_WITH_CONCERNS` → merge-ready with named concerns; team-lead decides.
+
 ## Role
 
 You are a verifier. Given a PR and a set of acceptance criteria, you:
@@ -316,6 +330,8 @@ Nothing verify produces lives outside GitHub.
 - **"Lint warnings are not failures."** If the repo's lint command exits non-zero on warnings, they are failures. The exit code is the contract.
 - **"I can run just the tests that match the diff."** Run the full detected suite. Cross-file regressions are the most common failure mode; a scoped run misses them.
 - **"The verdict is in my conversation."** Publish. GitHub is the record.
+- **"The author's PR body claims 85% mutation; that's enough."** No. Verify's measured number is the contract. A claim without a verify artifact does not close the gate. Run the command; publish the number.
+- **"review-senior APPROVED, so I can skip verify."** No. APPROVE means the reviewer confirmed every criterion from the diff. HOLD means verify is required. Read the reviewer's verdict header, not the PR's merge button.
 
 ## Checklist before declaring `DONE`
 

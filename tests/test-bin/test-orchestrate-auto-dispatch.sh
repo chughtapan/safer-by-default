@@ -254,6 +254,33 @@ test_epic_body_template_includes_linear_project_line() {
     }
 }
 
+# sbd#129: Step 5c.0 read-reviewer-body gate must be present.
+test_skill_md_has_step_5c0_read_reviewer_body() {
+  grep -qF "Step 5c.0 — Read reviewer body before merging" "$SKILL_MD"
+}
+
+test_skill_md_step5c0_has_gh_pr_view_command() {
+  grep -qF 'gh pr view <N> --repo <R> --json reviews --jq' "$SKILL_MD"
+}
+
+# sbd#130: Phase 5e pane stall check must be present.
+test_skill_md_has_pane_stall_check() {
+  grep -qF "Waiting for team lead approval" "$SKILL_MD"
+}
+
+test_skill_md_has_phase_5e_protocol() {
+  grep -qF "Phase 5e — permission_request response protocol" "$SKILL_MD"
+}
+
+# sbd#129+130: forbidden list entries must be present.
+test_skill_md_forbidden_read_reviewer_body() {
+  grep -qF "without reading the reviewer body on GitHub via the Step 5c.0 procedure" "$SKILL_MD"
+}
+
+test_skill_md_forbidden_permission_request_stall() {
+  grep -qF "Letting a teammate \`permission_request\` sit unanswered past one sweep tick" "$SKILL_MD"
+}
+
 # ---------------------------------------------------------------------------
 
 echo "── orchestrate-auto-dispatch unit tests ──"
@@ -276,5 +303,11 @@ run_test "SKILL.md pins per_tick_cap=3"                         test_skill_md_pi
 run_test "SKILL.md pins pane_ceiling=20"                        test_skill_md_pins_pane_ceiling_to_twenty
 run_test "SKILL.md has one template per dispatchable modality"  test_skill_md_has_all_seven_templates
 run_test "epic body template includes Linear project line"      test_epic_body_template_includes_linear_project_line
+run_test "SKILL.md has Step 5c.0 read-reviewer-body gate"      test_skill_md_has_step_5c0_read_reviewer_body
+run_test "SKILL.md Step 5c.0 has gh pr view command"           test_skill_md_step5c0_has_gh_pr_view_command
+run_test "SKILL.md has pane stall check string"                test_skill_md_has_pane_stall_check
+run_test "SKILL.md has Phase 5e protocol subsection"           test_skill_md_has_phase_5e_protocol
+run_test "SKILL.md forbidden: read reviewer body"              test_skill_md_forbidden_read_reviewer_body
+run_test "SKILL.md forbidden: permission_request stall"        test_skill_md_forbidden_permission_request_stall
 
 report
