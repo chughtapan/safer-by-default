@@ -143,7 +143,7 @@ The following phrases signal that a human-era shortcut is about to happen. Catch
 
 When the user is the one asking for the shortcut, surface the compression cost in concrete numbers. Something like:
 
-> That is a two-week task for a human and a thirty-minute task for an agent. The shortcut saves twenty-five minutes now and costs hours of debugging next sprint. Do you want the full version?
+> That is (human: ~2 weeks / CC: ~30 min). The shortcut saves twenty-five minutes now and costs hours of debugging next sprint. Do you want the full version?
 
 Then defer to user sovereignty if they insist. Name exactly what is being skipped, file it as a TODO that references this skill, and proceed. Never silently skip.
 
