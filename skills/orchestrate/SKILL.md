@@ -493,10 +493,11 @@ for repo in $(jq -r '.repos[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/n
 done > /tmp/orch-queue.jsonl
 ```
 
-Filter the queue in-process. The first two filters are body-only and cheap; the marker filter requires a per-candidate `gh issue view --json comments` call (the marker is a comment, not in the issue body) and should run last so we only pay for survivors:
+Filter the queue in-process. The first two filters are body-only and cheap; the deferral and idempotency markers require per-candidate `gh issue view --json comments` calls and should run last so we only pay for survivors:
 
 - Drop any row whose title or body references a teammate already in `config.json` `.members[].name` (already in flight).
 - Drop any row whose parent epic (from `## Parent` or `Parent: #N` in the body) has a linked open PR authored by the dispatching team (somebody is on it).
+- For each surviving candidate, check the `safer:deferred` label and deferral marker (see subsection below).
 - For each surviving candidate, fetch comments and scan for the idempotency marker. The marker is `<!-- orchestrate:dispatched teammate=<name> at=<iso> -->`; drop the candidate if any comment matches and its `at=` timestamp is within the last 30 minutes (re-entrance guard against a team-lead crash mid-tick):
 
   ```bash
@@ -512,6 +513,52 @@ Filter the queue in-process. The first two filters are body-only and cheap; the 
     continue
   fi
   ```
+
+#### Deferral marker
+
+A sub-issue labeled `safer:deferred` carries a structured comment that records why it is held and until when. The filter drops deferred sub-issues whose `until` condition has not been satisfied.
+
+Marker format (in an HTML comment on the sub-issue):
+
+```
+<!-- safer:deferred reason="<free-form string, quote-escaped>" until="<ISO8601|condition:...>" added-by="<team-member-name>" at="<ISO8601>" -->
+```
+
+`until` values:
+
+| Shape | Semantics | Example |
+|---|---|---|
+| ISO8601 UTC | Filter drops sub-issue until wall-clock time ≥ `until` | `2026-04-20T00:00:00Z` |
+| `condition:<freeform>` | Filter drops unconditionally; unblock requires human label removal | `condition:upstream-pr-merged:chughtapan/cc-judge#14` |
+
+Regex (ECMA/PCRE compatible; `until` field must be ISO8601 or `condition:*`):
+
+```
+<!-- safer:deferred reason="(?<reason>(?:[^"\\]|\\.)*)" until="((?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)|(?:condition:[^"]+))" added-by="(?<by>[^"]+)" at="(?<at>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)" -->
+```
+
+Filter logic (fail-closed): Drop any sub-issue labeled `safer:deferred` unless its marker's `until` condition has passed. If the label is present but no marker comment is found, log `deferred_marker_missing: issue=#N` and skip (fail-closed). If the marker is malformed, log `deferred_marker_malformed: issue=#N` and skip.
+
+Pseudocode:
+
+```bash
+if gh issue view "$N" --repo "$repo" --json labels \
+     --jq '.labels[].name' | grep -qx 'safer:deferred'; then
+  marker=$(gh issue view "$N" --repo "$repo" --json comments --jq '
+    .comments[].body |
+    capture("<!-- safer:deferred reason=\"(?<r>(?:[^\"\\\\]|\\\\.)*)\" until=\"(?<u>[^\"]+)\" added-by=\"[^\"]+\" at=\"[^\"]+\" -->")
+    | .u' | tail -1)
+  case "$marker" in
+    "")                 echo "deferred_marker_missing: issue=#$N"; continue ;;
+    condition:*)        continue ;;
+    ????-??-??T*)
+      now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      [ "$marker" \> "$now" ] && continue
+      ;;
+    *)                  echo "deferred_marker_malformed: issue=#$N marker=$marker"; continue ;;
+  esac
+fi
+```
 
 The surviving rows are the candidate queue. Record the count (`queue_len`) for the log line in 6b.
 

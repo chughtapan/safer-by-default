@@ -27,6 +27,10 @@ MODALITY_REGEX='^safer:(implement-(junior|senior|staff)|verify|spike|research|sp
 # The idempotency marker format from SKILL.md Step 6e.
 MARKER_REGEX='^<!-- orchestrate:dispatched teammate=[A-Za-z0-9_-]+ at=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z -->$'
 
+# The deferral marker format from SKILL.md Step 6a deferral-marker subsection.
+# until field must be either ISO8601 (YYYY-MM-DDTHH:MM:SSZ) or condition:*
+DEFERRAL_MARKER_REGEX='<!-- safer:deferred reason="(?<reason>(?:[^"\\]|\\.)*)" until="((?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)|(?:condition:[^"]+))" added-by="(?<by>[^"]+)" at="(?<at>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)" -->'
+
 # ---------------------------------------------------------------------------
 
 test_regex_matches_all_seven_modalities() {
@@ -108,6 +112,69 @@ test_idempotency_marker_extracts_teammate_and_timestamp() {
   ts=$(echo "$c" | sed -n 's/.*at=\([0-9T:Z-]\+\).*/\1/p')
   assert_equal "$name" "impl-senior-66" "extract name" && \
     assert_equal "$ts" "2026-04-18T23:45:00Z" "extract ts"
+}
+
+test_deferral_marker_matches_canonical_format() {
+  local good=(
+    "<!-- safer:deferred reason=\"awaiting user confirmation\" until=\"2026-04-20T00:00:00Z\" added-by=\"team-lead\" at=\"2026-04-19T15:30:00Z\" -->"
+    "<!-- safer:deferred reason=\"upstream PR merge\" until=\"condition:chughtapan/cc-judge#14\" added-by=\"orchestrate\" at=\"2026-04-18T12:00:00Z\" -->"
+    "<!-- safer:deferred reason=\"\" until=\"2026-12-31T23:59:59Z\" added-by=\"a\" at=\"2000-01-01T00:00:00Z\" -->"
+  )
+  for c in "${good[@]}"; do
+    echo "$c" | grep -qP "$DEFERRAL_MARKER_REGEX" || { echo "missed: $c"; return 1; }
+  done
+  return 0
+}
+
+test_deferral_marker_rejects_malformed() {
+  local bad=(
+    "<!-- safer:deferred reason=\"test\" until=\"2026-04-20\" added-by=\"x\" at=\"2026-04-19T15:30:00Z\" -->"  # no time in until
+    "<!-- safer:deferred reason=test until=\"2026-04-20T00:00:00Z\" added-by=\"x\" at=\"2026-04-19T15:30:00Z\" -->"  # unquoted reason
+    "<!-- safer:deferred reason=\"test\" until=2026-04-20T00:00:00Z added-by=\"x\" at=\"2026-04-19T15:30:00Z\" -->"  # unquoted until
+    "safer:deferred reason=\"test\" until=\"2026-04-20T00:00:00Z\" added-by=\"x\" at=\"2026-04-19T15:30:00Z\""  # not a comment
+    "<!-- safer:deferred reason=\"test\" until=\"2026-04-20T00:00:00Z\" added-by= at=\"2026-04-19T15:30:00Z\" -->"  # empty added-by
+  )
+  for c in "${bad[@]}"; do
+    if echo "$c" | grep -qP "$DEFERRAL_MARKER_REGEX"; then
+      echo "wrongly accepted: $c"; return 1
+    fi
+  done
+  return 0
+}
+
+test_deferral_marker_extracts_until_field() {
+  local c="<!-- safer:deferred reason=\"test\" until=\"2026-04-20T15:45:00Z\" added-by=\"team\" at=\"2026-04-19T12:00:00Z\" -->"
+  local until
+  until=$(echo "$c" | sed -n 's/.*until="\([^"]*\)".*/\1/p')
+  assert_equal "$until" "2026-04-20T15:45:00Z" "extract until ISO8601"
+}
+
+test_deferral_filter_skips_condition_indefinitely() {
+  local c="<!-- safer:deferred reason=\"upstream merge\" until=\"condition:chughtapan/cc-judge#14\" added-by=\"lead\" at=\"2026-04-19T12:00:00Z\" -->"
+  local until
+  until=$(echo "$c" | sed -n 's/.*until="\([^"]*\)".*/\1/p')
+  case "$until" in
+    condition:*) return 0 ;; # correct: condition: prefix means skip
+    *) echo "condition: check failed"; return 1 ;;
+  esac
+}
+
+test_deferral_filter_compares_iso8601_timestamps() {
+  # Simulate the filter logic: if marker.until > now, skip; else proceed.
+  local past="2026-04-18T00:00:00Z"
+  local future="2026-04-21T00:00:00Z"
+  local now="2026-04-19T12:00:00Z"
+
+  # Past: marker < now, so the deferral has expired; do NOT skip (proceed with dispatch)
+  if [ "$past" \> "$now" ]; then
+    echo "past check failed"; return 1
+  fi
+
+  # Future: marker > now, so the deferral is still active; skip
+  if ! [ "$future" \> "$now" ]; then
+    echo "future check failed"; return 1
+  fi
+  return 0
 }
 
 # Priority-tier sort reference implementation from Step 6c:
@@ -197,6 +264,11 @@ run_test "SKILL.md Step 6a uses the pinned regex verbatim"      test_skill_md_st
 run_test "idempotency marker matches canonical format"          test_idempotency_marker_matches_canonical_format
 run_test "idempotency marker rejects malformed strings"         test_idempotency_marker_rejects_malformed
 run_test "idempotency marker extracts teammate + timestamp"     test_idempotency_marker_extracts_teammate_and_timestamp
+run_test "deferral marker matches canonical format"             test_deferral_marker_matches_canonical_format
+run_test "deferral marker rejects malformed strings"            test_deferral_marker_rejects_malformed
+run_test "deferral marker extracts until field"                 test_deferral_marker_extracts_until_field
+run_test "deferral filter skips condition indefinitely"         test_deferral_filter_skips_condition_indefinitely
+run_test "deferral filter compares ISO8601 timestamps"          test_deferral_filter_compares_iso8601_timestamps
 run_test "priority sort orders by tier then age"                test_priority_sort_orders_by_tier
 run_test "priority sort breaks ties by oldest created_at"       test_priority_sort_breaks_ties_by_age
 run_test "per-tick cap limits dispatch to 3"                    test_per_tick_cap_limits_dispatch
