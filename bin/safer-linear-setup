@@ -1,0 +1,125 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Linear API setup automation for safer-by-default workspace
+# Usage: LINEAR_API_KEY=xxx ./bin/safer-linear-setup
+
+# Check for API key
+if [ -z "${LINEAR_API_KEY:-}" ]; then
+  echo "STATUS: FAIL — LINEAR_API_KEY not set. Generate at https://linear.app/moltzap/settings/api"
+  exit 1
+fi
+
+API_KEY="$LINEAR_API_KEY"
+ENDPOINT="https://api.linear.app/graphql"
+LABELS_CREATED=0
+PROJECTS_CREATED=0
+
+# Helper: make GraphQL query
+query_linear() {
+  local query="$1"
+  curl -s -X POST "$ENDPOINT" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $API_KEY" \
+    -d "{\"query\": $(printf '%s' "$query" | jq -Rs '.')}" || echo "{}"
+}
+
+# Check if team exists
+team_exists() {
+  local response=$(query_linear 'query { teams(filter: { key: { eq: "SBD" } }) { nodes { id } } }')
+  local count=$(echo "$response" | jq -r '.data.teams.nodes | length' 2>/dev/null || echo "0")
+  [ "$count" -gt 0 ] && return 0 || return 1
+}
+
+# Create team
+create_team() {
+  query_linear 'mutation { teamCreate(input: { key: "SBD", name: "Safer-by-Default" }) { team { id } } }' > /dev/null 2>&1 || true
+}
+
+# Label colors (hex format for Linear)
+declare -A LABEL_COLORS=(
+  [junior]="#0891b2"        # teal
+  [senior]="#2563eb"        # blue
+  [staff]="#7c3aed"         # purple
+  [spec]="#06b6d4"          # cyan
+  [spike]="#ea580c"         # orange
+  [research]="#facc15"      # yellow
+  [verify]="#10b981"        # green
+  [architect]="#d946ef"     # magenta
+  [review-senior]="#dc2626" # red
+  [dogfood]="#ec4899"       # pink
+  [plan-approved]="#a3e635" # lime
+)
+
+# Check label exists
+label_exists() {
+  local name="$1"
+  local response=$(query_linear "query { issueLabels(filter: { name: { eq: \"$name\" } }) { nodes { id } } }")
+  local count=$(echo "$response" | jq -r '.data.issueLabels.nodes | length' 2>/dev/null || echo "0")
+  [ "$count" -gt 0 ] && return 0 || return 1
+}
+
+# Create label
+create_label() {
+  local name="$1"
+  local color="$2"
+  query_linear "mutation { issueLabelCreate(input: { name: \"$name\", color: \"$color\" }) { issueLabel { id } } }" > /dev/null 2>&1 || true
+}
+
+# Ensure team exists (idempotent)
+if ! team_exists; then
+  create_team
+  sleep 1
+fi
+
+# Create labels (idempotent)
+for label_name in "${!LABEL_COLORS[@]}"; do
+  if ! label_exists "$label_name"; then
+    create_label "$label_name" "${LABEL_COLORS[$label_name]}"
+    ((LABELS_CREATED++))
+  fi
+done
+
+# Project names and descriptions
+declare -a PROJ_NAMES=(
+  "Epic-B-cc-judge"
+  "Epic-C-zapbot-simplify"
+  "Moltzap-migration"
+  "Community-feedback-agents"
+  "Reentrance-Tier-1"
+  "Testing-doctrine"
+)
+
+declare -A PROJ_DESC=(
+  [Epic-B-cc-judge]="Epic B: cc-judge enhancement for stricter validation"
+  [Epic-C-zapbot-simplify]="Epic C: simplify zapbot routing and execution"
+  [Moltzap-migration]="Moltzap workspace migration from external system"
+  [Community-feedback-agents]="Community feedback collection and agent coordination"
+  [Reentrance-Tier-1]="Tier-1 reentrance and concurrency fixes"
+  [Testing-doctrine]="Testing doctrine enforcement and CI gate integration"
+)
+
+# Check and create projects (idempotent)
+for proj_name in "${PROJ_NAMES[@]}"; do
+  local response=$(query_linear "query { projects(filter: { name: { eq: \"$proj_name\" } }) { nodes { id } } }")
+  local exists=$(echo "$response" | jq -r '.data.projects.nodes | length' 2>/dev/null || echo "0")
+  if [ "$exists" -eq 0 ]; then
+    query_linear "mutation { projectCreate(input: { name: \"$proj_name\", description: \"${PROJ_DESC[$proj_name]}\" }) { project { id } } }" > /dev/null 2>&1 || true
+    ((PROJECTS_CREATED++))
+  fi
+done
+
+# Create 1-week cycles (idempotent)
+local cycles_response=$(query_linear 'query { cycles(first: 1) { nodes { id } } }')
+local cycles_count=$(echo "$cycles_response" | jq -r '.data.cycles.nodes | length' 2>/dev/null || echo "0")
+if [ "$cycles_count" -eq 0 ]; then
+  local start_date=$(date -u +%Y-%m-%d)
+  local end_date=$(date -u -d '+7 days' +%Y-%m-%d 2>/dev/null || date -u -v+7d +%Y-%m-%d 2>/dev/null || echo "error")
+  if [ "$end_date" != "error" ]; then
+    query_linear "mutation { cycleCreate(input: { startsAt: \"$start_date\", endsAt: \"$end_date\" }) { cycle { id } } }" > /dev/null 2>&1 || true
+  fi
+fi
+
+echo "STATUS: OK — team SBD ready, $LABELS_CREATED labels created/verified, $PROJECTS_CREATED projects created/verified, cycles enabled"
+exit 0
