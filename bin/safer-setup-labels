@@ -1,0 +1,69 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# GitHub label setup for safer-by-default
+# Creates orchestrate-related labels idempotently.
+# Usage: safer-setup-labels [--quiet]
+
+main() {
+  local quiet=false
+
+  # Parse flags
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --quiet)
+        quiet=true
+        shift
+        ;;
+      *)
+        echo "ERROR: Unknown flag '$1'"
+        exit 1
+        ;;
+    esac
+  done
+
+  # Verify gh is authenticated
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "ERROR: gh not authenticated"
+    exit 1
+  fi
+
+  local repo
+  repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+
+  # Create safer:deferred label idempotently
+  create_label_idempotent "safer:deferred" "ededed" "orchestrate: hold dispatch until reason expires"
+}
+
+# Create a label if it doesn't exist; fail silently if it does.
+# Usage: create_label_idempotent <label-name> <color> <description>
+create_label_idempotent() {
+  local label_name="$1"
+  local color="$2"
+  local description="$3"
+
+  # Check if label already exists
+  if gh label list --limit 1000 | grep -q "^$label_name"; then
+    if [ "$quiet" = false ]; then
+      echo "SKIP: label '$label_name' already exists"
+    fi
+    return 0
+  fi
+
+  # Create the label
+  if gh label create "$label_name" --color "$color" --description "$description"; then
+    if [ "$quiet" = false ]; then
+      echo "CREATE: label '$label_name' created"
+    fi
+    return 0
+  else
+    echo "ERROR: failed to create label '$label_name'"
+    return 1
+  fi
+}
+
+# Entry point
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  main "$@"
+fi

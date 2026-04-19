@@ -20,6 +20,7 @@ Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `S
 git clone --single-branch --depth 1 https://github.com/chughtapan/safer-by-default.git ~/.claude/skills/safer-by-default
 cd ~/.claude/skills/safer-by-default
 ./setup
+./bin/safer-setup-labels
 ```
 
 Requirements: `gh` (authenticated), `git`, `bash`, `bun` (for the template generator). Optional: [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
