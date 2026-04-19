@@ -546,7 +546,7 @@ if gh issue view "$N" --repo "$repo" --json labels \
      --jq '.labels[].name' | grep -qx 'safer:deferred'; then
   marker=$(gh issue view "$N" --repo "$repo" --json comments --jq '
     .comments[].body |
-    capture("<!-- safer:deferred reason=\"(?<r>(?:[^\"\\\\]|\\\\.)*)\" until=\"(?<u>[^\"]+)\" added-by=\"[^\"]+\" at=\"[^\"]+\" -->")
+    capture("<!-- safer:deferred reason=\"(?<r>(?:[^\"\\\\]|\\\\.)*)\" until=\"(?<u>(?:\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)|(?:condition:[^\"]+))\" added-by=\"[^\"]+\" at=\"[^\"]+\" -->")
     | .u' | tail -1)
   case "$marker" in
     "")                 echo "deferred_marker_missing: issue=#$N"; continue ;;

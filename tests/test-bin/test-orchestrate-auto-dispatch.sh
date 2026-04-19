@@ -29,7 +29,7 @@ MARKER_REGEX='^<!-- orchestrate:dispatched teammate=[A-Za-z0-9_-]+ at=[0-9]{4}-[
 
 # The deferral marker format from SKILL.md Step 6a deferral-marker subsection.
 # until field must be either ISO8601 (YYYY-MM-DDTHH:MM:SSZ) or condition:*
-DEFERRAL_MARKER_REGEX='<!-- safer:deferred reason="(?<reason>(?:[^"\\]|\\.)*)" until="((?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)|(?:condition:[^"]+))" added-by="(?<by>[^"]+)" at="(?<at>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)" -->'
+DEFERRAL_MARKER_REGEX='<!-- safer:deferred reason="(([^"\\]|\\.)*)" until="(([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)|(condition:[^"]+))" added-by="([^"]+)" at="([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)" -->'
 
 # ---------------------------------------------------------------------------
 
@@ -121,7 +121,7 @@ test_deferral_marker_matches_canonical_format() {
     "<!-- safer:deferred reason=\"\" until=\"2026-12-31T23:59:59Z\" added-by=\"a\" at=\"2000-01-01T00:00:00Z\" -->"
   )
   for c in "${good[@]}"; do
-    echo "$c" | grep -qP "$DEFERRAL_MARKER_REGEX" || { echo "missed: $c"; return 1; }
+    echo "$c" | grep -qE "$DEFERRAL_MARKER_REGEX" || { echo "missed: $c"; return 1; }
   done
   return 0
 }
@@ -135,7 +135,7 @@ test_deferral_marker_rejects_malformed() {
     "<!-- safer:deferred reason=\"test\" until=\"2026-04-20T00:00:00Z\" added-by= at=\"2026-04-19T15:30:00Z\" -->"  # empty added-by
   )
   for c in "${bad[@]}"; do
-    if echo "$c" | grep -qP "$DEFERRAL_MARKER_REGEX"; then
+    if echo "$c" | grep -qE "$DEFERRAL_MARKER_REGEX"; then
       echo "wrongly accepted: $c"; return 1
     fi
   done
