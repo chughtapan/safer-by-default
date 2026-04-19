@@ -1,0 +1,4 @@
+[
+  {"id":"spike-ao-B","role":"spike-teammate-B","status":"stuck","issueId":74,"workspacePath":"/tmp/spike/t3-B"},
+  {"id":"spike-ao-C","role":"spike-teammate-C","status":"merged","issueId":65,"workspacePath":"/tmp/spike/t3-C"}
+]

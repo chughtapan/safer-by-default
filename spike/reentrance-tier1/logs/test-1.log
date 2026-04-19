@@ -1,0 +1,24 @@
+TEST 1 — kill one teammate; state-comment + ao + tmux → verdict
+started: 2026-04-18T23:55:23Z
+
+## Step A — seed state-comment (simulated heartbeat 6 min ago)
+edited: comment 4274802058 on repos/chughtapan/safer-by-default/issues/74
+state-comment seeded with last_heartbeat=2026-04-18T23:49:23Z (6 min stale)
+
+## Step B — ao session ls fixture (stuck session = restorable)
+[{"id":"spike-ao-A","role":"spike-teammate-A","status":"stuck","issueId":74,"workspacePath":"/tmp/spike/t1"}]
+
+## Step C — run the 3-source liveness verdict
+teammate:       spike-teammate-A
+sub_issue:      74
+hb_teammate:    spike-teammate-A
+hb_last_commit: deadbee
+hb_age_sec:     362 (fresh-threshold=300)
+ao_id:          spike-ao-A
+ao_status:      stuck
+tmux_panes:     0
+verdict:        restorable
+action:         ao session restore spike-ao-A; skip cleanStaleWorktree
+
+verdict-elapsed-sec: 1 (budget: <=120)
+VERDICT: PASS — verdict reached within 2-min cron window

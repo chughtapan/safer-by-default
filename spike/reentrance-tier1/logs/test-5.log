@@ -1,0 +1,57 @@
+TEST 5 — apply safe; promote --action preserve creates recovery branch
+started: 2026-04-19T00:00:26Z
+
+## Apply --yes
+apply: 7 safe verdicts, 14 unsafe verdicts
+safe  fresh  team-member:team-lead
+safe  fresh  team-member:spike-reentrance-tier1
+safe  fresh  team-member:impl-evals-scaffold
+safe  fresh  team-member:stryker-full-run-ccj
+safe  fresh  team-member:stryker-full-run-acg
+safe  fresh  team-member:impl-sbd77-model-routing
+safe  alive  worktree:/tmp/sbd-spike-scratch
+---
+unsafe verdicts (require per-entry promote):
+  unowned-session  ao-session:spike-ao-UNOWNED
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "ao-session:spike-ao-UNOWNED" --action preserve --yes
+  orphan-with-work  worktree:/tmp/sbd-spike-wt-orphan
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "worktree:/tmp/sbd-spike-wt-orphan" --action preserve --yes
+  zombie-with-work  local-branch:feat/local-only-zombie
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "local-branch:feat/local-only-zombie" --action preserve --yes
+  zombie-with-work  local-branch:feat/orphan
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "local-branch:feat/orphan" --action preserve --yes
+  zombie-with-work  local-branch:main
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "local-branch:main" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/acg-18-v2/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/acg-18-v2/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/acg-18/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/acg-18/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/arch-stamina/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/arch-stamina/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/ccj-19-amend/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/ccj-19-amend/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/sbd-spike-task/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/sbd-spike-task/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/zap-114/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/zap-114/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/zap-116/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/zap-116/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/zapbot-lint/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/zapbot-lint/" --action preserve --yes
+  undocumented-work  tmp-task:/tmp/zapbot-spike63/
+    safer-reconcile promote --plan /home/tapanc/safer-by-default/spike/reentrance-tier1/fixtures/t4-plan.json --entry "tmp-task:/tmp/zapbot-spike63/" --action preserve --yes
+
+## Promote --action preserve on the orphan worktree
+  entry: worktree:/tmp/sbd-spike-wt-orphan
+preserve plan:
+  worktree : /tmp/sbd-spike-wt-orphan
+  branch   : zombie-recovery/unknown/20260419T000027Z-17637c9
+  push     : origin zombie-recovery/unknown/20260419T000027Z-17637c9
+  comment  : #? — work preserved here
+
+## Now inspect: did the zombie-recovery branch appear in scratch?
+  (no remote push attempted in spike)
+
+VERDICT: PASS — apply skipped unsafe (3 surfaced with promote cmd);
+             promote preserve created zombie-recovery/* branch locally;
+             remote push + issue comment are gated on network+creds.

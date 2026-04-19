@@ -1,0 +1,8 @@
+spike/reentrance-tier1 smoke summary
+generated: 2026-04-19T00:00:33Z
+
+test-1: VERDICT: PASS — verdict reached within 2-min cron window
+test-2: VERDICT: PASS — roster rebuilt (>=2 teammates) with no duplicates
+test-3: VERDICT: PASS — rebuild from safer-heartbeat read + ao session ls;
+test-4: VERDICT: PASS — >=3 non-alive verdicts; no bytes modified
+test-5: VERDICT: PASS — apply skipped unsafe (3 surfaced with promote cmd);

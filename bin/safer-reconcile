@@ -1,0 +1,382 @@
+#!/usr/bin/env bash
+# safer-reconcile — cold-start enumeration + non-destructive report/apply for
+# the five local-workspace roots identified in sbd#61 Round 7. Sibling to
+# safer-heartbeat.
+#
+# Subcommands:
+#   scan    --team NAME [--repo O/R] [--format json|table] [--show-prompts]
+#   apply   --plan PATH [--yes] [--repo O/R]
+#   promote --entry ID --action preserve|discard|reopen [--yes]
+#           [--plan PATH] [--repo O/R]
+#
+# Reconciliation rule (Round 7):
+#   - GitHub wins on intent.
+#   - Local wins on bytes.
+#   - User wins on ambiguity.
+#
+# Safe verdicts (apply --yes acts on these):
+#   alive, restorable, fresh, clean-done
+# Unsafe verdicts (always require promote):
+#   orphan-with-work, zombie-with-work, unowned-session, undocumented-work,
+#   partially-durable, remote-only, team-lead-scratch
+#
+# Test hooks (spike):
+#   SBD_AO_SESSION_LS_OVERRIDE=<path>   read ao session ls JSON from file
+#   SBD_TMUX_PANES_OVERRIDE=<path>      read pane ids from file (one per line)
+#   SBD_GH_ISSUES_OVERRIDE=<path>       read gh issue list JSON from file
+#
+# Spike-quality bash (throwaway per PRINCIPLES.md).
+
+set -uo pipefail
+
+die() { echo "safer-reconcile: $*" >&2; exit 1; }
+
+default_repo() {
+  gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null
+}
+
+# load_ao_sessions — emit the ao session ls --json payload as a JSON array.
+load_ao_sessions() {
+  if [ -n "${SBD_AO_SESSION_LS_OVERRIDE:-}" ] && [ -f "$SBD_AO_SESSION_LS_OVERRIDE" ]; then
+    cat "$SBD_AO_SESSION_LS_OVERRIDE"
+    return
+  fi
+  if command -v ao >/dev/null 2>&1; then
+    ao session ls --all --json 2>/dev/null || echo "[]"
+  else
+    echo "[]"
+  fi
+}
+
+# load_tmux_panes — one pane id per line.
+load_tmux_panes() {
+  if [ -n "${SBD_TMUX_PANES_OVERRIDE:-}" ] && [ -f "$SBD_TMUX_PANES_OVERRIDE" ]; then
+    cat "$SBD_TMUX_PANES_OVERRIDE"
+    return
+  fi
+  tmux list-panes -a -F '#{pane_id}' 2>/dev/null || true
+}
+
+# load_gh_issues REPO — open+closed sub-issues with labels, as JSON array.
+load_gh_issues() {
+  local repo="$1"
+  if [ -n "${SBD_GH_ISSUES_OVERRIDE:-}" ] && [ -f "$SBD_GH_ISSUES_OVERRIDE" ]; then
+    cat "$SBD_GH_ISSUES_OVERRIDE"
+    return
+  fi
+  gh issue list --repo "$repo" --state all --limit 300 \
+    --json number,title,state,labels,body \
+    --jq '[.[] | select(.labels | map(.name) | any(startswith("safer:")))]' \
+    2>/dev/null || echo "[]"
+}
+
+# ── scan ─────────────────────────────────────────────────────────────
+
+cmd_scan() {
+  local team="" repo="" format="json" show_prompts=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --team) team="$2"; shift 2 ;;
+      --repo) repo="$2"; shift 2 ;;
+      --format) format="$2"; shift 2 ;;
+      --show-prompts) show_prompts=1; shift ;;
+      *) shift ;;
+    esac
+  done
+  [ -n "$team" ] || die "scan: --team required"
+  [ -n "$repo" ] || repo=$(default_repo)
+  [ -n "$repo" ] || die "scan: could not resolve --repo"
+
+  local cfg="$HOME/.claude/teams/$team/config.json"
+  [ -f "$cfg" ] || die "scan: team config missing: $cfg"
+
+  local ao_json issues_json panes
+  ao_json=$(load_ao_sessions)
+  issues_json=$(load_gh_issues "$repo")
+  panes=$(load_tmux_panes)
+
+  # Emit entries to a temp jsonl so we can cleanly join in jq at the end.
+  local tmpf; tmpf=$(mktemp /tmp/sbd-scan-XXXX.jsonl)
+
+  # Root 1: team-config members.
+  local show_p
+  if [ "$show_prompts" -eq 1 ]; then show_p="."; else show_p='"<redacted>"'; fi
+  jq -c --argjson ao "$ao_json" --argjson iss "$issues_json" --arg team "$team" \
+     --arg panes "$panes" '
+    .members[] |
+    . as $m |
+    ($ao | map(select(.role == $m.name)) | .[0]) as $aom |
+    ($iss | map(select(.title | test("\\b" + $m.name + "\\b"))) | .[0]) as $issm |
+    ($panes | split("\n") | any(. == ($m.tmuxPaneId // ""))) as $pane_alive |
+    {
+      location: ("team-member:" + $m.name),
+      kind: "team-member",
+      teammate: $m.name,
+      tmuxPaneId: ($m.tmuxPaneId // null),
+      pane_alive: $pane_alive,
+      prompt: (if $m.prompt then ('"$show_p"') else null end),
+      ao_session: ($aom.id // null),
+      sub_issue: ($issm.number // null),
+      github_state: ($issm.state // null)
+    }' "$cfg" >> "$tmpf"
+
+  # Root 2: ao sessions — surface any not tied to a team member.
+  jq -c --argjson iss "$issues_json" --slurpfile mem <(
+        jq -c '.members[].name' "$cfg"
+      ) '
+    . as $sessions |
+    $sessions[]? |
+    . as $s |
+    ($iss | map(select(.number == ($s.issueId // -1))) | .[0]) as $issm |
+    {
+      location: ("ao-session:" + ($s.id // $s.name // "unknown")),
+      kind: "ao-session",
+      ao_session: ($s.id // $s.name // null),
+      ao_status: ($s.status // null),
+      workspacePath: ($s.workspacePath // null),
+      sub_issue: ($s.issueId // null),
+      github_state: ($issm.state // null),
+      github_title: ($issm.title // null)
+    }' <<<"$ao_json" >> "$tmpf"
+
+  # Root 3: git worktrees (current repo).
+  git worktree list --porcelain 2>/dev/null | awk '
+    /^worktree / { wt = substr($0, 10) }
+    /^HEAD /     { head = substr($0, 6) }
+    /^branch /   { br = substr($0, 8) }
+    /^$/ { if (wt) { printf "%s\t%s\t%s\n", wt, head, br; wt=""; head=""; br="" } }
+    END { if (wt) { printf "%s\t%s\t%s\n", wt, head, br } }
+  ' | while IFS=$'\t' read -r wt head br; do
+    local dirty
+    dirty=$(git -C "$wt" status --porcelain 2>/dev/null | wc -l)
+    jq -cn --arg wt "$wt" --arg head "$head" --arg br "$br" --argjson dirty "$dirty" '
+      {location: ("worktree:" + $wt), kind: "worktree",
+       workspacePath: $wt, head: $head, branch: $br, dirty_files: $dirty}' \
+      >> "$tmpf"
+  done
+
+  # Root 4: local-only branches.
+  git for-each-ref --format='%(refname:short) %(upstream:short)' refs/heads \
+    2>/dev/null | while read -r br up; do
+    [ -n "$br" ] || continue
+    if [ -z "$up" ]; then
+      local head_sha
+      head_sha=$(git rev-parse --short "$br" 2>/dev/null || echo "?")
+      jq -cn --arg br "$br" --arg sha "$head_sha" '
+        {location: ("local-branch:" + $br), kind: "local-branch",
+         branch: $br, head_sha: $sha}' >> "$tmpf"
+    fi
+  done
+
+  # Root 5: /tmp/<task>/ dirs with uncommitted state.
+  for d in /tmp/*/; do
+    [ -d "$d/.git" ] || continue
+    local n
+    n=$(git -C "$d" status --porcelain 2>/dev/null | wc -l)
+    if [ "$n" -gt 0 ]; then
+      jq -cn --arg p "$d" --argjson n "$n" '
+        {location: ("tmp-task:" + $p), kind: "tmp-task",
+         workspacePath: $p, dirty_files: $n}' >> "$tmpf"
+    fi
+  done
+
+  # Verdict pass: a single jq script applies the Round 7 matrix.
+  local out
+  out=$(jq -cs '
+    def verdict(e):
+      if e.kind == "team-member" then
+        (if e.github_state == "CLOSED" then "clean-done"
+         elif e.ao_session and (e.pane_alive == true) then "alive"
+         elif e.ao_session then "restorable"
+         elif e.sub_issue then "partially-durable"
+         else "fresh" end)
+      elif e.kind == "ao-session" then
+        (if e.sub_issue == null or e.github_state == null then "unowned-session"
+         elif e.github_state == "CLOSED" then "clean-done"
+         else "restorable" end)
+      elif e.kind == "worktree" then
+        (if e.dirty_files > 0 then "orphan-with-work"
+         else "alive" end)
+      elif e.kind == "local-branch" then "zombie-with-work"
+      elif e.kind == "tmp-task"     then "undocumented-work"
+      else "unknown" end;
+    def action(v):
+      {"alive":"skip",
+       "restorable":"ao session restore (+ skip cleanStaleWorktree)",
+       "fresh":"dispatch fresh teammate",
+       "clean-done":"no-op",
+       "orphan-with-work":"safer-reconcile promote --action preserve",
+       "zombie-with-work":"safer-reconcile promote --action preserve",
+       "unowned-session":"safer-reconcile promote --action discard (pause first)",
+       "undocumented-work":"safer-reconcile promote --action preserve",
+       "partially-durable":"dispatch fresh + resume-prompt at last_commit",
+       "remote-only":"dispatch fresh + resume-prompt at remote branch",
+       "team-lead-scratch":"skip"}[v] // "manual";
+    map(. + {verdict: verdict(.), recommended_action: action(verdict(.))}) |
+    {team: "'"$team"'", repo: "'"$repo"'",
+     generated_at: (now | strftime("%Y-%m-%dT%H:%M:%SZ")),
+     entries: ., summary: (group_by(.verdict // "unknown") |
+       map({(.[0].verdict // "unknown"): length}) | add // {})}
+  ' "$tmpf")
+  rm -f "$tmpf"
+
+  case "$format" in
+    json)  printf '%s\n' "$out" | jq . ;;
+    table)
+      printf '%s\n' "$out" | jq -r '
+        .entries[] | [.kind, .location, .verdict, .recommended_action] | @tsv' \
+        | awk -F'\t' '{printf "%-14s %-60s %-20s %s\n", $1, $2, $3, $4}'
+      ;;
+    *) die "unknown format: $format" ;;
+  esac
+}
+
+# ── apply ────────────────────────────────────────────────────────────
+
+cmd_apply() {
+  local plan="" yes=0 repo=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --plan) plan="$2"; shift 2 ;;
+      --yes)  yes=1; shift ;;
+      --repo) repo="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  [ -n "$plan" ] || die "apply: --plan required"
+  [ -f "$plan" ] || die "apply: plan not found: $plan"
+  [ -n "$repo" ] || repo=$(default_repo)
+
+  local safe_filter='.entries[] | select(.verdict == "alive" or .verdict == "restorable" or .verdict == "fresh" or .verdict == "clean-done")'
+  local unsafe_filter='.entries[] | select(.verdict == "orphan-with-work" or .verdict == "zombie-with-work" or .verdict == "unowned-session" or .verdict == "undocumented-work" or .verdict == "partially-durable" or .verdict == "remote-only")'
+
+  local safe_count unsafe_count
+  safe_count=$(jq -r "[$safe_filter] | length" "$plan")
+  unsafe_count=$(jq -r "[$unsafe_filter] | length" "$plan")
+
+  echo "apply: $safe_count safe verdicts, $unsafe_count unsafe verdicts"
+  if [ "$yes" -eq 0 ]; then
+    echo "apply: dry-run (re-invoke with --yes to act on safe verdicts)"
+  fi
+
+  # Safe actions: log each, act only under --yes. In this spike, actions are
+  # side-effecting only for 'restorable' (would call ao session restore). The
+  # others are either no-ops or inert from the reconcile perspective.
+  jq -c "$safe_filter" "$plan" | while read -r e; do
+    local v loc aos
+    v=$(jq -r '.verdict' <<<"$e")
+    loc=$(jq -r '.location' <<<"$e")
+    aos=$(jq -r '.ao_session // "-"' <<<"$e")
+    echo "safe  $v  $loc"
+    if [ "$yes" -eq 1 ] && [ "$v" = "restorable" ] && [ "$aos" != "-" ] && [ "$aos" != "null" ]; then
+      if command -v ao >/dev/null 2>&1; then
+        ao session restore "$aos" >/dev/null 2>&1 \
+          && echo "    restored: $aos" \
+          || echo "    restore-failed: $aos"
+      else
+        echo "    ao-absent: would restore $aos"
+      fi
+    fi
+  done
+
+  echo "---"
+  echo "unsafe verdicts (require per-entry promote):"
+  jq -c "$unsafe_filter" "$plan" | while read -r e; do
+    local v loc cmd
+    v=$(jq -r '.verdict' <<<"$e")
+    loc=$(jq -r '.location' <<<"$e")
+    cmd="safer-reconcile promote --plan $plan --entry \"$loc\" --action preserve --yes"
+    echo "  $v  $loc"
+    echo "    $cmd"
+  done
+}
+
+# ── promote ──────────────────────────────────────────────────────────
+
+cmd_promote() {
+  local plan="" entry="" action="" yes=0 repo=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --plan)   plan="$2"; shift 2 ;;
+      --entry)  entry="$2"; shift 2 ;;
+      --action) action="$2"; shift 2 ;;
+      --yes)    yes=1; shift ;;
+      --repo)   repo="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  [ -n "$entry" ] || die "promote: --entry required"
+  [ -n "$action" ] || die "promote: --action required"
+  [ -n "$repo" ] || repo=$(default_repo)
+
+  local ekind ewt ebranch esub
+  if [ -n "$plan" ] && [ -f "$plan" ]; then
+    local e
+    e=$(jq -c --arg loc "$entry" '.entries[] | select(.location == $loc)' "$plan" \
+        | head -1)
+    ekind=$(jq -r '.kind // ""' <<<"$e")
+    ewt=$(jq -r '.workspacePath // ""' <<<"$e")
+    ebranch=$(jq -r '.branch // ""' <<<"$e")
+    esub=$(jq -r '.sub_issue // ""' <<<"$e")
+  fi
+
+  case "$action" in
+    preserve)
+      [ -n "$ewt" ] || die "promote preserve: need workspacePath; check plan"
+      local sha iso br
+      sha=$(git -C "$ewt" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+      iso=$(date -u +%Y%m%dT%H%M%SZ)
+      br="zombie-recovery/${esub:-unknown}/${iso}-${sha}"
+      echo "preserve plan:"
+      echo "  worktree : $ewt"
+      echo "  branch   : $br"
+      echo "  push     : origin $br"
+      echo "  comment  : #${esub:-?} — work preserved here"
+      if [ "$yes" -eq 1 ]; then
+        git -C "$ewt" checkout -B "$br" >/dev/null 2>&1
+        git -C "$ewt" add -A && git -C "$ewt" commit --allow-empty \
+          -m "spike: preserve pre-close work ($ewt)" >/dev/null 2>&1 || true
+        git -C "$ewt" push origin "$br" 2>&1 || echo "  (push failed; spike ok)"
+        [ -n "$esub" ] && [ "$esub" != "null" ] \
+          && gh issue comment "$esub" --repo "$repo" \
+               --body "Pre-close work preserved on branch \`$br\`. (safer-reconcile promote preserve)" \
+               >/dev/null 2>&1 \
+          && echo "  commented: #$esub"
+        # Remove the worktree after preserve.
+        git worktree remove --force "$ewt" 2>/dev/null || true
+        echo "  removed  : $ewt"
+      fi
+      ;;
+    discard)
+      echo "discard plan (DRY RUN ONLY in spike):"
+      echo "  worktree : $ewt"
+      echo "  branch   : $ebranch"
+      echo "  risk     : destructive — require --yes + TTY confirm (not wired)"
+      ;;
+    reopen)
+      [ -n "$esub" ] || die "promote reopen: need sub_issue"
+      echo "reopen plan:"
+      echo "  reopen   : #$esub"
+      if [ "$yes" -eq 1 ]; then
+        gh issue reopen "$esub" --repo "$repo" >/dev/null 2>&1 \
+          && echo "  reopened: #$esub"
+      fi
+      ;;
+    *) die "unknown --action: $action" ;;
+  esac
+}
+
+main() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    scan)    cmd_scan "$@" ;;
+    apply)   cmd_apply "$@" ;;
+    promote) cmd_promote "$@" ;;
+    ""|-h|--help)
+      sed -n '1,30p' "$0" | sed 's/^# \{0,1\}//'
+      ;;
+    *) die "unknown subcommand: $sub" ;;
+  esac
+}
+
+main "$@"

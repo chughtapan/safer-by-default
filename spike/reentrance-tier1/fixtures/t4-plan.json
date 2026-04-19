@@ -1,0 +1,221 @@
+{
+  "team": "orchestrate-run-1",
+  "repo": "chughtapan/safer-by-default",
+  "generated_at": "2026-04-19T00:00:26Z",
+  "entries": [
+    {
+      "location": "team-member:team-lead",
+      "kind": "team-member",
+      "teammate": "team-lead",
+      "tmuxPaneId": "",
+      "pane_alive": false,
+      "prompt": null,
+      "ao_session": null,
+      "sub_issue": null,
+      "github_state": null,
+      "verdict": "fresh",
+      "recommended_action": "dispatch fresh teammate"
+    },
+    {
+      "location": "team-member:spike-reentrance-tier1",
+      "kind": "team-member",
+      "teammate": "spike-reentrance-tier1",
+      "tmuxPaneId": "%191",
+      "pane_alive": true,
+      "prompt": "<redacted>",
+      "ao_session": null,
+      "sub_issue": null,
+      "github_state": null,
+      "verdict": "fresh",
+      "recommended_action": "dispatch fresh teammate"
+    },
+    {
+      "location": "team-member:impl-evals-scaffold",
+      "kind": "team-member",
+      "teammate": "impl-evals-scaffold",
+      "tmuxPaneId": "%193",
+      "pane_alive": true,
+      "prompt": "<redacted>",
+      "ao_session": null,
+      "sub_issue": null,
+      "github_state": null,
+      "verdict": "fresh",
+      "recommended_action": "dispatch fresh teammate"
+    },
+    {
+      "location": "team-member:stryker-full-run-ccj",
+      "kind": "team-member",
+      "teammate": "stryker-full-run-ccj",
+      "tmuxPaneId": "%196",
+      "pane_alive": true,
+      "prompt": "<redacted>",
+      "ao_session": null,
+      "sub_issue": null,
+      "github_state": null,
+      "verdict": "fresh",
+      "recommended_action": "dispatch fresh teammate"
+    },
+    {
+      "location": "team-member:stryker-full-run-acg",
+      "kind": "team-member",
+      "teammate": "stryker-full-run-acg",
+      "tmuxPaneId": "%197",
+      "pane_alive": true,
+      "prompt": "<redacted>",
+      "ao_session": null,
+      "sub_issue": null,
+      "github_state": null,
+      "verdict": "fresh",
+      "recommended_action": "dispatch fresh teammate"
+    },
+    {
+      "location": "team-member:impl-sbd77-model-routing",
+      "kind": "team-member",
+      "teammate": "impl-sbd77-model-routing",
+      "tmuxPaneId": "%198",
+      "pane_alive": true,
+      "prompt": "<redacted>",
+      "ao_session": null,
+      "sub_issue": null,
+      "github_state": null,
+      "verdict": "fresh",
+      "recommended_action": "dispatch fresh teammate"
+    },
+    {
+      "location": "ao-session:spike-ao-UNOWNED",
+      "kind": "ao-session",
+      "ao_session": "spike-ao-UNOWNED",
+      "ao_status": "stuck",
+      "workspacePath": "/tmp/spike/ghost",
+      "sub_issue": null,
+      "github_state": null,
+      "github_title": null,
+      "verdict": "unowned-session",
+      "recommended_action": "safer-reconcile promote --action discard (pause first)"
+    },
+    {
+      "location": "worktree:/tmp/sbd-spike-scratch",
+      "kind": "worktree",
+      "workspacePath": "/tmp/sbd-spike-scratch",
+      "head": "17637c954d3d4ff2187d7831411392bd2e4655b3",
+      "branch": "refs/heads/main",
+      "dirty_files": 0,
+      "verdict": "alive",
+      "recommended_action": "skip"
+    },
+    {
+      "location": "worktree:/tmp/sbd-spike-wt-orphan",
+      "kind": "worktree",
+      "workspacePath": "/tmp/sbd-spike-wt-orphan",
+      "head": "17637c954d3d4ff2187d7831411392bd2e4655b3",
+      "branch": "refs/heads/feat/orphan",
+      "dirty_files": 1,
+      "verdict": "orphan-with-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "local-branch:feat/local-only-zombie",
+      "kind": "local-branch",
+      "branch": "feat/local-only-zombie",
+      "head_sha": "17637c9",
+      "verdict": "zombie-with-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "local-branch:feat/orphan",
+      "kind": "local-branch",
+      "branch": "feat/orphan",
+      "head_sha": "17637c9",
+      "verdict": "zombie-with-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "local-branch:main",
+      "kind": "local-branch",
+      "branch": "main",
+      "head_sha": "17637c9",
+      "verdict": "zombie-with-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/acg-18-v2/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/acg-18-v2/",
+      "dirty_files": 1,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/acg-18/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/acg-18/",
+      "dirty_files": 3,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/arch-stamina/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/arch-stamina/",
+      "dirty_files": 1,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/ccj-19-amend/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/ccj-19-amend/",
+      "dirty_files": 3,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/sbd-spike-task/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/sbd-spike-task/",
+      "dirty_files": 1,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/zap-114/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/zap-114/",
+      "dirty_files": 1,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/zap-116/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/zap-116/",
+      "dirty_files": 1,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/zapbot-lint/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/zapbot-lint/",
+      "dirty_files": 1,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    },
+    {
+      "location": "tmp-task:/tmp/zapbot-spike63/",
+      "kind": "tmp-task",
+      "workspacePath": "/tmp/zapbot-spike63/",
+      "dirty_files": 1,
+      "verdict": "undocumented-work",
+      "recommended_action": "safer-reconcile promote --action preserve"
+    }
+  ],
+  "summary": {
+    "alive": 1,
+    "fresh": 6,
+    "orphan-with-work": 1,
+    "undocumented-work": 9,
+    "unowned-session": 1,
+    "zombie-with-work": 3
+  }
+}

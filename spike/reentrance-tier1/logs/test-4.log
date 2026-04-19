@@ -1,0 +1,53 @@
+TEST 4 — reconcile scan; 3 non-alive verdicts; no bytes touched
+started: 2026-04-19T00:00:22Z
+
+seeded scratch repo at /tmp/sbd-spike-scratch
+worktrees:
+/tmp/sbd-spike-scratch    17637c9 [main]
+/tmp/sbd-spike-wt-orphan  17637c9 [feat/orphan]
+
+## Fixture ao session ls (1 unowned session):
+[{"id":"spike-ao-UNOWNED","role":"spike-ghost","status":"stuck","issueId":null,"workspacePath":"/tmp/spike/ghost"}]
+
+## Fixture gh issue list (empty; simulates no matching sub-issues):
+
+## Scan
+{
+  "alive": 1,
+  "fresh": 6,
+  "orphan-with-work": 1,
+  "undocumented-work": 9,
+  "unowned-session": 1,
+  "zombie-with-work": 3
+}
+
+## Verdicts by kind:
+team-member    team-member:team-lead                                        fresh
+team-member    team-member:spike-reentrance-tier1                           fresh
+team-member    team-member:impl-evals-scaffold                              fresh
+team-member    team-member:stryker-full-run-ccj                             fresh
+team-member    team-member:stryker-full-run-acg                             fresh
+team-member    team-member:impl-sbd77-model-routing                         fresh
+ao-session     ao-session:spike-ao-UNOWNED                                  unowned-session
+worktree       worktree:/tmp/sbd-spike-scratch                              alive
+worktree       worktree:/tmp/sbd-spike-wt-orphan                            orphan-with-work
+local-branch   local-branch:feat/local-only-zombie                          zombie-with-work
+local-branch   local-branch:feat/orphan                                     zombie-with-work
+local-branch   local-branch:main                                            zombie-with-work
+tmp-task       tmp-task:/tmp/acg-18-v2/                                     undocumented-work
+tmp-task       tmp-task:/tmp/acg-18/                                        undocumented-work
+tmp-task       tmp-task:/tmp/arch-stamina/                                  undocumented-work
+tmp-task       tmp-task:/tmp/ccj-19-amend/                                  undocumented-work
+tmp-task       tmp-task:/tmp/sbd-spike-task/                                undocumented-work
+tmp-task       tmp-task:/tmp/zap-114/                                       undocumented-work
+tmp-task       tmp-task:/tmp/zap-116/                                       undocumented-work
+tmp-task       tmp-task:/tmp/zapbot-lint/                                   undocumented-work
+tmp-task       tmp-task:/tmp/zapbot-spike63/                                undocumented-work
+
+non-alive count: 20 (expect >= 3)
+
+## No-bytes-touched probe:
+  /tmp/sbd-spike-scratch working-tree diff after scan:
+  /tmp/sbd-spike-wt-orphan dirty files unchanged:
+dirty.txt
+VERDICT: PASS — >=3 non-alive verdicts; no bytes modified

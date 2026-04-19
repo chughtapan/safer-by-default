@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# safer-heartbeat — per-sub-issue ownership + liveness via an edited-in-place
+# HTML-comment (schema v=1) on the GitHub sub-issue. Sibling to safer-reconcile.
+#
+# Subcommands:
+#   emit  --sub-issue N --teammate NAME [--repo O/R] [--ao-session S]
+#         [--workspace P] [--prompt-sha SHA] [--last-commit SHA]
+#         [--last-gate LABEL] [--status working|blocked|waiting_review|done]
+#         Creates the state-comment if absent; edits it in place otherwise.
+#
+#   read  --sub-issue N [--repo O/R]
+#         Prints the parsed state-comment as JSON ({} if none present).
+#
+#   list  --epic N [--repo O/R]
+#         Emits a JSON array of state-comments across sub-issues referencing
+#         the parent epic in their body (`Parent: #N` or a `#N` mention).
+#
+# Spike-quality bash (throwaway per PRINCIPLES.md spike modality). Keys go
+# in the HTML block exactly as described in sbd#61 Round 3.
+
+set -uo pipefail
+
+SCHEMA_HEADER="<!-- orchestrate-state v=1"
+SCHEMA_FOOTER="-->"
+
+die() { echo "safer-heartbeat: $*" >&2; exit 1; }
+
+default_repo() {
+  gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null
+}
+
+# find_state_comment_id — echo the comment id (or empty) for the teammate-owned
+# state-comment on a sub-issue.
+find_state_comment_id() {
+  local repo="$1" issue="$2"
+  gh api "repos/$repo/issues/$issue/comments" --paginate \
+    --jq ".[] | select(.body | startswith(\"$SCHEMA_HEADER\")) | .id" \
+    | head -1
+}
+
+# fetch_state_comment_body — echo the raw (newline-preserving) body of the
+# given comment id.
+fetch_state_comment_body() {
+  local repo="$1" cid="$2"
+  gh api "repos/$repo/issues/comments/$cid" --jq .body
+}
+
+# build_body — emit the full state-comment body from env-passed KEY=value lines.
+# Inputs via globals KV_TEAMMATE etc.
+build_body() {
+  cat <<EOF
+$SCHEMA_HEADER
+teammate=$KV_TEAMMATE
+ao_session=$KV_AO_SESSION
+workspace=$KV_WORKSPACE
+prompt_sha=$KV_PROMPT_SHA
+last_heartbeat=$KV_LAST_HEARTBEAT
+last_commit=$KV_LAST_COMMIT
+last_gate=$KV_LAST_GATE
+status=$KV_STATUS
+$SCHEMA_FOOTER
+
+${KV_PROSE:-}
+EOF
+}
+
+# parse_body — read body on stdin, emit flat JSON object.
+parse_body() {
+  awk -v HDR="$SCHEMA_HEADER" -v FTR="$SCHEMA_FOOTER" '
+    BEGIN { in_block = 0; printf "{" ; first = 1 }
+    {
+      if (index($0, HDR) == 1) { in_block = 1; next }
+      if (in_block && $0 == FTR)       { in_block = 0; next }
+      if (in_block) {
+        eq = index($0, "=")
+        if (eq > 0) {
+          k = substr($0, 1, eq - 1)
+          v = substr($0, eq + 1)
+          gsub(/"/, "\\\"", v)
+          if (!first) printf ","
+          printf "\"%s\":\"%s\"", k, v
+          first = 0
+        }
+      }
+    }
+    END { printf "}\n" }
+  '
+}
+
+cmd_emit() {
+  local repo="" sub="" teammate="" ao="" workspace="" prompt_sha="" \
+        last_commit="" last_gate="" status="working" prose="" force_ts=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo)        repo="$2"; shift 2 ;;
+      --sub-issue)   sub="$2"; shift 2 ;;
+      --teammate)    teammate="$2"; shift 2 ;;
+      --ao-session)  ao="$2"; shift 2 ;;
+      --workspace)   workspace="$2"; shift 2 ;;
+      --prompt-sha)  prompt_sha="$2"; shift 2 ;;
+      --last-commit) last_commit="$2"; shift 2 ;;
+      --last-gate)   last_gate="$2"; shift 2 ;;
+      --status)      status="$2"; shift 2 ;;
+      --prose)       prose="$2"; shift 2 ;;
+      --force-ts)    force_ts="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  [ -n "$sub" ] || die "emit: --sub-issue required"
+  [ -n "$teammate" ] || die "emit: --teammate required"
+  [ -n "$repo" ] || repo=$(default_repo)
+  [ -n "$repo" ] || die "emit: could not resolve --repo"
+
+  export KV_TEAMMATE="$teammate" KV_AO_SESSION="${ao:-none}" \
+         KV_WORKSPACE="${workspace:-none}" KV_PROMPT_SHA="${prompt_sha:-none}" \
+         KV_LAST_HEARTBEAT="${force_ts:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" \
+         KV_LAST_COMMIT="${last_commit:-none}" \
+         KV_LAST_GATE="${last_gate:-unknown}" \
+         KV_STATUS="$status" KV_PROSE="$prose"
+  local body; body=$(build_body)
+  local cid
+  cid=$(find_state_comment_id "$repo" "$sub")
+  if [ -n "$cid" ]; then
+    local payload
+    payload=$(printf '%s' "$body" | jq -Rs '{body: .}')
+    printf '%s' "$payload" \
+      | gh api --method PATCH "repos/$repo/issues/comments/$cid" \
+               --input - >/dev/null \
+      || die "emit: PATCH failed"
+    echo "edited: comment $cid on repos/$repo/issues/$sub"
+  else
+    printf '%s' "$body" | gh issue comment "$sub" --repo "$repo" --body-file - \
+      | tail -1
+  fi
+}
+
+cmd_read() {
+  local repo="" sub=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo)      repo="$2"; shift 2 ;;
+      --sub-issue) sub="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  [ -n "$sub" ] || die "read: --sub-issue required"
+  [ -n "$repo" ] || repo=$(default_repo)
+  local cid
+  cid=$(find_state_comment_id "$repo" "$sub")
+  if [ -z "$cid" ]; then
+    echo "{}"
+    return 0
+  fi
+  fetch_state_comment_body "$repo" "$cid" | tr -d '\r' | parse_body
+}
+
+cmd_list() {
+  local repo="" epic=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) repo="$2"; shift 2 ;;
+      --epic) epic="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  [ -n "$epic" ] || die "list: --epic required"
+  [ -n "$repo" ] || repo=$(default_repo)
+  local subs
+  # Include the epic itself AND every sub-issue whose body references it.
+  subs=$(
+    { echo "$epic"
+      gh issue list --repo "$repo" --state all --limit 300 \
+        --search "in:body #$epic" --json number --jq '.[].number'
+    } | sort -u
+  )
+  printf '['
+  local first=1
+  for n in $subs; do
+    local j; j=$(cmd_read --repo "$repo" --sub-issue "$n")
+    [ "$j" = "{}" ] && continue
+    [ $first -eq 1 ] || printf ','
+    first=0
+    printf '{"sub_issue":%s,"state":%s}' "$n" "$j"
+  done
+  printf ']\n'
+}
+
+main() {
+  local sub="${1:-}"; shift || true
+  case "$sub" in
+    emit) cmd_emit "$@" ;;
+    read) cmd_read "$@" ;;
+    list) cmd_list "$@" ;;
+    ""|-h|--help)
+      sed -n '1,25p' "$0" | sed 's/^# \{0,1\}//'
+      ;;
+    *) die "unknown subcommand: $sub" ;;
+  esac
+}
+
+main "$@"

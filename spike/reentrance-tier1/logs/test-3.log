@@ -1,0 +1,66 @@
+TEST 3 — both die; rebuild from heartbeat + ao; restore restorable
+started: 2026-04-18T23:55:57Z
+
+## Step A — reuse heartbeats from tests 1+2
+[
+  {
+    "sub_issue": 65,
+    "state": {
+      "teammate": "spike-teammate-C",
+      "ao_session": "spike-ao-C",
+      "workspace": "none",
+      "prompt_sha": "none",
+      "last_heartbeat": "2026-04-18T23:55:51Z",
+      "last_commit": "cafe123",
+      "last_gate": "review",
+      "status": "waiting_review"
+    }
+  },
+  {
+    "sub_issue": 74,
+    "state": {
+      "teammate": "spike-teammate-B",
+      "ao_session": "spike-ao-B",
+      "workspace": "none",
+      "prompt_sha": "none",
+      "last_heartbeat": "2026-04-18T23:55:50Z",
+      "last_commit": "feedf00",
+      "last_gate": "implementing",
+      "status": "working"
+    }
+  }
+]
+
+## Step B — ao session ls fixture: 1 restorable, 1 merged
+[
+  {"id":"spike-ao-B","role":"spike-teammate-B","status":"stuck","issueId":74,"workspacePath":"/tmp/spike/t3-B"},
+  {"id":"spike-ao-C","role":"spike-teammate-C","status":"merged","issueId":65,"workspacePath":"/tmp/spike/t3-C"}
+]
+
+## Step C — per-teammate verdict + restore
+--- spike-teammate-B ---
+teammate:       spike-teammate-B
+sub_issue:      74
+hb_teammate:    spike-teammate-B
+hb_last_commit: feedf00
+hb_age_sec:     10 (fresh-threshold=300)
+ao_id:          spike-ao-B
+ao_status:      stuck
+tmux_panes:     0
+verdict:        alive
+action:         skip
+--- spike-teammate-C ---
+teammate:       spike-teammate-C
+sub_issue:      74
+hb_teammate:    spike-teammate-B
+hb_last_commit: feedf00
+hb_age_sec:     11 (fresh-threshold=300)
+ao_id:          spike-ao-C
+ao_status:      merged
+tmux_panes:     0
+verdict:        clean-done
+action:         prune from roster
+
+VERDICT: PASS — rebuild from safer-heartbeat read + ao session ls;
+             restorable sessions surfaced for ao session restore;
+             merged sessions classified clean-done (no dispatch).
