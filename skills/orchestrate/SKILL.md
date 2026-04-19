@@ -108,6 +108,8 @@ If any required binary (`safer-slug`, `safer-telemetry-log`, `safer-update-check
 - "Helping" a blocked modality by doing part of its work.
 - Inferring a sub-task's modality when the shape is ambiguous — ask the user.
 - Dispatching `implement-*` on a bug that has not been reproduced by investigate.
+- Merging a PR or closing a sub-issue based solely on a teammate `SendMessage` summary, without reading the reviewer body on GitHub via the Step 5c.0 procedure.
+- Letting a teammate `permission_request` sit unanswered past one sweep tick. Decide and respond that tick — approve via SendMessage, deny via Escape + SendMessage, or take the action from team-lead context. Idle permission_requests are a stop-rule violation.
 
 ### The shape of work that belongs here
 
@@ -322,6 +324,50 @@ Then cascade forward per modality lifecycle:
 - `implement-*` → `plan-approved` → `implementing` (the PR is merged) → `verifying` (verify sub-task runs) → `done`.
 - `investigate` / `spike` / `research` → `plan-approved` → `done` (these produce writeups, not code).
 
+**Step 5c.0 — Read reviewer body before merging.**
+
+Before transitioning a sub-issue out of `review` (`review → plan-approved` on the
+manual path in Step 5c, or `review → plan-approved` on the auto-gate path in
+Phase 5d loop body item 5), team-lead MUST read the full reviewer body on
+GitHub. The teammate's `SendMessage` summary is a one-line compression; gating
+conditions live in the body, not in the summary. Acting on the summary alone is
+how the verify gate gets skipped (incident: 2026-04-19, acg#27).
+
+Fetch the most recent review body:
+
+```bash
+gh pr view <N> --repo <R> --json reviews --jq '.reviews[-1].body'
+```
+
+Scan the body for these three condition patterns. Any match blocks the merge:
+
+1. **Conditional approval** — phrases like *"approve but do not merge without X"*,
+   *"LGTM pending Y"*, *"approve subject to Z"*. The verdict is approval against
+   the stated acceptance, not unconditional ship.
+2. **Follow-up gates** — explicit references to a downstream modality that must
+   run before merge: *"goes to verify before merge"*, *"needs another review
+   pass"*, *"hold for stamina"*, *"out-of-band check required"*.
+3. **Deferred-acceptance items** — acceptance criteria the reviewer marked as
+   not-yet-met but acceptable to defer past this review, with a stated condition
+   for closing the deferral: *"accept as DRAFT pending CI green"*, *"merge after
+   the linked Linear ticket lands"*.
+
+If any pattern matches:
+- **Manual path (Step 5c):** treat as `ESCALATED`. Do not transition the label.
+  Post the matched pattern as a comment on the sub-issue and route per Phase 6.
+- **Auto-gate path (Step 5d item 5):** skip this sub-issue on this tick. Post a
+  one-line comment naming the matched pattern (per the same human-visible
+  rule that governs Step 5c.1), and defer to the next human-driven tick. The
+  auto-gate never resolves a condition; it only detects and defers.
+
+If none of the patterns match and the body is an unconditional approval against
+the stated acceptance criteria, proceed to Step 5c.1.
+
+Failure mode the gate prevents: team-lead reads the teammate summary `APPROVE`,
+proceeds to Step 5c.1, closes the sub-issue, and merges the PR — while the
+reviewer body said *"goes to verify before merge."* The verify gate is skipped;
+the merge ships unmeasured.
+
 Once accepted, run the four steps below in order. These are the canonical gate-and-dispatch procedure; the Phase 5d auto-monitor calls into them (step 5 → Step 5c.1–5c.2; step 6 → Step 5c.3–5c.4).
 
 **Step 5c.1 — Post the gating comment and close the sub-issue.**
@@ -444,6 +490,34 @@ Record the returned job id on the parent epic (comment) so the next operator can
 **Loop body.** Each tick does exactly the checks below, in order. The loop writes no code and makes no decisions that are not already encoded in an artifact.
 
 1. **Team roster.** Read `~/.claude/teams/<team-name>/config.json` with `jq` to list teammates and their `isActive` flag. Example: `jq -r '.members[] | "\(.name)\t\(.isActive)\t\(.paneId // "-")"' ~/.claude/teams/<team-name>/config.json`.
+
+1a. **Teammate pane stall check.** For every teammate (excluding `team-lead`) whose `tmuxPaneId` is in `$ALIVE`, capture the pane and regex-match for the claude-swarm permission dialog string. The Agent backend uses a separate tmux socket — discover it once per tick, do NOT assume `default`:
+
+    ```bash
+    SWARM_SOCKET=$(ls /tmp/tmux-$(id -u)/claude-swarm-* 2>/dev/null | head -1)
+    [ -z "$SWARM_SOCKET" ] && echo "swarm_socket_missing: skipping pane stall check" && return 0
+
+    for paneId in $(jq -r '.members[] | select(.name != "team-lead") | .tmuxPaneId // empty' \
+                    ~/.claude/teams/<team-name>/config.json); do
+      capture=$(tmux -S "$SWARM_SOCKET" capture-pane -t "$paneId" -p 2>/dev/null) || continue
+      if echo "$capture" | grep -q 'Waiting for team lead approval'; then
+        # Extract the requested tool + command from the last ~40 lines of the capture.
+        # Surface as a sweep-summary anomaly. The team-lead MUST respond this tick
+        # via the Phase 5e protocol — not the next.
+        teammate=$(jq -r --arg pid "$paneId" \
+          '.members[] | select(.tmuxPaneId == $pid) | .name' \
+          ~/.claude/teams/<team-name>/config.json)
+        echo "permission_stall: teammate=$teammate pane=$paneId"
+        echo "$capture" | tail -40
+      fi
+    done
+    ```
+
+    Guardrails:
+    - Never kill a pane that matched `Waiting for team lead approval`. Path (a) and Path (b) cleanup in step 4 do not apply to stalled panes; the work is alive, blocked on a decision.
+    - Never auto-respond. The Phase 5e protocol below defines the team-lead's response mechanisms; this step only surfaces the anomaly.
+    - If `$SWARM_SOCKET` is empty (claude-swarm not running, or socket name changed upstream), log `swarm_socket_missing` and skip the step. Do not fall back to the `default` socket — that would scan the wrong panes.
+
 2. **Review-ready sub-issues.** `gh issue list --label review --json number,title,url,labels` for this repo. Any hit is a candidate for Step 5c.
 3. **Open PRs.** `gh pr list --json number,url,isDraft,mergeable,statusCheckRollup` to see which draft PRs are green.
    - **Linear project sync (if configured).** Run `safer-linear-setup assign-projects --since 5m --quiet` to backfill any issues filed in the last 5 minutes to their correct Linear project. Requires `LINEAR_API_KEY` env var; silently skips if not set.
@@ -482,7 +556,7 @@ Record the returned job id on the parent epic (comment) so the next operator can
    - Path (a) requires only pane-missing from `$ALIVE`. A teammate whose work is incomplete but whose process died is still removed — their pane is gone either way, and the work needs to be re-dispatched.
    - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
 
-5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`).
+5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`). Before any auto-gate transition fires, run **Step 5c.0** against the linked PR's reviewer body; skip the sub-issue if any of the three condition patterns matches.
 6. **Auto-dispatch pending work (work-queue scan).** The prior steps react to state the loop already knows about. Step 6 is the proactive scan: enumerate pending sub-issues across every repo this team serves, filter out the ones that are already in flight, prioritize what is left, and dispatch up to the per-tick cap. Without this step the orchestrator idles between user prompts even when work is queued. Step 6 is mandatory once a team is installed.
 
 **Step 6a — enumerate pending work.** Scan every repo this team watches (`~/.claude/teams/<team-name>/config.json` carries `repos: []`; fall back to the current repo if the field is absent). For each, list open sub-issues whose labels name a dispatchable modality:
@@ -894,6 +968,31 @@ team lead with the spec URL.
 
 Templates are intentionally terse. They do not replicate the full modality charter; they point the teammate at `SKILL.md` and carry the scope contract that differs per modality. If a template grows beyond ~25 lines, the modality has shifted; revisit the template rather than expanding it in-place.
 
+### Phase 5e — permission_request response protocol
+
+When Step 1a surfaces a `permission_stall:` anomaly in the sweep summary, the team-lead MUST respond within the same tick. Sitting on a permission_request past one sweep tick is a Forbidden-list violation.
+
+**Decision sequence (always in this order):**
+
+1. **Read the pane capture** (the last ~40 lines printed under the `permission_stall:` line). Extract the actual tool name and the actual command. The truncated inbox JSON is unreliable; the pane capture is authoritative.
+2. **Classify the request.** Three checks, in order:
+   - **Scope.** Is the request inside the teammate's named sub-issue scope? Cross-scope requests get denied — the teammate is escalating sideways instead of upstream (Principle 8 violation).
+   - **Destructive-action rules.** Per existing rules in PRINCIPLES.md, the team-lead does NOT approve `rm -rf` outside the working directory, `git push --force` to protected branches, `DROP TABLE`, or any irreversible operation without explicit user authorization.
+   - **Session-level authorization.** If the user has pre-authorized the operation class for this session (e.g., "approve all rebases on this branch"), apply it; otherwise default-deny destructive operations.
+3. **Respond via one of three mechanisms:**
+   - **Approve via SendMessage.** Send the teammate a message naming the approval and any conditions: `{"to": "<teammate>", "summary": "permission approved", "message": "Approved: <tool> <command>. Proceed."}`. The teammate reads its inbox and the dialog clears on acceptance.
+   - **Deny via Escape + SendMessage.** Dismiss the modal first, then explain the denial:
+     ```bash
+     SWARM_SOCKET=$(ls /tmp/tmux-$(id -u)/claude-swarm-* | head -1)
+     tmux -S "$SWARM_SOCKET" send-keys -t <paneId> Escape
+     ```
+     Follow with `SendMessage({to: "<teammate>", message: "Denied: <reason>. Escalate to <upstream-modality> if blocked."})`.
+   - **Take the action from team-lead context, then notify.** When the action is safer from team-lead context (lockfile cleanup, branch hygiene, anything that requires repo-level authority the teammate does not need), perform the action in the team-lead pane, dismiss the teammate's dialog with `tmux send-keys Escape`, then SendMessage the teammate that the action is done and to proceed.
+
+**Discovery.** The claude-swarm tmux socket is at `/tmp/tmux-<uid>/claude-swarm-<pid>`, NOT `default`. Confirm with `ls /tmp/tmux-$(id -u)/claude-swarm-*`. Hardcoding `default` silently scans the wrong panes — capture-pane returns blank, the regex never matches, and stuck dialogs go unnoticed.
+
+**Audit.** Every Phase 5e response logs a one-line entry to the parent epic comment: `permission_decision: teammate=<name> tool=<tool> verdict=<approve|deny|sideaction> reason="<short>"`. The audit line is not optional — the next operator reading the epic must be able to reconstruct why each request was answered the way it was.
+
 ### Phase 6 — Backtrack
 
 When a sub-task reports `ESCALATED` / `BLOCKED` / `NEEDS_CONTEXT`, do not rescue. Read the escalation artifact, classify the cause, and route:
@@ -1048,6 +1147,8 @@ Nothing orchestrate produces lives outside GitHub (see Artifact discipline → G
 - **"The user wants it fast; I'll skip the spec sub-task."** → Three-strikes rule will find you within 2 re-triages. Do the spec.
 - **"This is the same sub-task that escalated last week; I'll just run it again."** → Re-triage. Something is structurally different; find it.
 - **"I'll just dispatch impl; investigate is overhead for an obvious bug."** → No. If you cannot point at a reproduction artifact, you do not know the bug. Route to `/safer:investigate` first.
+- **"The teammate said APPROVE, so I merged."** → No. Read the reviewer body via the Step 5c.0 procedure. Approve against the stated acceptance is conditional on all named gates (verify, re-review, out-of-band checks) having run. The teammate summary compresses; conditions live in the body.
+- **"Teammate pane is quiet; task must be progressing."** → No. Quiet pane + roster `isActive=false` has three causes: (a) task done, (b) process crashed, (c) stuck on a permission dialog the team-lead never saw. Capture the pane (Step 1a) before assuming (a). The existing Path (a) cleanup is correct only when the pane is missing from `$ALIVE`, not when it is alive but quiet.
 
 ---
 
