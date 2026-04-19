@@ -229,6 +229,28 @@ Expected: `tier: staff`. Other classifications are signals:
 - `tier: junior` or `tier: senior` → the sub-issue was mislabeled, or the spec did not actually require new architectural surface. Note in PR body; not a stop.
 - No classification or tool error → escalate via `NEEDS_CONTEXT` rather than guessing.
 
+### Phase 8a — Pre-PR simplify pass (mandatory, stricter than senior)
+
+Before opening the PR, run `/simplify` on the diff:
+
+```
+/simplify
+```
+
+Apply **every** finding unless it conflicts with a plan-approved architect decision. For each skipped finding, cite the specific plan line in the PR body under "Simplify skips." Skipping a finding without a plan citation is a stop-rule-adjacent signal; escalate if uncertain. An empty result (no findings) is a valid outcome — note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored — skipped" and the reviewer decides whether to block.
+
+### Phase 8b — Codex diff review (mandatory)
+
+After committing, run `/codex` on the PR diff as an independent cross-model review pass:
+
+```
+/codex --mode review --diff HEAD
+```
+
+Post the codex verdict as a comment on the sub-issue before opening the PR (the reviewer and `/safer:review-senior` pass will see it). This counts as one independent pass toward the stamina N budget (PRINCIPLES.md → Durability — independent roles: mechanical/cross-model vs human-style).
+
+If `/codex` is unavailable, log "codex diff review: unavailable — skipped" on the sub-issue and proceed.
+
 ### Phase 9 — Open the PR
 
 ```bash
@@ -262,6 +284,12 @@ Architect plan: <URL or 'none'>
 
 ## Tests
 - <bullet per test file / path>
+
+## Simplify skips
+- <plan line> — <reason finding was skipped> (or "none")
+
+## Codex diff review
+- <codex verdict summary> (or "unavailable — skipped")
 
 ## Confidence
 <LOW|MED|HIGH> — <evidence>
@@ -389,7 +417,10 @@ Post on the sub-issue; leave the branch in place with the anchored work committe
 - [ ] Every switch over a union ends in `absurd`.
 - [ ] Tests cover success, each error tag, and each named invariant.
 - [ ] Lint, typecheck, and tests pass across touched packages.
+- [ ] Pre-PR `/simplify` pass run; all findings applied or each skip cites the plan line in PR body.
+- [ ] `/codex` diff review run; verdict posted on sub-issue (or "unavailable — skipped" logged).
 - [ ] Draft PR opened with title prefixed `[impl-staff]` and tables in body; sub-issue label transitioned `implementing` → `review`.
+- [ ] `/safer:review-senior` is mandatory before this PR merges (noted in PR body or enforced by orchestrate Phase 5c).
 - [ ] `safer.skill_end` event emitted.
 - [ ] Status marker on the last line of your response.
 

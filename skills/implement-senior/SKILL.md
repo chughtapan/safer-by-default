@@ -192,6 +192,16 @@ Expected output: `tier: senior`. Failure modes:
 - `tier: junior` → the plan was smaller than senior-tier. Not a stop-rule violation, but note it in the PR body and suggest the sub-issue be relabeled next time.
 - `tier: staff` → the diff crossed into staff territory (new module, new public surface). Stop rule fired. Escalate.
 
+### Phase 6a — Pre-PR simplify pass (mandatory)
+
+Before opening the PR, run `/simplify` on the diff:
+
+```
+/simplify
+```
+
+Apply all findings unless a finding would conflict with a plan-approved architect decision. For each skipped finding, cite the plan line in the PR body under "Simplify skips." An empty result (no findings) is a valid outcome — note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored — skipped" in the PR body and proceed; the reviewer decides whether to block.
+
 ### Phase 7 — Open the PR
 
 ```bash
@@ -341,7 +351,9 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 - [ ] Every package-boundary decode uses a schema.
 - [ ] Tests cover each cross-module path the plan names.
 - [ ] Lint, typecheck, and tests pass across touched packages.
+- [ ] Pre-PR `/simplify` pass run; findings applied or cited with skip reason in PR body.
 - [ ] Draft PR opened with title prefixed `[impl-senior]` and plan-anchor table in body.
+- [ ] `/safer:review-senior` is mandatory before this PR merges (noted in PR body or enforced by orchestrate Phase 5c).
 - [ ] Sub-issue label transitioned `implementing` → `review`.
 - [ ] `safer.skill_end` event emitted.
 - [ ] Status marker on the last line of your response.
