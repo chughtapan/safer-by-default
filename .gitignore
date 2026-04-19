@@ -10,3 +10,4 @@
 
 # Local state (never committed; user-specific)
 ~/.safer/
+/.codex

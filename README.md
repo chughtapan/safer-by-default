@@ -57,6 +57,35 @@ cd ~/.claude/skills/safer-by-default
 
 **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
 
+## Use with Codex
+
+This repository is authored as a **Claude-style skill plugin**, not a native Codex plugin. The quickest Codex path is to install a small compatibility layer that:
+
+- links this repo into `~/.codex/skills/safer-by-default`
+- creates Codex skill wrappers like `safer:spec`, `safer:architect`, `safer:review-senior`
+- links `bin/safer-*` into `~/.local/bin`
+
+Run:
+
+```bash
+./setup-codex
+```
+
+Then restart Codex so it reloads skills.
+
+Example prompts inside Codex:
+
+- `Use safer:setup to bootstrap this TypeScript repo.`
+- `Use safer:spec to turn this idea into a spec.`
+- `Use safer:architect for the approved spec in issue #123.`
+- `Use safer:review-senior to review this diff.`
+
+Notes:
+
+- The wrappers forward to the original skill docs in this repo; they do not rewrite the doctrine.
+- GitHub-backed flows still expect `gh` to be installed and authenticated.
+- The upstream docs say `AskUserQuestion`; in Codex that maps to a normal clarification question or the nearest available user-input mechanism.
+
 ## Skill catalog
 
 Thirteen skills, grouped by **modality** (the type of work: design, execution, gating, or bootstrap).
