@@ -615,13 +615,24 @@ The `Agent` call in Step 6d includes the `model` parameter per the table below. 
 | `safer:implement-staff` | opus (claude-opus-4-7) | new modules / new public interfaces / new architectural patterns |
 | `safer:dogfood` | haiku | **acid test**: if haiku can't cold-read the artifact, the artifact has portability bug |
 | `safer:spike` | opus | throwaway feasibility requires exploratory reasoning |
-| `safer:research` | opus | iterative hypothesis loop over literature |
-| `safer:architect` | opus | design-module decisions; high blast radius |
+| `safer:research` Researcher role | opus | deep-reasoning per round |
+| `safer:research` Supervisor role | **codex** (gpt-5.4-xhigh) | independent second-opinion breaks single-model groupthink |
+| `safer:architect` | **codex** (gpt-5.4-xhigh via `/codex` consult) → **opus review** | Architecture benefits from second-model cross-check |
 | `safer:review-senior` | opus | review is high-stakes reading |
 | `safer:verify` | opus | formal sign-off |
-| `safer:spec` | opus | translating intent to acceptance criteria |
+| `safer:spec` | **codex** (gpt-5.4-xhigh via `/codex` consult) → **opus review** | Design decisions benefit from independent-model angle; opus gates |
 
 > **Dogfood-on-haiku is an acid test.** Upgrading dogfood to opus masks portability debt. Keep dogfood on haiku.
+
+### Codex dispatch pattern
+
+**Codex as second-opinion dispatcher.** Three modes mirror gstack `/codex`:
+
+1. **Consult mode (spec, architect):** codex writes first draft using gpt-5.4-xhigh. Opus reviews and signs off or requests revision. Two-pass: codex-draft → opus-review.
+2. **Supervisor mode (research):** codex supervises each round's researcher output. Researcher stays opus; supervisor stays codex. Breaks "single-model groupthink" failure mode.
+3. **Challenge mode (ad-hoc):** any modality can dispatch codex as an adversarial pass on an artifact. Out-of-scope for default routing; orchestrator invokes explicitly.
+
+**Invocation:** use the gstack `/codex` skill for all three modes. Do NOT import `@openai/sdk` raw (same doctrine as cc-judge's `@anthropic-ai/sdk` anti-pattern: route through the harness CLI, not the LLM API directly).
 
 ### Per-modality dispatch prompt templates
 
@@ -679,7 +690,8 @@ Parent epic: {PARENT_URL}
 Branch: {BRANCH_HINT}
 
 Read PRINCIPLES.md and skills/implement-senior/SKILL.md at the plugin root.
-Load the architect plan the parent epic references. No plan, escalate.
+Load the architect plan the parent epic references. Architect uses codex consult
+→ opus review; once opus signs off, implementation begins. No plan, escalate.
 
 Acceptance: {ACCEPTANCE}
 
@@ -759,7 +771,7 @@ writeup as a sub-issue comment. The branch stays unmerged. Status marker
 
 ```
 source: orchestrate-auto-dispatch
-Dispatch with: `model: opus` per orchestrate Model routing table.
+Dispatch with: `model: opus` (researcher) + `model: codex` (supervisor) per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:research`.
 
 Sub-issue: {ISSUE_URL}
@@ -770,16 +782,17 @@ Read PRINCIPLES.md and skills/research/SKILL.md at the plugin root.
 Acceptance: {ACCEPTANCE}
 
 Run an iterative hypothesis loop; post one comment per iteration on the
-sub-issue as your research ledger. Produce no code. Status marker +
-SendMessage the team lead with the ledger URL when the loop converges
-or the budget runs out.
+sub-issue as your research ledger. Codex supervises each round as a second-opinion
+dispatcher (independent check to break single-model groupthink). Produce no code.
+Status marker + SendMessage the team lead with the ledger URL when the loop
+converges or the budget runs out.
 ```
 
 #### spec
 
 ```
 source: orchestrate-auto-dispatch
-Dispatch with: `model: opus` per orchestrate Model routing table.
+Dispatch with: `model: codex` (gpt-5.4-xhigh via /codex consult) → opus review per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:spec`.
 
 Sub-issue: {ISSUE_URL}
@@ -790,10 +803,10 @@ Read PRINCIPLES.md and skills/spec/SKILL.md at the plugin root.
 Acceptance: {ACCEPTANCE}
 
 Produce a spec with goals, non-goals, invariants, and explicit acceptance
-criteria. No architecture, no libraries, no code. Publish as a comment on
-the parent epic (or sub-issue body per the skill's publication rule).
-Transition the sub-issue to `review`. Status marker + SendMessage the
-team lead with the spec URL.
+criteria. No architecture, no libraries, no code. Use codex consult mode to draft;
+opus will review and sign off. Publish as a comment on the parent epic (or sub-issue
+body per the skill's publication rule). Transition the sub-issue to `review`.
+Status marker + SendMessage the team lead with the spec URL.
 ```
 
 Templates are intentionally terse. They do not replicate the full modality charter; they point the teammate at `SKILL.md` and carry the scope contract that differs per modality. If a template grows beyond ~25 lines, the modality has shifted; revisit the template rather than expanding it in-place.
