@@ -1,24 +1,9 @@
 ---
 name: safer-docs-reader
 version: 0.1.0
+model: opus
 description: |
-  Read a docs artifact (local file, GitHub issue URL, GitHub PR URL) and
-  collect persona-specific feedback by dispatching N ephemeral sub-agents
-  on haiku — one per persona prompt template. Aggregate verdicts via a
-  deterministic severity-weighted consensus rule, propose actionable
-  iteration items, and loop up to a bounded round limit (N=3 max; round 2
-  auto-triggered on BLOCK or ≥2 overlapping FRICTION; round 3 gated on
-  user approval). Personas live as prompt files in `prompts/`, never as
-  their own skill directories. Each persona emits a verdict, a list of
-  severity-tagged items with evidence, and per-axis scores. The emitted
-  shape is cc-judge-compatible so a future cc-judge wiring can ingest
-  each persona as a ScenarioSchema result; the adopted axes named in
-  the persona rubrics include `install-friction` and `cli-ergonomics`.
-  Use when a docs
-  artifact is about to be handed to a broader audience and you need
-  multi-perspective feedback before the next modality runs. Do NOT use
-  for code review (`safer-review-senior` owns diffs), for production
-  editorial (out of scope), or to auto-apply revisions (emit-only).
+  Read a docs artifact and dispatch 4 ephemeral haiku personas for multi-perspective feedback. Aggregate verdicts via severity-weighted consensus; loop up to N=3 rounds (round 3 user-gated). Emit-only — does not revise the artifact.
 triggers:
   - docs reader
   - personas feedback on this
@@ -36,6 +21,8 @@ allowed-tools:
   - Read
   - Write
   - SendMessage
+  - TeamCreate
+  - TeamDelete
 ---
 
 # /safer:docs-reader
@@ -57,7 +44,7 @@ These are the spec invariants this skill enforces. Every reference to `Invariant
 1. **One skill.** No new per-persona skill directories. A persona is a prompt file plus an ephemeral sub-agent.
 2. **Ephemeral sub-agents.** A persona sub-agent exists for exactly one feedback pass; its team is deleted at run end on every exit path.
 3. **Opus orchestrator, haiku personas.** The skill runs on opus; every persona `Agent` call carries `model: "haiku"` per the orchestrate model-routing table. Dispatch is always `TeamCreate` + `Agent(team_name, ...)`; never standalone `Agent`; never in-session `Skill`.
-4. **Bounded iteration.** The round limit is fixed at N=3: round 1 auto; round 2 conditional auto on the round-limit rule below; round 3 only with explicit user authorization at dispatch (`--allow-round-3`). The loop cannot exceed N=3.
+4. **Bounded iteration.** The round limit is fixed at N=3: round 1 auto; round 2 only on explicit user trigger after revision; round 3 only with explicit user authorization at dispatch (`--allow-round-3`). The loop cannot exceed N=3.
 5. **Aggregator is named and deterministic.** The severity-weighted consensus rule below is the complete aggregator contract. The aggregator introduces no judgments the personas did not emit; it does not reweight, rephrase, or invent items or scores.
 6. **Artifact discipline.** Every run publishes a summary comment on the target artifact when the target is a GitHub issue/PR. No state lives only in conversation.
 7. **Cold-start readable.** The aggregate report is actionable by a fresh session with no prior context.
@@ -77,7 +64,7 @@ You are the orchestrator. Given an artifact reference, you:
 3. Spawn one sub-agent per persona via `Agent(team_name, name, model: haiku)`, each with the persona prompt + payload + output schema.
 4. Collect each sub-agent's structured verdict.
 5. Aggregate via severity-weighted consensus (deterministic; see §Aggregation).
-6. Decide whether to loop: round 2 auto-triggers on ≥1 BLOCK or ≥2 overlapping FRICTION; round 3 is user-gated.
+6. Decide whether to loop: round 2 runs only on explicit user trigger (after they apply revisions); round 3 is user-gated via `--allow-round-3`.
 7. On run end (DONE, DONE_WITH_CONCERNS, ESCALATED, BLOCKED), tear down the team via `TeamDelete`.
 8. Publish the aggregate report back to the artifact's thread (for GitHub inputs) or print to stdout (for local files, with optional cross-post to `SAFER_PARENT_ISSUE`).
 9. Emit telemetry and exit with one status marker.
@@ -140,7 +127,7 @@ If the invocation did not specify `--issue`, `--pr`, or `--file`, ask. No artifa
 | Dimension | Rule |
 |---|---|
 | Artifacts per invocation | 1 |
-| Rounds per invocation | 3 max (round 1 auto; round 2 conditional auto; round 3 user-gated) |
+| Rounds per invocation | 3 max (round 1 auto; round 2 user-triggered after revision; round 3 user-gated) |
 | Personas per round | 4 canonical (or the subset from `--personas`), one haiku sub-agent each |
 | Teams per invocation | 1 (ephemeral; torn down on exit) |
 | Aggregator rules | exactly the severity-weighted consensus stated below; no ad-hoc reweighting |
@@ -226,7 +213,6 @@ For each persona, call `Agent` with the team name and haiku model:
 Agent({
   team_name: "$TEAM_NAME",
   name: "persona-<persona-slug>",
-  subagent_type: "general-purpose",
   model: "haiku",
   description: "docs-reader persona pass",
   prompt: "<assembled prompt string>"
@@ -240,7 +226,7 @@ Invariants:
 - `description` is generic — it must not leak project identifiers into the sub-agent's bootstrap.
 - `name` is `persona-<slug>`, unique within the team; collisions fail the dispatch.
 
-All N personas are dispatched in parallel (one tool-use block with N `Agent` calls). Each sub-agent emits one structured verdict and then goes idle; the orchestrator collects via `SendMessage` back-channel or the Agent tool's return value, whichever the harness provides.
+All N personas are dispatched in parallel (one tool-use block with N `Agent` calls). Each sub-agent emits one structured verdict as its final message; the orchestrator collects each verdict from the `Agent` call's synchronous return value.
 
 If a persona's `Agent` call fails (team ceiling, haiku unavailable, prompt too large), record the failure for that persona and continue with the rest. A persona failure contributes one `SYSTEM_FAILURE` entry to that persona's slot in the aggregate; it does not terminate the run unless *every* persona fails.
 
@@ -300,7 +286,7 @@ The aggregate report contains:
 **Round-limit logic:**
 
 - **Round 1** always runs.
-- **Round 2** auto-triggers iff round 1's must-fix list is non-empty (≥1 BLOCK OR ≥2 overlapping FRICTION). Before dispatching round 2, the orchestrator re-reads the artifact payload. **The orchestrator does not revise the artifact itself.** Round 2 re-runs the same personas against the unchanged artifact only if the user has applied revisions between rounds (the user or downstream implementor pastes a revised payload via `--file` or updates the issue/PR body). If no revision was applied, round 2 is skipped and the run reports the round-1 must-fix list as the final hand-off.
+- **Round 2** runs only on explicit user trigger: the user applies revisions to the artifact and re-invokes the skill (updating the issue/PR body or supplying `--file` with the revised path). The orchestrator re-reads the artifact payload at round start. **The orchestrator does not revise the artifact itself.** Round 2 re-runs the same 4 personas against the revised artifact. If round 1 ends with a non-empty must-fix list and the user does not re-invoke, the run ends with `DONE_WITH_CONCERNS` and the must-fix list is the hand-off.
 - **Round 3** runs only if `--allow-round-3` was passed at dispatch AND round 2's must-fix list is still non-empty. Absent `--allow-round-3`, round 2 is the last round; if the must-fix list is still non-empty, the run ends with `DONE_WITH_CONCERNS` and the caller routes upstream.
 
 Round limit is Invariant §4.4: the constant is fixed at N=3 and cannot be overridden without the explicit dispatch flag.
@@ -332,6 +318,7 @@ case "$KIND" in
       echo "Parent orchestrator: $URL"
     fi
     ;;
+  *) echo "ERROR: unknown KIND: $KIND"; exit 1 ;;
 esac
 ```
 
@@ -436,7 +423,7 @@ One status marker on the last line of the final reply.
 - [ ] Every persona was dispatched via `Agent(team_name, name, model: "haiku")`. No standalone `Agent`. No in-session `Skill`.
 - [ ] Every persona's reply validated against its template schema (or re-invoked once on failure).
 - [ ] Aggregator applied the severity-weighted consensus rules exactly; no invented items or scores.
-- [ ] Round-limit rule enforced: round 2 auto only on BLOCK or ≥2 overlapping FRICTION; round 3 only with `--allow-round-3`.
+- [ ] Round-limit rule enforced: round 2 only on explicit user trigger after revision; round 3 only with `--allow-round-3`.
 - [ ] Aggregate report published to the correct destination per the publication map.
 - [ ] Team torn down via `TeamDelete`, on every exit path.
 - [ ] `safer.skill_end` event emitted.
