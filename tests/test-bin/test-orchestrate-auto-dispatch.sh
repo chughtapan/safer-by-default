@@ -176,6 +176,17 @@ test_skill_md_has_all_seven_templates() {
   return 0
 }
 
+test_epic_body_template_includes_linear_project_line() {
+  # Phase 3 epic body template must include the Linear project context line
+  # for Linear sync integration. Extract the template from SKILL.md and verify
+  # the expected line is present.
+  sed -n '/^Epic body template:/,/^```$/p' "$SKILL_MD" | \
+    grep -q 'Linear project:' || {
+      echo "Linear project line missing from epic body template";
+      return 1;
+    }
+}
+
 # ---------------------------------------------------------------------------
 
 echo "── orchestrate-auto-dispatch unit tests ──"
@@ -192,5 +203,6 @@ run_test "per-tick cap limits dispatch to 3"                    test_per_tick_ca
 run_test "SKILL.md pins per_tick_cap=3"                         test_skill_md_pins_per_tick_cap_to_three
 run_test "SKILL.md pins pane_ceiling=20"                        test_skill_md_pins_pane_ceiling_to_twenty
 run_test "SKILL.md has one template per dispatchable modality"  test_skill_md_has_all_seven_templates
+run_test "epic body template includes Linear project line"      test_epic_body_template_includes_linear_project_line
 
 report
