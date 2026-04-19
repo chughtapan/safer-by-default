@@ -1,0 +1,55 @@
+id: principle-3-typed-errors.raw-throw-in-effect-gen
+name: "P3 typed errors: raw throw -> tagged error inside Effect.gen"
+description: >
+  Agent receives a TypeScript module whose Effect.gen function signals
+  failure with `throw new Error("bad input")`. It is asked to refactor the
+  failure path to use a tagged error via Effect.fail while preserving the
+  Effect signature. Pass iff the refactor introduces a Data.TaggedError
+  subclass plus Effect.fail; fail iff a raw throw remains, iff the Effect
+  signature is dropped, or iff the agent sidesteps via try/catch.
+axis: principle-3-typed-errors
+
+setupPrompt: |
+  Open src/validate.ts. It contains one Effect.gen function whose failure
+  path uses `throw new Error("bad input")`. Refactor that failure path to
+  use a tagged error instead:
+    - Declare a tagged error class with `class <Name>Error extends Data.TaggedError("<Name>Error")<{ readonly message: string }> {}`.
+    - Replace the raw throw with `yield* Effect.fail(new <Name>Error({ message: "bad input" }))`.
+    - Keep the function's Effect return signature; do not change the exported function name or parameters.
+    - Do not add any other files. Only edit src/validate.ts.
+  Write the final file back to src/validate.ts with your changes applied.
+
+workspace:
+  - path: src/validate.ts
+    content: |
+      import { Effect } from "effect";
+
+      export const validate = (input: string) =>
+        Effect.gen(function* () {
+          if (input.length === 0) {
+            throw new Error("bad input");
+          }
+          return yield* Effect.succeed(input.toUpperCase());
+        });
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  src/validate.ts defines a Data.TaggedError subclass and uses Effect.fail
+  on the failure branch. The exported validate function still returns an
+  Effect (Effect.gen or equivalent). No raw `throw new Error` remains
+  inside the validate body. The agent does not convert the function to
+  synchronous code, and does not wrap the throw in a try/catch to paper
+  over it — both are P3 anti-patterns, not P3 conformance.
+
+validationChecks:
+  - "src/validate.ts defines a class extending Data.TaggedError (e.g. `class BadInputError extends Data.TaggedError(\"BadInputError\")<{ readonly message: string }> {}`)"
+  - "src/validate.ts calls Effect.fail with a new instance of that tagged error class on the failure branch"
+  - "src/validate.ts no longer contains the substring `throw new Error` inside the validate function body"
+  - "The exported `validate` function still returns an Effect (Effect.gen or equivalent); the exported name and parameter list are unchanged"
+  - "ANTI-PATTERN (FAIL): agent removed `Effect.gen` and made the function synchronous to sidestep the throw — this is Principle 8 ratcheting down, not P3 conformance"
+  - "ANTI-PATTERN (FAIL): agent wrapped the throw in `try { ... } catch { ... }` and returned Effect.fail from the catch — this is a bare-catch (Principle 1 anti-pattern), not a tagged error channel"
+
+metadata:
+  migratedFrom: "cc-judge scenarios/acg-rule-coverage/no-raw-throw-to-tagged.yaml"
+  batch: "v1-first-batch"

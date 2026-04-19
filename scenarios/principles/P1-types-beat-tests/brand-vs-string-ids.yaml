@@ -1,0 +1,72 @@
+id: principle-1-types-beat-tests.brand-vs-string-ids
+name: "P1 types beat tests: brand UserId and OrderId to make confusion unrepresentable"
+description: >
+  Agent receives a TypeScript module where UserId and OrderId are both raw
+  `string`, and are passed into a single function in an order that is easy
+  to confuse. The agent is asked to make the confusion impossible. Pass iff
+  the agent introduces branded types at the type-system level; fail iff the
+  agent adds a runtime check, a unit test, or leaves `string` in place.
+axis: principle-1-types-beat-tests
+
+setupPrompt: |
+  Open src/orders.ts. `transferOrder(userId, orderId)` takes two `string`
+  arguments; a caller that swaps them is indistinguishable from a caller
+  that does not. Make the confusion impossible by construction.
+
+  Requirements:
+    - Declare `type UserId = string & { readonly __brand: "UserId" }` and
+      `type OrderId = string & { readonly __brand: "OrderId" }` (or any
+      equivalent nominal-brand pattern the Effect or TypeScript community
+      uses — e.g., Effect's `Brand.nominal<Name>()`).
+    - Construct branded values at the module edge where the raw strings
+      enter (e.g., a `UserId(raw)` / `OrderId(raw)` factory).
+    - Update `transferOrder`'s parameter types so swapping arguments is a
+      compile error.
+    - Do not add a unit test asserting `userId !== orderId`. Do not add a
+      runtime guard that throws if the ids look swapped. Types, not tests.
+    - Only edit src/orders.ts.
+
+  Write the final file back to src/orders.ts.
+
+workspace:
+  - path: src/orders.ts
+    content: |
+      // transferOrder takes (userId, orderId). A caller that swaps them
+      // compiles and runs; the bug surfaces in production as "wrong user
+      // got the wrong order."
+      export type UserId = string;
+      export type OrderId = string;
+
+      export function transferOrder(userId: UserId, orderId: OrderId): void {
+        console.log(`transferring ${orderId} for user ${userId}`);
+      }
+
+      // Example caller — today, swap is legal:
+      // transferOrder(rawOrder, rawUser);  // compiles, wrong behavior.
+      export function exampleCall(rawUser: string, rawOrder: string): void {
+        transferOrder(rawUser, rawOrder);
+      }
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  src/orders.ts contains two branded types (UserId and OrderId) encoded at
+  the type system level — either as intersection with a nominal brand
+  (`string & { readonly __brand: "UserId" }`) or via Effect's Brand API
+  (`Brand.nominal<UserId>()`). Construction happens at exactly one site per
+  brand (a factory or a schema decode). `transferOrder` accepts the
+  branded types (not raw `string`), so swapping arguments is a compile
+  error. No unit test and no runtime guard is added — the type system is
+  the test.
+
+validationChecks:
+  - "src/orders.ts declares `UserId` as a branded type (intersection with `{ __brand }` marker, or `Brand.nominal<UserId>()`, or equivalent nominal construction)"
+  - "src/orders.ts declares `OrderId` as a separately branded type with a distinct brand marker; `UserId` and `OrderId` are not mutual aliases"
+  - "`transferOrder`'s parameter types are the branded `UserId` and `OrderId` (not raw `string`)"
+  - "There is exactly one construction site per brand (a factory function, `Brand.nominal`, or a schema decode); branded values are not minted ad-hoc inside `transferOrder` or its callers"
+  - "ANTI-PATTERN (FAIL): agent added a unit test asserting `userId !== orderId` or similar runtime inequality — the test exists for constraints the type system could not encode; this one can"
+  - "ANTI-PATTERN (FAIL): agent added a runtime `if (userId.startsWith(...))` or `throw` guard to catch swaps at runtime — this is human-era belt-and-braces, not type-level prevention"
+  - "ANTI-PATTERN (FAIL): agent left `type UserId = string` and `type OrderId = string` in place with only a rename — structural aliases do not brand"
+
+metadata:
+  batch: "v1-first-batch"
