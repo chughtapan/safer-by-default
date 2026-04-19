@@ -189,6 +189,7 @@ Epic body template:
 ## Context
 
 - **Project:** <name> (<https://github.com/OWNER/REPO>)
+- **Linear project:** <name>   <!-- one of the projects in the MOL team; required if Linear sync is desired -->
 - **Motivation:** <one sentence, in the user's own words if they stated it — why this matters now>
 - **Prior artifacts:** <bullet list of full URLs to every spec, issue, comment, PR, or doc this epic depends on. If none, write "none.">
 
@@ -228,6 +229,7 @@ Record the parent epic's issue number.
 2. **Every acceptance cell answers "what artifact, in what state, makes this row done."** One-line stubs like "tests green" are insufficient. Name the artifact type (PR, comment, sub-issue body, label), the location, and the state transition that closes the row.
 3. **Every external reference is a full URL.** `#5`, `PR #12`, "see the spec" are all invalid. Write `<https://github.com/OWNER/REPO/issues/5>`. This applies to sub-issues, prior artifacts, linked PRs, and any other cross-reference in the body. A bare `#N` breaks the moment the reader is in a different repo or session.
 4. **The `## Next step` section is mandatory.** The epic is only useful if the next action is explicit. Name the first sub-issue to dispatch (by URL), its modality, and the teammate (or `TBD`) that will pick it up.
+5. **The `Linear project` line is mandatory if Linear sync is enabled for this repo.** Pick the project from the live Linear `MOL` team list. If the epic is genuinely cross-project, name the dominant project and add a comment cross-link rather than splitting the epic.
 
 ### Phase 4 — Create sub-issues
 
