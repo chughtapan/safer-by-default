@@ -254,7 +254,7 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 
 # Artifact discipline
 
-The eight principles govern the work. These three rules govern what you hand off when the work is done.
+The eight principles govern the work. These five rules govern what you hand off when the work is done.
 
 ## GitHub is the record
 
@@ -295,6 +295,44 @@ Artifacts are written for a reader who has none of your context. The agent picki
 The test: open the artifact in a new session with no prior context. Read it start to finish. Can you act on it? If no, rewrite before publish.
 
 Anti-patterns: *"See the plan" where the plan is in a scratchpad.* *"As discussed above" in a doc the reader is seeing for the first time.* *Function names whose meaning depends on a naming debate the next reader was not present for.*
+
+## Estimates are in CC-time, not human-time
+
+Effort estimates in all artifacts carry two scales. Decomposition and user expectation depend on the CC scale; a single "2 weeks" is unactionable when the work lands in 30 minutes.
+
+| Task type | Human team | CC + plugin | Compression |
+|---|---|---|---|
+| Boilerplate / scaffolding | 2 days | 15 min | ~100× |
+| Test writing | 1 day | 15 min | ~50× |
+| Feature implementation | 1 week | 30 min | ~30× |
+| Bug fix + regression test | 4 hours | 15 min | ~20× |
+| Architecture / design | 2 days | 4 hours | ~5× |
+| Research / exploration | 1 day | 3 hours | ~3× |
+
+*Source: gstack/ETHOS.md (in-tree mirror at `~/.claude/skills/gstack/ETHOS.md:20-27`); heuristic, not measured.*
+
+Every effort estimate is written as `(human: ~X / CC: ~Y)`.
+
+**Decomposition rule.** Pattern-match the task to its nearest row. Composite tasks (e.g., architect-plus-feature) sum components and report each sub-estimate separately: `(human: ~2 days / CC: ~4 hours)` for the architecture component plus `(human: ~1 week / CC: ~30 min)` for the feature component, not a single collapsed estimate.
+
+**Per-modality row.**
+
+| Modality | Compression | Row |
+|---|---|---|
+| `spec` | ~2× | below Research; purely thinking-bound |
+| `architect` | ~5× | Architecture / design |
+| `research` | ~3× | Research / exploration |
+| `investigate` | ~3× | Research / exploration |
+| `spike` | ~5× | Architecture / design |
+| `implement-junior` | ~30× | Feature implementation |
+| `implement-senior` | ~30× | Feature implementation |
+| `implement-staff` | ~20× | Feature + Architecture (cross-module amortizes) |
+| `review-senior` | ~50× | Test writing (mechanical reading) |
+| `verify` | ~50× | Test writing (mechanical) |
+| `orchestrate` | sum of children | per sub-task row, plus small overhead |
+| `stamina` | N × artifact-row | inherit the artifact's row, multiply by N |
+
+Anti-patterns: *"2 weeks" with no CC equivalent — both scales are required.* *Pattern-matching architect or research to the Feature row — the ~5× and ~3× rows exist for this reason; the gstack 4-row preamble subset dropped them, producing systematic underestimates.* *Collapsing a composite task to one row — report each component separately.*
 
 ## Durability — the stamina rule
 
