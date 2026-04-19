@@ -662,6 +662,9 @@ Read the sub-issue and parent epic before touching code.
 Acceptance: {ACCEPTANCE}
 
 Scope is ONE module. If you need to touch a second module, stop and escalate.
+
+**Optional: /simplify pass.** If your diff touches >50 lines or introduces helper functions, consider running `/simplify`. Junior scope is usually narrow enough that it's not required, but it's cheap insurance.
+
 Open a draft PR titled `[impl-junior] ...`. Move the sub-issue to `review`.
 Emit a status marker (DONE / DONE_WITH_CONCERNS / ESCALATED / BLOCKED / NEEDS_CONTEXT)
 on your final output and SendMessage the team lead with the PR URL.
@@ -685,7 +688,18 @@ Acceptance: {ACCEPTANCE}
 
 Scope is cross-module WITHIN the plan. Do not introduce new modules, new public
 surface outside the plan, or new deps. `safer-diff-scope --head HEAD` must report
-`senior`. Open a draft PR titled `[impl-senior] ...` with a plan-anchor table.
+`senior`.
+
+**Pre-PR simplify pass.** After tests pass + build green, run gstack `/simplify` on the changed files. Review its findings:
+- DRY violations → consolidate.
+- Over-engineering (premature abstractions, one-use helpers) → inline.
+- Dead code → delete.
+- Inefficient or cleverer-than-needed code → simplify.
+
+Apply all findings unless a specific one would expand scope beyond the original spec. For any finding you skip, comment in the PR body why.
+
+Then re-run tests + build green. Commit as `refactor: apply /simplify findings (pre-PR cleanup)`. THEN open the draft PR titled `[impl-senior] ...` with a plan-anchor table.
+
 Status marker + SendMessage the team lead with the PR URL.
 ```
 
@@ -709,7 +723,10 @@ Read the approved spec + architect plan the parent epic references.
 Acceptance: {ACCEPTANCE}
 
 You may introduce new modules, new public interfaces, and new deps — all of
-which must trace to the approved plan. Open a draft PR titled `[impl-staff] ...`.
+which must trace to the approved plan.
+
+**Pre-PR simplify pass (MANDATORY for staff-tier).** Staff PRs introduce new public surface — simplify is the first chance to catch over-designed APIs, unnecessary new modules, or duplicated patterns. Run `/simplify` across the full diff. Apply every finding unless it conflicts with a plan-approved architectural decision (cite the plan line if skipping). Re-run `pnpm test && pnpm build && pnpm typecheck && pnpm lint` — all green. Commit as `refactor: apply /simplify findings (pre-PR cleanup)`. THEN open the draft PR titled `[impl-staff] ...`.
+
 Status marker + SendMessage the team lead with the PR URL.
 ```
 
