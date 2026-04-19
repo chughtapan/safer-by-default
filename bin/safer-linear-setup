@@ -82,6 +82,12 @@ assign_projects_main() {
     exit 1
   fi
 
+  # Validate --since format at the boundary before passing to date
+  if [ -n "$since_duration" ] && ! echo "$since_duration" | grep -qE '^[0-9]+[mhd]$'; then
+    echo "ERROR: --since DURATION must match ^[0-9]+[mhd]$ (e.g., 5m, 2h, 1d)"
+    exit 1
+  fi
+
   # Initialize counters
   local assigned=0
   local skipped=0
@@ -113,24 +119,36 @@ assign_projects_main() {
     local gh_labels
     gh_labels=$(echo "$issue_json" | jq -r '.labels | map(.name) | join("\n") // ""')
 
-    # Determine project per ranked rules
+    # Determine project per ranked rules; return 1 signals an API error
     local project
-    project=$(resolve_project_for_issue "$gh_number" "$gh_body" "$gh_labels")
+    if ! project=$(resolve_project_for_issue "$gh_number" "$gh_body" "$gh_labels"); then
+      if [ "$quiet" = false ]; then
+        echo "ERROR #$gh_number — project resolution failed (Linear API error)"
+      fi
+      ((++error))
+      continue
+    fi
 
     if [ -z "$project" ]; then
       project="SBD ops"
-      ((catchall++))
+      ((++catchall))
     fi
 
-    # Query Linear for the issue
+    # Query Linear for the issue; return 1 signals an API error
     local linear_issue
-    linear_issue=$(query_linear_issue_by_gh_number "$gh_number") || true
+    if ! linear_issue=$(query_linear_issue_by_gh_number "$gh_number"); then
+      if [ "$quiet" = false ]; then
+        echo "ERROR #$gh_number — Linear API call failed"
+      fi
+      ((++error))
+      continue
+    fi
 
     if [ -z "$linear_issue" ]; then
       if [ "$quiet" = false ]; then
         echo "SKIP #$gh_number — not found in Linear"
       fi
-      ((skipped++))
+      ((++skipped))
       continue
     fi
 
@@ -144,18 +162,24 @@ assign_projects_main() {
       if [ "$quiet" = false ]; then
         echo "SKIP #$gh_number — already assigned to $project"
       fi
-      ((skipped++))
+      ((++skipped))
       continue
     fi
 
     # Get project ID from Linear
     local project_id
-    project_id=$(query_linear_project_id "$project") || true
+    if ! project_id=$(query_linear_project_id "$project"); then
+      if [ "$quiet" = false ]; then
+        echo "ERROR #$gh_number — Linear API call failed querying project '$project'"
+      fi
+      ((++error))
+      continue
+    fi
     if [ -z "$project_id" ] || [ "$project_id" = "null" ]; then
       if [ "$quiet" = false ]; then
         echo "ERROR #$gh_number — project '$project' not found in Linear"
       fi
-      ((error++))
+      ((++error))
       continue
     fi
 
@@ -165,18 +189,18 @@ assign_projects_main() {
         if [ "$quiet" = false ]; then
           echo "ASSIGN #$gh_number → $project"
         fi
-        ((assigned++))
+        ((++assigned))
       else
         if [ "$quiet" = false ]; then
           echo "ERROR #$gh_number — failed to assign to $project"
         fi
-        ((error++))
+        ((++error))
       fi
     else
       if [ "$quiet" = false ]; then
         echo "DRY-RUN: would assign #$gh_number → $project"
       fi
-      ((assigned++))
+      ((++assigned))
     fi
   done < <(echo "$issues_json" | jq -c '.[]')
 
@@ -197,7 +221,9 @@ assign_projects_main() {
 # Helper functions
 # ============================================================================
 
-# Resolve project for an issue using ranked rules (Q1)
+# Resolve project for an issue using ranked rules (Q1).
+# Returns 0 with project name on stdout on success (empty stdout = no match, caller uses catchall).
+# Returns 1 on Linear API failure; the main loop must not treat API failure as a no-match.
 resolve_project_for_issue() {
   local gh_number="$1"
   local body="$2"
@@ -216,7 +242,7 @@ resolve_project_for_issue() {
   parent_match=$(printf '%s' "$body" | grep -i '^Parent: *#' | head -1 | sed 's/.*#\([0-9]*\).*/\1/' || true)
   if [ -n "$parent_match" ]; then
     local parent_project
-    parent_project=$(get_issue_project "$parent_match") || true
+    parent_project=$(get_issue_project "$parent_match") || return 1
     if [ -n "$parent_project" ]; then
       echo "$parent_project"
       return 0
@@ -228,7 +254,7 @@ resolve_project_for_issue() {
   parent_heading=$(printf '%s' "$body" | grep -A 1 '^## Parent' | tail -1 | grep -o '#[0-9]*' | head -1 | sed 's/#//' || true)
   if [ -n "$parent_heading" ]; then
     local parent_project
-    parent_project=$(get_issue_project "$parent_heading") || true
+    parent_project=$(get_issue_project "$parent_heading") || return 1
     if [ -n "$parent_project" ]; then
       echo "$parent_project"
       return 0
@@ -237,7 +263,7 @@ resolve_project_for_issue() {
 
   # Rule 4: Label keyword mapping
   local project
-  project=$(map_labels_to_project "$labels") || true
+  project=$(map_labels_to_project "$labels")
   if [ -n "$project" ]; then
     echo "$project"
     return 0
@@ -247,13 +273,14 @@ resolve_project_for_issue() {
   return 0
 }
 
-# Get the project assigned to a GH issue
+# Get the project assigned to a GH issue.
+# Returns 1 on API error; returns 0 with empty stdout if issue not found in Linear.
 get_issue_project() {
   local gh_number="$1"
   local linear_issue
-  linear_issue=$(query_linear_issue_by_gh_number "$gh_number") || true
+  linear_issue=$(query_linear_issue_by_gh_number "$gh_number") || return 1
   if [ -n "$linear_issue" ]; then
-    echo "$linear_issue" | jq -r '.project.name // ""' || true
+    echo "$linear_issue" | jq -r '.project.name // ""'
   fi
 }
 
@@ -267,6 +294,10 @@ map_labels_to_project() {
     "safer:spike|Tracking infra"
     "community-feedback|Community feedback agents"
     "safer:spec|Testing doctrine"
+    "cc-judge|cc-judge"
+    "zapbot-simplify|zapbot simplify"
+    "moltzap-migration|Moltzap migration"
+    "reentrance-tier-1|Reentrance Tier-1"
   )
 
   for entry in "${label_map[@]}"; do
@@ -281,13 +312,16 @@ map_labels_to_project() {
   return 0
 }
 
-# Query Linear API for an issue by GH number
+# Query Linear API for an issue by GH issue URL (exact match via attachment).
+# Linear's GH sync stores the GH issue URL as an attachment; filtering by URL
+# avoids false matches from body-text mentions of "#N".
 query_linear_issue_by_gh_number() {
   local gh_number="$1"
-  local query="query { issues(filter: { searchableContent: { contains: \"#$gh_number\" } }) { nodes { id project { id name } } } }"
+  local gh_url="https://github.com/chughtapan/safer-by-default/issues/$gh_number"
+  local query="query { issues(filter: { attachments: { url: { eq: \"$gh_url\" } } }) { nodes { id project { id name } } } }"
   local response
-  response=$(query_linear "$query") || echo "{}"
-  echo "$response" | jq '.data.issues.nodes[0] // empty' || true
+  response=$(query_linear "$query") || return 1
+  echo "$response" | jq '.data.issues.nodes[0] // empty'
 }
 
 # Query Linear API for a project ID by name
@@ -295,8 +329,8 @@ query_linear_project_id() {
   local project_name="$1"
   local query="query { projects(filter: { name: { eq: \"$project_name\" } }) { nodes { id } } }"
   local response
-  response=$(query_linear "$query") || echo "{}"
-  echo "$response" | jq -r '.data.projects.nodes[0].id // ""' || true
+  response=$(query_linear "$query") || return 1
+  echo "$response" | jq -r '.data.projects.nodes[0].id // ""'
 }
 
 # Assign an issue to a project in Linear
@@ -305,7 +339,7 @@ assign_issue_to_project() {
   local project_id="$2"
   local query="mutation { issueUpdate(id: \"$issue_id\", input: { projectId: \"$project_id\" }) { issue { id } } }"
   local response
-  response=$(query_linear "$query") || echo "{}"
+  response=$(query_linear "$query") || return 1
   # Check for errors
   if echo "$response" | jq -e '.errors' >/dev/null 2>&1; then
     return 1
@@ -313,13 +347,17 @@ assign_issue_to_project() {
   return 0
 }
 
-# Make GraphQL query to Linear API
+# Make GraphQL query to Linear API. Returns 1 on network/HTTP failure.
 query_linear() {
   local query="$1"
-  curl -s -X POST "https://api.linear.app/graphql" \
+  local response
+  if ! response=$(curl -s --fail -X POST "https://api.linear.app/graphql" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $LINEAR_API_KEY" \
-    -d "{\"query\": $(printf '%s' "$query" | jq -Rs '.')}" || echo "{}"
+    -d "{\"query\": $(printf '%s' "$query" | jq -Rs '.')}"); then
+    return 1
+  fi
+  echo "$response"
 }
 
 # Entry point - only call main if this script is being executed (not sourced)
