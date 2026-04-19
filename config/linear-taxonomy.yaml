@@ -1,0 +1,49 @@
+# Linear project taxonomy for safer-by-default (v2).
+#
+# Single source of truth for:
+#   1. Linear project names the assignment flow may target.
+#   2. Label-to-project mapping used by rule (4) in the ranked-rules engine.
+#   3. The named catchall project used when rules (1)-(4) produce no match.
+#
+# Schema is declared in lib/safer-linear/taxonomy.sh (validate_taxonomy).
+# Any script that needs a project name reads it from this file, not from
+# hard-coded strings. Adding/renaming a project is exactly one PR that edits
+# only this file.
+#
+# Spec reference: https://github.com/chughtapan/safer-by-default/issues/113#issuecomment-4275105753
+
+# v1 schema. Bump when a structural break occurs.
+schemaVersion: 1
+
+# Named catchall project. MUST also appear in `projects`.
+# Spec invariant 3 (exhaustiveness): every resolved issue lands in exactly one project.
+catchall: "SBD ops"
+
+# Full set of Linear project names v2 may target.
+# Spec invariant 7 (bootstrap determinism): create-from-taxonomy is closed
+# over this list. Since Q1 resolves to require-preexisting, this list is the
+# set of projects the preflight asserts exist in Linear; unknown projects
+# produce a named error and nonzero exit.
+projects:
+  - "Tracking infra"
+  - "SBD ops"
+  - "Linear integration"
+  - "Testing doctrine"
+  - "Reentrance Tier-1"
+  - "Community feedback agents"
+  - "Moltzap migration"
+
+# Label → project mapping. First-match-wins; order is significant.
+# Used only by rule (4). Every `project` value MUST appear in `projects`.
+# (Taxonomy loader enforces the cross-reference; see validate_taxonomy.)
+labelMap:
+  - label: "safer:spike"
+    project: "Tracking infra"
+  - label: "community-feedback"
+    project: "Community feedback agents"
+  - label: "safer:spec"
+    project: "Testing doctrine"
+  - label: "moltzap-migration"
+    project: "Moltzap migration"
+  - label: "reentrance-tier-1"
+    project: "Reentrance Tier-1"
