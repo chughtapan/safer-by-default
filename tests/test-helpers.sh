@@ -84,6 +84,23 @@ run_test() {
   fi
 }
 
+# mock_gh_dir <exit-code> <stdout-payload>
+# Writes a fake gh binary to a temp dir and prints the dir path.
+# Caller: prepend the dir to PATH, then rm -rf after use.
+mock_gh_dir() {
+  local rc="$1"
+  local out="$2"
+  local dir
+  dir=$(mktemp -d)
+  cat > "$dir/gh" <<GHEOF
+#!/usr/bin/env bash
+echo '$out'
+exit $rc
+GHEOF
+  chmod +x "$dir/gh"
+  echo "$dir"
+}
+
 report() {
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
