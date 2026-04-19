@@ -179,12 +179,15 @@ Transition the label: `safer-transition-label --issue "$ISSUE" --from planning -
 
 ### Phase 2: The loop
 
-For each round, do the following four steps:
+The Supervisor role is **codex** (cross-model independent evaluation). Run `/codex --mode supervisor` on the Researcher turn output before writing the Supervisor turn. If `/codex` is unavailable, fall back to the internal Supervisor turn and log the skip on the sub-issue.
+
+For each round, do the following five steps:
 
 1. **Researcher turn.** Write the four-part turn (CLAIM, EVIDENCE, EXPERIMENT, EXPECTED) to a scratch file, run the experiment, then fill in INSIGHT, IMPLICATIONS, CONFIDENCE.
-2. **Supervisor turn.** Write QUESTIONS, RATING, GUIDANCE.
-3. **Publish the round.** Post the concatenated Researcher + Supervisor turns as a comment on the research issue. Each round is one comment; comments are the ledger.
-4. **Check exit conditions.** If Supervisor rated EXCELLENT and Researcher confidence is at least 0.8, exit the loop. If round count equals 20, exit with `DONE_WITH_CONCERNS`. Else, increment round and continue.
+2. **Codex supervisor gate.** Run `/codex --mode supervisor` on the Researcher output. Codex stamps `continue` / `hold` / `escalate`. `hold` → Researcher revises the same round before advancing. `escalate` → treat as a POOR round and emit `NEEDS_CONTEXT` to the caller. `continue` → proceed.
+3. **Supervisor turn.** Write QUESTIONS, RATING, GUIDANCE (informed by the codex stamp).
+4. **Publish the round.** Post the concatenated Researcher + codex stamp + Supervisor turns as a comment on the research issue. Each round is one comment; comments are the ledger.
+5. **Check exit conditions.** If Supervisor rated EXCELLENT and Researcher confidence is at least 0.8, exit the loop. If round count equals 20, exit with `DONE_WITH_CONCERNS`. Else, increment round and continue.
 
 Comment template for a round:
 
@@ -202,6 +205,10 @@ Comment template for a round:
 **INSIGHT.** <one or two sentences>
 **IMPLICATIONS.** <what this changes>
 **CONFIDENCE.** <0.0 to 1.0> ; <justification>
+
+### Codex supervisor
+**STAMP.** <continue | hold | escalate>
+**NOTE.** <one sentence from codex, or "unavailable — skipped" if /codex not installed>
 
 ### Supervisor
 **QUESTIONS.**

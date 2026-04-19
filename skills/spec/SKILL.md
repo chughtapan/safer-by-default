@@ -157,6 +157,17 @@ echo "$URL"
 rm -f "$TMP"
 ```
 
+**Codex review-after (upstream-stage gate).** Before transitioning to `review`, run `/codex` on the published spec artifact:
+
+```
+/codex --mode review --artifact "$URL"
+```
+
+- `approve` → proceed to `review`.
+- `changes-requested` → revise the spec (one round); re-publish; re-run codex.
+- `reject` → escalate to the user with codex's reasoning; do NOT transition.
+- Unavailable → log the skip on the sub-issue; transition without the codex pass.
+
 Transition the sub-issue (or the spec issue) from `planning` to `review`:
 
 ```bash

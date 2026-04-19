@@ -221,10 +221,24 @@ else
     --labels "safer:architect,review")
 fi
 
-safer-transition-label --issue "$ARCH_SUB_ISSUE" --from planning --to review
 echo "Design: $DOC_URL"
 echo "Stubs PR: $PR_URL"
 rm -f "$TMP"
+```
+
+**Codex review-after (upstream-stage gate).** Before transitioning to `review`, run `/codex` on the published design doc:
+
+```
+/codex --mode review --artifact "$DOC_URL"
+```
+
+- `approve` → proceed to `review`.
+- `changes-requested` → revise the design doc (one round); re-publish; re-run codex.
+- `reject` → escalate to the user with codex's reasoning; do NOT transition.
+- Unavailable → log the skip on the sub-issue; transition without the codex pass.
+
+```bash
+safer-transition-label --issue "$ARCH_SUB_ISSUE" --from planning --to review
 ```
 
 ### Phase 8 — Close out

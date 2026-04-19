@@ -623,6 +623,30 @@ The `Agent` call in Step 6d includes the `model` parameter per the table below. 
 
 > **Dogfood-on-haiku is an acid test.** Upgrading dogfood to opus masks portability debt. Keep dogfood on haiku.
 
+### Codex dispatch pattern
+
+Three modes mirror gstack `/codex`. Invoke via the gstack `/codex` skill — do NOT call `codex` binary or `@openai/sdk` raw; the harness CLI is the routing boundary.
+
+1. **Review mode (spec, architect upstream stages):** claude drafts; codex reviews the published artifact before `review → plan-approved`. Verdict: `approve` / `changes-requested` / `reject`. `changes-requested` routes back to the drafting modality as one revision round; `reject` escalates to the user with codex's reasoning. Opus stays the primary author — the SDS paper's independent-hypothesis claim motivates independent *evaluation*, not independent *generation*.
+2. **Supervisor mode (research):** per-round. Researcher output lands as a comment; codex reads and stamps `continue` / `hold` / `escalate` before the next round's dispatch. Breaks single-model groupthink on multi-round reasoning.
+3. **Diff review mode (implement-staff mandatory; implement-senior optional):** codex reads the PR diff, independent of `/safer:review-senior`. Verdict posted as a PR comment before the human review fires. Counts as one independent pass toward the stamina N budget (PRINCIPLES.md → Durability).
+
+**Budget.** One codex pass per artifact for spec/architect; one per research round for supervisor; one per staff PR for diff review. No over-calling — over-calling defeats the cost model.
+
+**Fallthrough.** If `/codex` is not installed or fails, proceed without the codex pass and log the skip on the sub-issue. Cross-model coverage is durability-additive, not a hard blocker.
+
+### Conflict resolution
+
+When routing rules conflict, this order governs. Earlier rules dominate.
+
+1. **User override wins.** User explicitly names a model, skips a gate, or routes differently → follow. Log override on sub-issue.
+2. **Scope discipline wins over capability upgrades.** If a scenario needs opus reasoning but the modality is junior, re-triage to senior. Never silently upgrade the junior's model — that hides scope drift.
+3. **Dogfood-on-haiku overrides artifact's model hint.** Dogfood IS the small-model test. If haiku cannot cold-read the artifact, fix the artifact, not the test.
+4. **Codex unavailable falls through to claude-only.** Log the skip. Blocking all spec work on a third-party CLI failure is worse than missing one cross-model pass.
+5. **Simplify finding conflicts with plan-approved architect decision.** Plan wins; skip finding; cite plan line in PR body.
+6. **Stamina N budget overlaps with codex + review-senior.** A codex diff-review pass and a `/safer:review-senior` pass count as N=2 (independent roles: mechanical/cross-model vs human-style). They do not double-count as N=1.
+7. **Gate failures are never silent.** Simplify errored, codex unreachable, review-senior did not fire: post a gate-skip comment on the sub-issue with the reason.
+
 ### Per-modality dispatch prompt templates
 
 Step 6d dispatches by filling the template that matches the sub-issue's `safer:<modality>` label. Every template is a copy-pasteable block. Every template carries the `source: orchestrate-auto-dispatch` header so a post-hoc audit can separate auto-dispatched work from human-driven dispatches. Every template ends with the mandatory status-marker instruction.
@@ -662,9 +686,11 @@ Read the sub-issue and parent epic before touching code.
 Acceptance: {ACCEPTANCE}
 
 Scope is ONE module. If you need to touch a second module, stop and escalate.
-Open a draft PR titled `[impl-junior] ...`. Move the sub-issue to `review`.
-Emit a status marker (DONE / DONE_WITH_CONCERNS / ESCALATED / BLOCKED / NEEDS_CONTEXT)
-on your final output and SendMessage the team lead with the PR URL.
+If the diff exceeds 50 LOC or introduces shared helpers, consider running /simplify
+before opening the PR. Open a draft PR titled `[impl-junior] ...`. Move the
+sub-issue to `review`. Emit a status marker (DONE / DONE_WITH_CONCERNS /
+ESCALATED / BLOCKED / NEEDS_CONTEXT) on your final output and SendMessage the
+team lead with the PR URL.
 ```
 
 #### implement-senior
@@ -685,7 +711,10 @@ Acceptance: {ACCEPTANCE}
 
 Scope is cross-module WITHIN the plan. Do not introduce new modules, new public
 surface outside the plan, or new deps. `safer-diff-scope --head HEAD` must report
-`senior`. Open a draft PR titled `[impl-senior] ...` with a plan-anchor table.
+`senior`. Before opening the PR, run /simplify on the diff (mandatory); apply
+findings unless a finding conflicts with a plan-approved decision (cite the plan
+line in the PR body). Open a draft PR titled `[impl-senior] ...` with a
+plan-anchor table. /safer:review-senior is mandatory before merge.
 Status marker + SendMessage the team lead with the PR URL.
 ```
 
@@ -709,8 +738,15 @@ Read the approved spec + architect plan the parent epic references.
 Acceptance: {ACCEPTANCE}
 
 You may introduce new modules, new public interfaces, and new deps — all of
-which must trace to the approved plan. Open a draft PR titled `[impl-staff] ...`.
-Status marker + SendMessage the team lead with the PR URL.
+which must trace to the approved plan. Before opening the PR:
+1. Run /simplify on the diff (mandatory, stricter than senior — apply every
+   finding unless it conflicts with a plan-approved architect decision; cite the
+   plan line in the PR body for any skipped finding).
+2. Run /codex on the PR diff (mandatory): post the codex verdict as a PR comment
+   before /safer:review-senior fires. This counts as one independent pass toward
+   the stamina N budget. If /codex is unavailable, log the skip on the sub-issue.
+Open a draft PR titled `[impl-staff] ...`. /safer:review-senior is mandatory
+before merge. Status marker + SendMessage the team lead with the PR URL.
 ```
 
 #### verify
@@ -759,7 +795,7 @@ writeup as a sub-issue comment. The branch stays unmerged. Status marker
 
 ```
 source: orchestrate-auto-dispatch
-Dispatch with: `model: opus` per orchestrate Model routing table.
+Dispatch with: `model: opus` (Researcher); Supervisor role uses codex.
 You are a teammate on team `{TEAM}` invoking `/safer:research`.
 
 Sub-issue: {ISSUE_URL}
@@ -770,8 +806,11 @@ Read PRINCIPLES.md and skills/research/SKILL.md at the plugin root.
 Acceptance: {ACCEPTANCE}
 
 Run an iterative hypothesis loop; post one comment per iteration on the
-sub-issue as your research ledger. Produce no code. Status marker +
-SendMessage the team lead with the ledger URL when the loop converges
+sub-issue as your research ledger. Produce no code. The Supervisor role
+for each round is codex (run /codex --mode supervisor on the Researcher
+output before advancing to the next round). If /codex is unavailable,
+log the skip and continue with the internal Supervisor turn. Status marker
++ SendMessage the team lead with the ledger URL when the loop converges
 or the budget runs out.
 ```
 
@@ -792,6 +831,11 @@ Acceptance: {ACCEPTANCE}
 Produce a spec with goals, non-goals, invariants, and explicit acceptance
 criteria. No architecture, no libraries, no code. Publish as a comment on
 the parent epic (or sub-issue body per the skill's publication rule).
+After publishing, run /codex --mode review on the published artifact. The
+codex verdict must be `approve` before transitioning to `review`. If
+`changes-requested`, revise and re-run (one revision round). If `reject`,
+escalate to the user with codex's reasoning. If /codex is unavailable, log
+the skip and transition to `review` without the codex pass.
 Transition the sub-issue to `review`. Status marker + SendMessage the
 team lead with the spec URL.
 ```
