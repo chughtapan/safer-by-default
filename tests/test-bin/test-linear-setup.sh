@@ -201,6 +201,49 @@ test_since_format_validation() {
   assert_contains "$output" "ERROR: --since DURATION" "rejects invalid --since format"
 }
 
+test_authorization_header_no_bearer_prefix() {
+  export LINEAR_API_KEY="lin_api_test123"
+  local header_file
+  header_file=$(mktemp)
+  trap "rm -f '$header_file'" RETURN
+
+  curl() {
+    while [ $# -gt 0 ]; do
+      if [ "$1" = "-H" ] && [ $# -gt 1 ]; then
+        if [[ "$2" == Authorization:* ]]; then
+          echo "${2#Authorization: }" > "$header_file"
+        fi
+        shift 2
+      else
+        shift
+      fi
+    done
+    # Return minimal valid JSON to avoid query_linear parse errors
+    echo '{"data": {"ok": true}}'
+  }
+  export -f curl
+
+  query_linear 'query { test }' >/dev/null
+
+  if [ ! -s "$header_file" ]; then
+    echo "FAIL: Authorization header not captured"
+    return 1
+  fi
+
+  local auth_value
+  auth_value=$(cat "$header_file")
+
+  if [[ "$auth_value" == *"Bearer "* ]]; then
+    echo "FAIL: Authorization header contains Bearer prefix: $auth_value"
+    return 1
+  fi
+  if [[ "$auth_value" != "lin_api_test123" ]]; then
+    echo "FAIL: Authorization header is not the API key. Got: $auth_value"
+    return 1
+  fi
+  return 0
+}
+
 # Run tests
 run_test "parent ref resolution" test_parent_ref_resolution
 run_test "manual override wins" test_manual_override_wins
@@ -214,5 +257,6 @@ run_test "assign-projects requires API key" test_assign_projects_requires_api_ke
 run_test "assign-projects requires flags" test_assign_projects_requires_flags
 run_test "assign-projects mutually exclusive flags" test_assign_projects_mutually_exclusive_flags
 run_test "--since format validation" test_since_format_validation
+run_test "Authorization header has no Bearer prefix" test_authorization_header_no_bearer_prefix
 
 report

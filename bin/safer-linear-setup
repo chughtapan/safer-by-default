@@ -353,7 +353,7 @@ query_linear() {
   local response
   if ! response=$(curl -s --fail -X POST "https://api.linear.app/graphql" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $LINEAR_API_KEY" \
+    -H "Authorization: $LINEAR_API_KEY" \
     -d "{\"query\": $(printf '%s' "$query" | jq -Rs '.')}"); then
     return 1
   fi
