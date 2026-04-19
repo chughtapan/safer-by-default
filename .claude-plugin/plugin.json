@@ -8,6 +8,10 @@
   "homepage": "https://github.com/chughtapan/safer-by-default",
   "repository": "https://github.com/chughtapan/safer-by-default",
   "license": "MIT",
+  "files": [
+    "bin",
+    "skills"
+  ],
   "keywords": [
     "claude-code",
     "claude-skills",
