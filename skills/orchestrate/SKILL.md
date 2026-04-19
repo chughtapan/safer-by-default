@@ -107,6 +107,7 @@ If any required binary (`safer-slug`, `safer-telemetry-log`, `safer-update-check
 - Promoting a sub-task to its next state without the expected artifact published.
 - "Helping" a blocked modality by doing part of its work.
 - Inferring a sub-task's modality when the shape is ambiguous — ask the user.
+- Dispatching `implement-*` on a bug that has not been reproduced by investigate.
 
 ### The shape of work that belongs here
 
@@ -134,6 +135,7 @@ Classification table:
 |---|---|
 | Ambiguous goal, no acceptance criteria | `/safer:spec` directly — no orchestration yet |
 | A reproducible bug, one symptom | `/safer:investigate` directly |
+| A flagged-but-unreproduced bug (reviewer / dogfood / escalation observation, no repro in hand) | `/safer:investigate` first — never `implement-*`. Eligible for `implement-*` only after investigate publishes a reproduction artifact. |
 | "Can we do X?" / "Is X feasible?" | `/safer:spike` directly |
 | "How do X systems work?" / open question | `/safer:research` directly |
 | "Fix this bug and ship the fix" | Orchestrate: investigate → implement-* → verify |
@@ -861,6 +863,12 @@ When a sub-task reports `ESCALATED` / `BLOCKED` / `NEEDS_CONTEXT`, do not rescue
 
 Update the decomposition table on the parent epic to reflect the re-triage. Emit `safer.modality_handoff` with the cause.
 
+#### Flagged vs reproduced
+
+**Rule.** A bug that has been *flagged* (reviewer observation, dogfood comment, teammate self-report) but not yet *reproduced* routes to `/safer:investigate`, never directly to `implement-*`. Re-label any `safer:implement-*` sub-issue opened against an unreproduced bug to `safer:investigate` before dispatch; wait for investigate to publish a reproduction artifact before re-opening the implement-* path.
+
+**Rationale.** A flagged symptom description is a hypothesis about the failure mode, not a fact. Dispatching `implement-*` against a hypothesis wastes a pane on the wrong cause and lands a fix that drifts from the real defect. The reproduction artifact is what turns the hypothesis into a fact the implementer can act on.
+
 **Three-strikes rule.** If a single sub-task has been re-triaged **3 times without reaching `done`**, the project is mis-scoped. Stop and escalate to the user via the Confusion Protocol (below). Do not attempt a fourth triage.
 
 ### Phase 7 — Close out
@@ -992,6 +1000,7 @@ Nothing orchestrate produces lives outside GitHub (see Artifact discipline → G
 - **"I'll skip the VP dashboard; the user can see the PRs."** → No. The dashboard is how the pipeline proves itself healthy.
 - **"The user wants it fast; I'll skip the spec sub-task."** → Three-strikes rule will find you within 2 re-triages. Do the spec.
 - **"This is the same sub-task that escalated last week; I'll just run it again."** → Re-triage. Something is structurally different; find it.
+- **"I'll just dispatch impl; investigate is overhead for an obvious bug."** → No. If you cannot point at a reproduction artifact, you do not know the bug. Route to `/safer:investigate` first.
 
 ---
 
