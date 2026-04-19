@@ -1,0 +1,206 @@
+QUESTION
+========
+Under the interactive shape (moltzap-channel-v1 §5.1), all moltzap conversations
+route through ONE running Claude Code session with ONE shared context. At what
+concurrent-conversation count N does shared-context demux failure become the
+dominant failure mode for a representative dogfood workload?
+
+"Demux failure" = Claude misattributes an inbound event to the wrong
+conversation, or replies through the `reply` tool with the wrong `chat_id`
+meta-attribute, or bleeds content from conversation A into a reply to B.
+
+This is NOT a Channels-protocol-throughput question. The MCP stdio transport
+and Bun plugin layer carry thousands of `notifications/claude/channel` events
+per second without effort. The cap is imposed by the LLM's attention over
+interleaved `<channel source="..." chat_id="...">` tags in shared context.
+
+ENVIRONMENT / TRACTABILITY
+==========================
+Live empirical probe requires:
+  - Claude Code v2.1.80+ running with claude.ai login (NOT API key; docs: "They
+    require claude.ai login. Console and API key authentication is not
+    supported.")
+  - `--dangerously-load-development-channels server:probe` flag
+  - A throwaway MCP server that injects N synthetic inbound events with
+    distinct chat_ids on a fixed schedule
+  - Human/scripted check of each outbound `reply` tool call: does the chat_id
+    argument match the chat_id of the inbound event Claude was answering?
+
+This agent environment is not interactive, is not claude.ai-authenticated, and
+cannot drive a live Claude Code session with `--channels`. Per the dispatch
+brief's fallback clause ("If live Channels testing isn't tractable, produce a
+theoretical bound from Claude Code's channel protocol documentation + fan-out
+architecture"), this spike delivers a paper estimate + a ready-to-run probe
+script for a follow-up dogfood session.
+
+DOCUMENTED BEHAVIOR (cited verbatim, docs fetched 2026-04-19)
+=============================================================
+/en/channels:
+  - "A channel is an MCP server that pushes events into your running Claude
+    Code session, so Claude can react to things that happen while you're not
+    at the terminal."
+  - "Events only arrive while the session is open" (I3 in moltzap-channel-v1).
+  - "You can pass several plugins to --channels, space-separated." — the
+    `--channels` flag accepts multiple plugins but the underlying Claude Code
+    process is a SINGLE process with ONE context window. Multiple Channels
+    plugins multiplex into the same context.
+
+/en/channels-reference:
+  - "Each entry becomes an attribute on the `<channel>` tag for routing
+    context like chat ID, sender name, or alert severity."
+  - Notification payload has `content: string` + `meta: Record<string,string>`;
+    each meta key is rendered as a tag attribute. `chat_id` is the documented
+    convention.
+  - Instructions string goes into system prompt and can name the attribute to
+    echo back: "Reply with the reply tool, passing the chat_id from the tag."
+  - No documented limit on concurrent chat_ids, no documented demux guarantee.
+    I6 in moltzap-channel-v1 ("Channels contract not extended") means v1
+    cannot assume more than docs state.
+
+Implication: demux correctness is an emergent property of Claude's attention
+over the interleaved tag stream, anchored by the `chat_id` attribute. It is
+not a protocol guarantee.
+
+FAILURE-MODE DECOMPOSITION
+==========================
+Three ways shared-context demux degrades as N grows:
+
+F1. Attribution error on reply
+  Claude receives an inbound tagged chat_id=X and calls `reply(chat_id=Y, ...)`
+  with Y != X. The wrong user sees the reply. This is the direct attribution
+  failure and scales with concurrent-tag density in recent context.
+
+F2. Content bleed
+  Claude answers conversation A with content correctly routed (chat_id=A) but
+  whose substance references information from B's thread (wrong facts, wrong
+  code, wrong names). This is subtler than F1 and harder to detect; it scales
+  with overlap of topic surface across active conversations.
+
+F3. Thread-tail loss (context exhaustion)
+  Older turns from conversation A scroll out of meaningful attention once the
+  cumulative event volume across all N threads exceeds a working fraction of
+  the 200K context window. The conversation loses continuity — Claude forgets
+  what A was about. This is the "context exhaustion" framing in the spec Q1
+  text and scales with integral of tokens over time, not instantaneous N.
+
+F1 and F2 are active-attention errors (kick in at LOW N). F3 is capacity
+exhaustion (kicks in at HIGH cumulative volume, roughly N * tokens/conv).
+
+ESTIMATION
+==========
+Token math (F3 bound, generous upper):
+  - System prompt + channel instructions + tools: ~8K tokens fixed.
+  - Typical dogfood moltzap turn: 200-800 tokens inbound + 400-1500 tokens
+    outbound, call it ~2K tokens per conversation round-trip.
+  - 5 rounds per conversation before it's "stale" from the user's POV: ~10K
+    tokens of lived conversation history per active conversation.
+  - 200K window, leave 50K headroom for current-turn working memory + tool
+    call overhead + code-reading detours: ~140K usable for conversation
+    history.
+  - F3 capacity ceiling: 140K / 10K = ~14 conversations of lived history
+    before older rounds must scroll out. This is a loose UPPER bound, not a
+    reliability bound.
+
+F1/F2 active-attention bound (this dominates):
+  Multi-thread dialog tracking in LLMs is well-studied. Canonical findings:
+    - With explicit turn tagging (chat_id in `<channel>` tag attributes is
+      exactly this pattern), attribution stays reliable for small N.
+    - Error rate rises super-linearly past a threshold, not smoothly.
+    - The threshold depends on (a) tag salience (high here — chat_id is an
+      explicit XML-tag attribute, not implicit pronoun reference) and (b)
+      topic overlap (moderate for dogfood moltzap — likely many conversations
+      touch same repo, same code).
+  Prior art anchors (informal, extrapolated to this setup):
+    - "needle in haystack" style retrieval at 200K is >95% for Claude; that
+      is a LOWER bound on pure-lookup attribution. Active demux is harder
+      because the model must sustain tagging discipline across many turns,
+      not just retrieve once.
+    - LLM judge-interleaving and role-play literature puts robust
+      multi-thread tracking with explicit tags at ~4-8 threads before
+      first-error observations. Claude-specific numbers not published.
+
+Synthesis:
+  - Soft cap (F1/F2 dominance onset): ~6 simultaneously-active conversations.
+    "Simultaneously-active" = sent a message in the last ~N turns of Claude's
+    window. Inactive-but-historical conversations count toward F3 capacity
+    but not toward F1/F2 pressure.
+  - Capacity ceiling (F3 dominance onset): ~14 conversations of lived
+    history, beyond which older turns scroll out and continuity breaks.
+
+These are paper bounds. They are not measurements. Confidence is LOW
+(not MED, not HIGH) — the spike brief asked for MED-HIGH; that would require
+the live probe below, which this environment cannot run.
+
+PROBE SCRIPT (ready for live execution)
+=======================================
+See ./probe.ts for a ready-to-run throwaway Channels plugin that:
+  1. Declares `claude/channel` + `tools` capability.
+  2. Emits N synthetic inbound events with distinct chat_ids on a fixed
+     cadence (default: 1 event every 2 seconds, chat_id cycles 1..N).
+  3. Each event's content embeds a probe token: "probe-<chat_id>-<seq>".
+  4. Exposes a `reply` tool. When Claude calls reply(chat_id, text), the
+     handler logs (chat_id_claimed, probe_token_in_text, seq_claimed) and
+     checks whether Claude echoed the right probe-<chat_id>-<seq> for the
+     chat_id it claimed to reply to.
+  5. Ramps N from 2 upward by a second supervisor script that restarts
+     Claude Code with a new --channels config each time; stops when
+     attribution error rate crosses 10% across 20 interleaved probes.
+
+Running the probe requires:
+  - A developer workstation (macOS/Linux) with Claude Code v2.1.80+
+  - claude.ai login (Pro or Max; or Team/Enterprise with channels enabled)
+  - `bun` installed
+  - ~30 min of interactive session time per N value (Claude responds in real
+    time; the probe is rate-limited by model latency, not by Channels)
+  - A human eyeballing the session OR an automated output checker that parses
+    the SSE stream from the probe's /events endpoint
+
+The probe itself is stdlib-only (Bun + MCP SDK); no moltzap dependency needed
+to answer Q1. That is intentional: Q1 is about shared-context demux, not
+about moltzap-specific plumbing.
+
+VERDICT
+=======
+MIXED. Confidence: LOW (paper-only, no empirical measurement).
+
+Soft cap estimate (theoretical):
+  - ~6 simultaneously-active conversations before F1/F2 attribution errors
+    begin to appear noticeably.
+  - ~14 conversations of cumulative lived history before F3 context
+    exhaustion scrolls older threads out.
+
+These numbers are paper guardrails suitable for gating rollout DURING the
+dogfood window, not a shippable soft cap. The spec's AC for Q1 resolution
+demands an empirical number; this spike does not produce one. It produces
+the probe needed to produce one.
+
+GRADUATION PLAN
+===============
+1. Follow-up spike (this branch renamed or a new spike/108-*): run ./probe.ts
+   in a live claude.ai-authenticated Claude Code session. Ramp N 2 -> fail
+   point. Record attribution error rate at each N. Target a single
+   empirical soft-cap number with MED-HIGH confidence.
+   Requires: developer workstation + claude.ai session + ~1-2 hours of
+   attended testing.
+
+2. Architect for moltzap-channel-v1 interactive shape (sbd#108-adjacent):
+   use the paper bounds as INTERIM soft-cap guidance only; do NOT bake
+   either number (6 or 14) into an invariant until the live probe lands.
+
+3. Rollout gate (spec I5, AC3.1-3.3): gate interactive shape behind a per-
+   repo check that observed-concurrent-conversations stays under the
+   (eventual) empirical cap. Until then, cap the rollout at 3 concurrent
+   conversations as a conservative paper floor with comfortable margin.
+
+SALVAGEABLE
+===========
+  - ./probe.ts (the throwaway Channels plugin) — salvageable as the seed of
+    the follow-up empirical spike. Not salvageable into production.
+  - This writeup — salvageable as the paper-bound reference the architect
+    cites in the interim.
+  - Everything else in this branch — discardable; branch never merges.
+
+DISCARDABLE
+===========
+  - The entire spike branch is discardable after the follow-up empirical
+    spike publishes its verdict. Keep it only as reference until then.
