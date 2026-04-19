@@ -197,7 +197,7 @@ Empty output from `$PM ls` means neither is installed. Install both.
 ### Step 2: Install the plugin and parser
 
 ```bash
-$PM add -D eslint-plugin-agent-code-guard @typescript-eslint/parser
+$PM add -D eslint-plugin-agent-code-guard@^0.0.2 @typescript-eslint/parser
 ```
 
 The parser lets ESLint understand TypeScript syntax. The plugin itself has no runtime dependencies beyond `@typescript-eslint/utils`.
@@ -303,14 +303,14 @@ Stack disables for Block 1:
 
 ```js
 // Included when the project is NOT on Effect (Step 4 answer B).
-"safer-by-default/async-keyword": "off",
-"safer-by-default/promise-type":  "off",
-"safer-by-default/then-chain":    "off",
+"agent-code-guard/async-keyword": "off",
+"agent-code-guard/promise-type":  "off",
+"agent-code-guard/then-chain":    "off",
 ```
 
 ```js
 // Included when the project has NO typed query builder (Step 4 answer B).
-"safer-by-default/no-raw-sql": "off",
+"agent-code-guard/no-raw-sql": "off",
 ```
 
 **Block 2: integration tests.** Uses `guard.configs.integrationTests.rules`, scoped to the glob from Step 3. Omit entirely if Step 3 answer was D.
@@ -449,7 +449,7 @@ rm -f src/__safer_probe__.ts
 if [ "$PROBE_EXIT" = "2" ]; then
   echo "PROBE:failed. eslint config is broken:"
   cat /tmp/safer-probe-err.txt
-elif grep -q '"ruleId":"safer-by-default/bare-catch"' /tmp/safer-probe-out.json 2>/dev/null; then
+elif grep -q '"ruleId":"agent-code-guard/bare-catch"' /tmp/safer-probe-out.json 2>/dev/null; then
   echo "PROBE:passed"
 else
   echo "PROBE:failed. bare-catch did not fire on a probe file that should trigger it."
@@ -478,8 +478,8 @@ Tabulate violations by rule. Present as a table:
 
 | Rule | Violations |
 |---|---|
-| `safer-by-default/bare-catch` | 3 |
-| `safer-by-default/no-hardcoded-secrets` | 1 |
+| `agent-code-guard/bare-catch` | 3 |
+| `agent-code-guard/no-hardcoded-secrets` | 1 |
 | ... | ... |
 
 Ask via `AskUserQuestion`:

@@ -168,14 +168,14 @@ Each rule ships a `Before` / `After` example at `node_modules/eslint-plugin-agen
 Every `eslint-disable` carries a written reason; `eslint-comments/require-description` enforces this. A valid suppression:
 
 ```ts
-// eslint-disable-next-line safer-by-default/no-raw-sql -- generated migration file; raw DDL by design
+// eslint-disable-next-line agent-code-guard/no-raw-sql -- generated migration file; raw DDL by design
 ```
 
 Invalid suppressions:
 
 ```ts
 // eslint-disable-next-line -- fix later
-// eslint-disable-next-line safer-by-default/bare-catch
+// eslint-disable-next-line agent-code-guard/bare-catch
 ```
 
 "Fix later" is not a reason. A bare `eslint-disable-next-line` without a rule name silences every rule on that line; the plugin treats that as a rule violation in itself.
