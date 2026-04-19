@@ -542,7 +542,7 @@ priority_sort() {
 }
 ```
 
-**Step 6d — post marker first, then dispatch (order matters).** For each candidate in priority order, up to `budget`, dispatch using the inline template that matches its `safer:<modality>` label (see *Per-modality dispatch prompt templates* below). The marker MUST be posted before the `Agent` call so a concurrent next tick reading comments in Step 6a sees it and skips; if we dispatched first, a slow Agent spawn (>2 min) plus the cron interval could re-dispatch the same issue.
+**Step 6d — post marker first, then dispatch (order matters).** For each candidate in priority order, up to `budget`, dispatch using the inline template that matches its `safer:<modality>` label (see *Per-modality dispatch prompt templates* below). The marker MUST be posted before the `Agent` call so a concurrent next tick reading comments in Step 6a sees it and skips; if we dispatched first, a slow Agent spawn (>2 min) plus the cron interval could re-dispatch the same issue. Dispatch `Agent` call includes the `model` parameter per the Model routing table — every modality has a default; override only if user explicitly names a different model.
 
 For each candidate:
 
@@ -604,6 +604,25 @@ Default is `*/2 * * * *` (every 2 minutes) and you should not change it without 
 
 **Cancel.** Keep the job id from `CronCreate`. To stop the loop: `CronDelete({ jobId: "<id>" })`. Also run this in Phase 7 at close-out (see below).
 
+### Model routing
+
+The `Agent` call in Step 6d includes the `model` parameter per the table below. Every modality has a default model; override only if the user explicitly names a different model for a task.
+
+| Modality | Model | Rationale |
+|---|---|---|
+| `safer:implement-junior` | haiku (claude-haiku-4-5) | "fill in body of one module" is small-model territory |
+| `safer:implement-senior` | sonnet (claude-sonnet-4-6) | cross-module-within-plan; judgment without creativity |
+| `safer:implement-staff` | opus (claude-opus-4-7) | new modules / new public interfaces / new architectural patterns |
+| `safer:dogfood` | haiku | **acid test**: if haiku can't cold-read the artifact, the artifact has portability bug |
+| `safer:spike` | opus | throwaway feasibility requires exploratory reasoning |
+| `safer:research` | opus | iterative hypothesis loop over literature |
+| `safer:architect` | opus | design-module decisions; high blast radius |
+| `safer:review-senior` | opus | review is high-stakes reading |
+| `safer:verify` | opus | formal sign-off |
+| `safer:spec` | opus | translating intent to acceptance criteria |
+
+> **Dogfood-on-haiku is an acid test.** Upgrading dogfood to opus masks portability debt. Keep dogfood on haiku.
+
 ### Per-modality dispatch prompt templates
 
 Step 6d dispatches by filling the template that matches the sub-issue's `safer:<modality>` label. Every template is a copy-pasteable block. Every template carries the `source: orchestrate-auto-dispatch` header so a post-hoc audit can separate auto-dispatched work from human-driven dispatches. Every template ends with the mandatory status-marker instruction.
@@ -630,6 +649,7 @@ For `verify`, `research`, and `spec`, `{BRANCH_HINT}` is the empty string; their
 
 ```
 source: orchestrate-auto-dispatch
+Dispatch with: `model: haiku` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:implement-junior`.
 
 Sub-issue: {ISSUE_URL}
@@ -651,6 +671,7 @@ on your final output and SendMessage the team lead with the PR URL.
 
 ```
 source: orchestrate-auto-dispatch
+Dispatch with: `model: sonnet` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:implement-senior`.
 
 Sub-issue: {ISSUE_URL}
@@ -672,6 +693,7 @@ Status marker + SendMessage the team lead with the PR URL.
 
 ```
 source: orchestrate-auto-dispatch
+Dispatch with: `model: opus` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:implement-staff`.
 
 Sub-issue: {ISSUE_URL}
@@ -695,6 +717,7 @@ Status marker + SendMessage the team lead with the PR URL.
 
 ```
 source: orchestrate-auto-dispatch
+Dispatch with: `model: opus` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:verify`.
 
 Sub-issue: {ISSUE_URL}
@@ -716,6 +739,7 @@ fails. Status marker + SendMessage the team lead with the verdict URL.
 
 ```
 source: orchestrate-auto-dispatch
+Dispatch with: `model: opus` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:spike`.
 
 Sub-issue: {ISSUE_URL}
@@ -735,6 +759,7 @@ writeup as a sub-issue comment. The branch stays unmerged. Status marker
 
 ```
 source: orchestrate-auto-dispatch
+Dispatch with: `model: opus` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:research`.
 
 Sub-issue: {ISSUE_URL}
@@ -754,6 +779,7 @@ or the budget runs out.
 
 ```
 source: orchestrate-auto-dispatch
+Dispatch with: `model: opus` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:spec`.
 
 Sub-issue: {ISSUE_URL}
