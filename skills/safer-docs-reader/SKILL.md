@@ -36,8 +36,6 @@ allowed-tools:
   - Read
   - Write
   - SendMessage
-  - TeamCreate
-  - TeamDelete
 ---
 
 # /safer:docs-reader
