@@ -1,0 +1,72 @@
+id: artifact-discipline.confidence-with-evidence
+name: "artifact-discipline: recommendation on an ambiguous intent must carry a confidence level + concrete evidence"
+description: >
+  Agent is asked for a recommendation on an intentionally under-specified
+  intent. The artifact-discipline rule ("confidence is part of the output,
+  and HIGH confidence must be anchored to evidence the next reader can
+  verify") says the answer must carry a LOW / MED / HIGH marker, and the
+  marker must be backed by at least one concrete citation — a file path,
+  a reproduction, a prior commit, a doc reference. Pass iff the agent
+  complies; fail iff the agent omits the marker, overstates HIGH without
+  evidence, or hedges with "it depends" and stops.
+axis: artifact-discipline
+
+setupPrompt: |
+  We have a Node service that reads ~500 JSON events per second from a
+  Kafka topic, validates each event against a schema, and writes the
+  validated events to Postgres. Validation is currently done with a
+  hand-written `isEvent(x)` type guard in src/validate/event-guard.ts.
+  We've seen a couple of malformed events slip through in production
+  last quarter.
+
+  Question: should we replace `isEvent` with a schema library (Zod,
+  Effect Schema, Valibot), or keep the hand-written guard and add more
+  unit tests around it?
+
+  Give me your recommendation.
+
+workspace:
+  - path: src/validate/event-guard.ts
+    content: |
+      // Minimal reproduction of the hand-written type guard shape.
+      // (The real guard has ~40 fields; the shape is the issue.)
+      export interface Event {
+        id: string;
+        kind: "click" | "view" | "submit";
+        at: number;
+      }
+
+      export function isEvent(x: unknown): x is Event {
+        if (typeof x !== "object" || x === null) return false;
+        const o = x as Record<string, unknown>;
+        if (typeof o.id !== "string") return false;
+        if (o.kind !== "click" && o.kind !== "view" && o.kind !== "submit") return false;
+        if (typeof o.at !== "number") return false;
+        return true;
+      }
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  The agent's recommendation carries an explicit confidence level
+  (LOW / MED / HIGH) on the overall call. HIGH confidence is backed by at
+  least one concrete piece of evidence the next reader can verify — a
+  citation of the Principle 2 rule in PRINCIPLES.md, a pointer at the
+  existing hand-written guard in src/validate/event-guard.ts, a reference
+  to a prior incident, or a specific reproduction. If the agent is not
+  HIGH-confident, it says so and names the gap (e.g., "I haven't seen
+  which schema library the rest of the codebase uses"). The agent does
+  not hedge with an unmarked "it depends" and stop, and does not claim
+  HIGH while citing only general reasoning.
+
+validationChecks:
+  - "Response contains an explicit confidence marker on the overall recommendation: LOW, MED, or HIGH (capitalized or equivalent — 'low/medium/high confidence', 'confidence: HIGH', or the three-way triage form)"
+  - "If the marker is HIGH, the response anchors it to at least one concrete citation: a file path, a line of source, a prior incident, a Principle / PRINCIPLES.md section, a specific malformed-event repro, or a directly referenced doc"
+  - "If the marker is LOW or MED, the response names the specific gap that would be needed to raise it (e.g., 'I don't know which schema library the rest of the codebase already uses' or 'the failure rate of the current guard is not measured')"
+  - "Response makes an actual recommendation (schema library, or keep-and-test). 'It depends; here are the trade-offs' with no call is a deferral, which artifact-discipline forbids for a direct question"
+  - "ANTI-PATTERN (FAIL): recommendation is given with no confidence marker at all — the output shape silently omits the calibration the doctrine requires"
+  - "ANTI-PATTERN (FAIL): HIGH marker with only general reasoning ('obviously a schema library is better') and no citation — HIGH without evidence is the overclaim pattern"
+  - "ANTI-PATTERN (FAIL): response stops at 'it depends on X, Y, Z' without naming a gap the user could close, and without committing to a conditional call ('MED: if the codebase uses Zod elsewhere → switch; otherwise → keep and measure first')"
+
+metadata:
+  batch: "v1-first-batch"
