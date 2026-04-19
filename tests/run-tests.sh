@@ -22,7 +22,7 @@ for arg in "$@"; do
   esac
 done
 
-suites=("$HERE"/test-bin/test-*.sh)
+suites=("$HERE"/test-bin/test-*.sh "$HERE"/test-linear-v2/test-*.sh)
 if [ "$run_integration" = "1" ]; then
   suites+=("$HERE"/test-integration/test-*.sh)
 else
