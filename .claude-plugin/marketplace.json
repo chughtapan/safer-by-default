@@ -10,7 +10,7 @@
     {
       "name": "safer-by-default",
       "source": "./",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "description": "13 skills (orchestrate, spec, architect, implement-{junior,senior,staff}, investigate, spike, research, review-senior, verify, typescript, setup) plus 10 bin/ utilities. Composes with eslint-plugin-agent-code-guard (lint floor) and zapbot (publish).",
       "author": {
         "name": "Tapan Chugh"
