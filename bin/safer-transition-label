@@ -6,6 +6,8 @@
 # Exit: 0 on success, 1 on gh failure or missing args
 set -uo pipefail
 
+[ -f "$HOME/.zapbot/.env" ] && { set -a; . "$HOME/.zapbot/.env"; set +a; }
+
 ISSUE=""
 FROM=""
 TO=""

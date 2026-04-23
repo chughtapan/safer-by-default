@@ -13,6 +13,8 @@
 #   --confidence LOW|MED|HIGH   (default: MED)
 set -uo pipefail
 
+[ -f "$HOME/.zapbot/.env" ] && { set -a; . "$HOME/.zapbot/.env"; set +a; }
+
 FROM=""
 TO=""
 CAUSE=""
