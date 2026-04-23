@@ -23,6 +23,13 @@
 #       [--correlation-id <id>] \
 #       --body-file <path>     # or --body-stdin
 #
+# `--to-session`: specific-recipient hint. Written into the PeerMessage's
+# `to.senderId` field (PeerRecipient has no separate session field; zapbot's
+# roster manager keys senderId off the session name, so in practice the
+# caller passes the ao-session-name as the hint). Absent this flag, the
+# message is addressed by role only (senderId=null); the roster manager
+# resolves to a concrete recipient at send time.
+#
 # Exit codes:
 #   0    Delivered (stdout: `{"_tag":"Delivered","atMs":<n>}`)
 #   10   ReroutedToOrchestrator (recipient retired; stdout: route JSON)
@@ -77,16 +84,26 @@ BODY_FILE=""
 READ_STDIN=0
 
 while (( $# > 0 )); do
-  case "$1" in
-    --to-role)       TO_ROLE="${2:-}"; shift 2 ;;
-    --to-session)    TO_SESSION="${2:-}"; shift 2 ;;
-    --kind)          KIND="${2:-}"; shift 2 ;;
-    --artifact-url)  ARTIFACT_URL="${2:-}"; shift 2 ;;
-    --correlation-id) CORRELATION_ID="${2:-}"; shift 2 ;;
-    --body-file)     BODY_FILE="${2:-}"; shift 2 ;;
-    --body-stdin)    READ_STDIN=1; shift ;;
-    -h|--help)       usage; exit "$EXIT_USAGE" ;;
-    *)               die_usage "unknown flag: $1" ;;
+  flag="$1"
+  case "$flag" in
+    --to-role|--to-session|--kind|--artifact-url|--correlation-id|--body-file)
+      # Every value-taking flag must be followed by a value; otherwise the
+      # shift-2 below would crash under set -e with a non-UsageError exit.
+      if [ $# -lt 2 ]; then die_usage "missing value for $flag"; fi
+      value="$2"
+      case "$flag" in
+        --to-role)        TO_ROLE="$value" ;;
+        --to-session)     TO_SESSION="$value" ;;
+        --kind)           KIND="$value" ;;
+        --artifact-url)   ARTIFACT_URL="$value" ;;
+        --correlation-id) CORRELATION_ID="$value" ;;
+        --body-file)      BODY_FILE="$value" ;;
+      esac
+      shift 2
+      ;;
+    --body-stdin) READ_STDIN=1; shift ;;
+    -h|--help)    usage; exit "$EXIT_USAGE" ;;
+    *)            die_usage "unknown flag: $flag" ;;
   esac
 done
 

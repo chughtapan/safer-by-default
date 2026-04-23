@@ -28,6 +28,12 @@ test_usage_missing_to_role() {
   assert_equal "$rc" "64" "missing --to-role is UsageError"
 }
 
+test_usage_flag_without_value() {
+  # --to-role with no trailing value must be UsageError (not a shift-2 crash).
+  local rc; rc=$(run_cli --to-role)
+  assert_equal "$rc" "64" "value-taking flag with no value is UsageError"
+}
+
 test_usage_invalid_to_role() {
   local rc; rc=$(run_cli --to-role rogue --kind status-update --body-stdin)
   assert_equal "$rc" "64" "invalid --to-role is UsageError"
@@ -83,6 +89,7 @@ test_transport_failed_without_shim() {
 
 echo "[test-safer-peer-message]"
 run_test "missing --to-role is UsageError"              test_usage_missing_to_role
+run_test "value-taking flag with no value is UsageError" test_usage_flag_without_value
 run_test "invalid --to-role is UsageError"              test_usage_invalid_to_role
 run_test "invalid --kind is UsageError"                 test_usage_invalid_kind
 run_test "no body source is UsageError"                 test_usage_no_body_source
