@@ -121,6 +121,68 @@ test_helper_resolves_config_json_only() {
   assert_zero $? "helper should resolve ZAPBOT_API_KEY from config.json when .env absent"
 }
 
+test_narrow_export_scope_does_not_leak() {
+  _reset_sandbox
+  # Create .env with ZAPBOT_API_KEY and other variables (simulating real zapbot .env)
+  mkdir -p "$HOME/.zapbot"
+  cat > "$HOME/.zapbot/.env" << 'EOF'
+ZAPBOT_API_KEY=narrow-scope-test-key
+ZAPBOT_BRIDGE_URL=http://internal-bridge:3000
+INTERNAL_SECRET=should-not-leak
+SAFER_STATE_DIR=/tmp/safer-state
+EOF
+
+  # Source helper and verify that:
+  # 1. ZAPBOT_API_KEY is set correctly
+  # 2. Other variables do NOT leak to the caller environment
+  local result
+  result=$(bash -c "HOME='$HOME' . '$HELPER'; {
+    echo \"ZAPBOT_API_KEY=\$ZAPBOT_API_KEY\"
+    echo \"ZAPBOT_BRIDGE_URL=\${ZAPBOT_BRIDGE_URL:-unset}\"
+    echo \"INTERNAL_SECRET=\${INTERNAL_SECRET:-unset}\"
+    echo \"SAFER_STATE_DIR=\${SAFER_STATE_DIR:-unset}\"
+  }")
+
+  echo "$result" | grep -q "ZAPBOT_API_KEY=narrow-scope-test-key"
+  assert_zero $? "helper should extract ZAPBOT_API_KEY from .env"
+
+  echo "$result" | grep -q "ZAPBOT_BRIDGE_URL=unset"
+  assert_zero $? "ZAPBOT_BRIDGE_URL should not leak to caller"
+
+  echo "$result" | grep -q "INTERNAL_SECRET=unset"
+  assert_zero $? "INTERNAL_SECRET should not leak to caller"
+
+  echo "$result" | grep -q "SAFER_STATE_DIR=unset"
+  assert_zero $? "SAFER_STATE_DIR should not leak to caller"
+}
+test_jq_guard_error_message_present() {
+  # Verify that the error message for missing jq is present in the script
+  grep -q "jq required to read config.json" "$HELPER"
+  [ $? -eq 0 ] && return 0 || return 1
+}
+
+test_jq_guard_succeeds_when_jq_present() {
+  _reset_sandbox
+  # Set up config.json with API key (no .env file)
+  mkdir -p "$HOME/.zapbot"
+  echo '{"apiKey":"should-work-with-jq"}' > "$HOME/.zapbot/config.json"
+
+  # Source helper with normal PATH (jq should be available)
+  local result
+  result=$(bash -c "HOME='$HOME' . '$HELPER'; echo \"\$ZAPBOT_API_KEY\"")
+  if echo "$result" | grep -q "should-work-with-jq"; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+test_jq_command_check_before_execution() {
+  # Verify that the script checks for jq with 'command -v' before using it
+  grep -q "command -v jq >/dev/null 2>&1" "$HELPER"
+  [ $? -eq 0 ] && return 0 || return 1
+}
+
 # ── Run tests ───────────────────────────────────────────────────────
 
 run_test "helper file exists" test_helper_file_exists
@@ -131,4 +193,8 @@ run_test "helper preserves empty-but-set variable" test_helper_preserves_empty_b
 run_test "symlink invocation resolves helper" test_symlink_invocation_resolves_helper
 run_test "helper resolves ZAPBOT_API_KEY from .env only" test_helper_resolves_env_only
 run_test "helper resolves ZAPBOT_API_KEY from config.json only" test_helper_resolves_config_json_only
+run_test "narrow export scope does not leak" test_narrow_export_scope_does_not_leak
+run_test "jq guard error message present" test_jq_guard_error_message_present
+run_test "jq guard succeeds when jq present" test_jq_guard_succeeds_when_jq_present
+run_test "jq command check before execution" test_jq_command_check_before_execution
 report
