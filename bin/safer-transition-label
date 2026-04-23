@@ -6,8 +6,8 @@
 # Exit: 0 on success, 1 on gh failure or missing args
 set -uo pipefail
 
-# Source zapbot config resolution helper
-. "$(dirname "$0")/_safer-zapbot-env.sh"
+# Source zapbot config resolution helper (resolve symlinks for PATH invocation)
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/_safer-zapbot-env.sh"
 
 ISSUE=""
 FROM=""
