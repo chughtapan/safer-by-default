@@ -12,7 +12,8 @@
 # residual codex concern #1): SKILL.md prompt files invoke THIS binary by
 # name and MUST NOT import or reference `@moltzap/app-sdk`,
 # `@modelcontextprotocol/sdk`, `src/bridge.ts`, or `src/moltzap/*`. The
-# grep test `test/safer-peer-message-skill-purity.test.ts` enforces it.
+# grep test `tests/test-bin/test-safer-peer-message-skill-purity.sh`
+# enforces it (bash + ripgrep over `skills/**/SKILL.md`).
 #
 # Public signature:
 #
