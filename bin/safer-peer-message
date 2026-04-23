@@ -186,16 +186,8 @@ if ! command -v jq >/dev/null 2>&1; then
   exit "$EXIT_TRANSPORT_FAILED"
 fi
 
-TO_SENDER_FIELD="null"
-if [ -n "$TO_SESSION" ]; then
-  TO_SENDER_FIELD=$(jq -Rn --arg v "$TO_SESSION" '$v')
-fi
-
-ARTIFACT_FIELD="null"
-if [ -n "$ARTIFACT_URL" ]; then
-  ARTIFACT_FIELD=$(jq -Rn --arg u "$ARTIFACT_URL" '$u')
-fi
-
+# Single jq template: nullable --arg values are converted to JSON null
+# inside the template when the bash string is empty.
 PAYLOAD=$(jq -n \
   --arg kind "$KIND" \
   --arg channel "$CHANNEL" \
@@ -203,43 +195,39 @@ PAYLOAD=$(jq -n \
   --arg from_session "$AO_SESSION" \
   --arg from_sender "$MOLTZAP_LOCAL_SENDER_ID" \
   --arg to_role "$TO_ROLE" \
+  --arg to_session "$TO_SESSION" \
+  --arg artifact_url "$ARTIFACT_URL" \
   --arg body "$BODY_TEXT" \
   --arg correlation "$CORRELATION_ID" \
-  --argjson to_sender "$TO_SENDER_FIELD" \
-  --argjson artifact "$ARTIFACT_FIELD" \
   --argjson sent_at "$NOW_MS" \
   '{
     _tag: "PeerMessage",
     kind: $kind,
     channel: $channel,
     from: { role: $from_role, session: $from_session, senderId: $from_sender },
-    to:   { role: $to_role,   senderId: $to_sender },
+    to:   { role: $to_role,
+            senderId: (if $to_session == "" then null else $to_session end) },
     body: $body,
-    artifactUrl: $artifact,
+    artifactUrl: (if $artifact_url == "" then null else $artifact_url end),
     correlationId: $correlation,
     sentAtMs: $sent_at
   }')
 
-# Transport: forward the encoded payload to the MoltZap bridge via a shim
-# binary (`safer-peer-outbound-client`) that wraps the zapbot outbound MCP
-# tool. Absence of the shim means the caller is outside a MoltZap-capable
-# runtime; exit TransportFailed.
-if command -v safer-peer-outbound-client >/dev/null 2>&1; then
-  if RESPONSE=$(printf '%s' "$PAYLOAD" | safer-peer-outbound-client 2>/dev/null); then
-    RECEIPT_TAG=$(printf '%s' "$RESPONSE" | jq -r '._tag // empty')
-    case "$RECEIPT_TAG" in
-      Delivered)               printf '%s\n' "$RESPONSE"; exit "$EXIT_DELIVERED" ;;
-      ReroutedToOrchestrator)  printf '%s\n' "$RESPONSE"; exit "$EXIT_REROUTED" ;;
-      RecipientRetired)        printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_RECIPIENT_RETIRED" ;;
-      ChannelDisallowed)       printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_CHANNEL_DISALLOWED" ;;
-      DecodeFailed)            printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_DECODE_FAILED" ;;
-      *)                       printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_TRANSPORT_FAILED" ;;
-    esac
-  else
-    echo "$PROG: safer-peer-outbound-client failed" >&2
-    exit "$EXIT_TRANSPORT_FAILED"
-  fi
+if ! command -v safer-peer-outbound-client >/dev/null 2>&1; then
+  echo "$PROG: safer-peer-outbound-client not on PATH — cannot deliver" >&2
+  exit "$EXIT_TRANSPORT_FAILED"
 fi
 
-echo "$PROG: safer-peer-outbound-client not on PATH — cannot deliver" >&2
-exit "$EXIT_TRANSPORT_FAILED"
+if ! RESPONSE=$(printf '%s' "$PAYLOAD" | safer-peer-outbound-client 2>/dev/null); then
+  echo "$PROG: safer-peer-outbound-client failed" >&2
+  exit "$EXIT_TRANSPORT_FAILED"
+fi
+
+case "$(printf '%s' "$RESPONSE" | jq -r '._tag // empty')" in
+  Delivered)               printf '%s\n' "$RESPONSE"; exit "$EXIT_DELIVERED" ;;
+  ReroutedToOrchestrator)  printf '%s\n' "$RESPONSE"; exit "$EXIT_REROUTED" ;;
+  RecipientRetired)        printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_RECIPIENT_RETIRED" ;;
+  ChannelDisallowed)       printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_CHANNEL_DISALLOWED" ;;
+  DecodeFailed)            printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_DECODE_FAILED" ;;
+  *)                       printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_TRANSPORT_FAILED" ;;
+esac

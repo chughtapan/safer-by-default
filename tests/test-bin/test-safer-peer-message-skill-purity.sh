@@ -6,62 +6,34 @@
 # them), but they must not invoke them.
 #
 # The test therefore flags IMPORT-LIKE syntax (require / import / from /
-# $(invocation)) rather than bare mentions. Bare prose mentions inside a
-# "do not import" warning are expected.
+# bun-run invocation) rather than bare mentions.
 
-set -euo pipefail
+set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+source "$HERE/../test-helpers.sh"
+
+REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 SKILLS_DIR="$REPO_ROOT/skills"
 
-_fail=0
-_pass=0
-_total=0
+# Forbidden *usage* patterns. Combined into one alternation so each
+# SKILL.md is scanned once rather than once per pattern.
+FORBIDDEN_ALT='(^[[:space:]]*(import|const|let|var)[[:space:]].*[[:quote:]]@moltzap/)|(^[[:space:]]*(import|const|let|var)[[:space:]].*[[:quote:]]@modelcontextprotocol/)|(require\(['"'"'"]@moltzap/)|(require\(['"'"'"]@modelcontextprotocol/)|(bun[[:space:]]+run[[:space:]]+.*src/bridge\.ts)|(bun[[:space:]]+run[[:space:]]+.*src/moltzap/)'
 
-_log() { printf '%s\n' "$*" >&2; }
+test_no_skill_md_invokes_forbidden_transport() {
+  local offenders
+  offenders=$(find "$SKILLS_DIR" -type f -name "SKILL.md" -print0 \
+               | xargs -0 grep -EHn -- "$FORBIDDEN_ALT" 2>/dev/null || true)
+  if [ -z "$offenders" ]; then
+    return 0
+  fi
+  echo "    FAIL: forbidden transport invocations found"
+  echo "$offenders" | sed 's/^/      /'
+  return 1
+}
 
-# Forbidden *usage* patterns. Each entry is a regex. We use `grep -E` so
-# the patterns are extended-regex.
-FORBIDDEN_PATTERNS=(
-  # JS/TS import/require of transport SDKs.
-  "^[[:space:]]*(import|const|let|var)[[:space:]].*['\"]@moltzap/"
-  "^[[:space:]]*(import|const|let|var)[[:space:]].*['\"]@modelcontextprotocol/"
-  "require\\(['\"]@moltzap/"
-  "require\\(['\"]@modelcontextprotocol/"
-  # Shell invocation of the zapbot bridge binaries.
-  "bun[[:space:]]+run[[:space:]]+.*src/bridge\\.ts"
-  "bun[[:space:]]+run[[:space:]]+.*src/moltzap/"
-)
+echo "[test-safer-peer-message-skill-purity]"
+run_test "no SKILL.md invokes a forbidden transport" test_no_skill_md_invokes_forbidden_transport
 
-# Also flag any line that ends with `… @moltzap/…` etc. as an executable
-# statement — conservative belt-and-suspenders. These do not match the
-# prose warnings in the peer-channel preamble because the preamble uses
-# backtick-escaped inline code, not bare unquoted tokens.
-
-declare -a offenders=()
-while IFS= read -r -d '' skill_md; do
-  for pat in "${FORBIDDEN_PATTERNS[@]}"; do
-    if grep -En -- "$pat" "$skill_md" >/dev/null 2>&1; then
-      offenders+=("$skill_md: pattern=$pat")
-    fi
-  done
-done < <(find "$SKILLS_DIR" -type f -name "SKILL.md" -print0)
-
-_total=$(( _total + 1 ))
-if [ ${#offenders[@]} -eq 0 ]; then
-  _pass=$(( _pass + 1 ))
-  _log "  ✓ no SKILL.md invokes a forbidden transport directly"
-else
-  _fail=$(( _fail + 1 ))
-  _log "  ✗ forbidden transport invocations found in SKILL.md files:"
-  for o in "${offenders[@]}"; do
-    _log "      $o"
-  done
-fi
-
-echo ""
-echo "[test-safer-peer-message-skill-purity] $_pass/$_total passed"
-if [ "$_fail" -gt 0 ]; then
-  exit 1
-fi
-exit 0
+report
