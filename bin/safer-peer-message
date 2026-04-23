@@ -192,11 +192,31 @@ case "$KIND:$FROM_ROLE:$TO_ROLE" in
     ;;
 esac
 
-if [ -z "$CORRELATION_ID" ]; then
-  CORRELATION_ID="${AO_SESSION}-$(date +%s%N | tail -c 10)"
+# Milliseconds since epoch. macOS `date` doesn't support %N, so probe
+# once: GNU date → use %s%N/1_000_000; BSD date → use %s (seconds) plus
+# an in-process microsecond counter via `$RANDOM` to keep correlation
+# IDs unique within a session. Millisecond precision on BSD is close
+# enough for the sentAtMs field; the orchestrator uses it for ordering,
+# not for sub-millisecond scheduling.
+if date +%s%N 2>/dev/null | grep -qE '^[0-9]+$'; then
+  # GNU date returns "nanoseconds since epoch" — e.g. 1776984788741123456.
+  # Verify it didn't literal-emit the format string (BSD date echoes %N).
+  _GNU_NS=$(date +%s%N)
+  if [ "${_GNU_NS#*N}" = "$_GNU_NS" ]; then
+    NOW_MS=$(( _GNU_NS / 1000000 ))
+    CORR_SUFFIX=$(printf '%s' "$_GNU_NS" | tail -c 10)
+  else
+    NOW_MS=$(( $(date +%s) * 1000 ))
+    CORR_SUFFIX="${RANDOM}${RANDOM}"
+  fi
+else
+  NOW_MS=$(( $(date +%s) * 1000 ))
+  CORR_SUFFIX="${RANDOM}${RANDOM}"
 fi
 
-NOW_MS=$(( $(date +%s%N) / 1000000 ))
+if [ -z "$CORRELATION_ID" ]; then
+  CORRELATION_ID="${AO_SESSION}-${CORR_SUFFIX}"
+fi
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "$PROG: jq required (boundary encode for PeerMessage)" >&2

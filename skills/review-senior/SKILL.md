@@ -30,6 +30,18 @@ Read `PRINCIPLES.md` at the plugin root. Single-skill rule (Invariant 11):
 this is the ONLY safer review skill. Adding a second is a SPEC-revision
 trigger.
 
+## Iron rule
+
+> **You comment; you do not edit. The author applies fixes.**
+
+`/safer:review-senior` itself never writes to the diff. It dispatches
+composed gstack skills; some of those (notably `/review`) may write
+their own comments and some legacy flows write edits. The safer-side
+posture is read-only review: you aggregate verdicts and publish a
+comment, never a patch. If the instinct to "just fix this one line"
+appears, it is the stop rule firing. Write the comment; let the author
+push the fix.
+
 ## Role
 
 **Dispatch, don't review.** Route the artifact to the correct composed
@@ -59,6 +71,38 @@ A PR that introduces a new LLM prompt routes under rows 1 + 4.
 
 The routing table is additive. A UI-touching PR runs rows 1 and 3; a
 spec that describes an LLM prompt runs rows 2 and 4.
+
+## Craft checks the reviewer still owns (Principles 1-4)
+
+gstack `/review` looks at structural issues, `/simplify` at reuse /
+efficiency, `/codex` at independent cross-model signal. None of them
+know the safer craft floor (see `PRINCIPLES.md`). Before publishing the
+aggregate verdict, run these four checks against the diff or artifact
+yourself and fold findings into the aggregate body:
+
+- **P1 (Types beat tests).** New constraints should be encoded in types
+  (branded types, discriminated unions, `NonEmptyArray`, literal-string
+  unions), not enforced by runtime `assert`/`.length > 0`/`if (!x) throw`
+  patterns a type would have made unnecessary. Flag `as T` casts across
+  module boundaries.
+- **P2 (Validate at boundaries).** Every new ingress point (HTTP handler,
+  JSON parser, env-var read, file read, MoltZap inbound, CLI flag decode)
+  must decode through a schema. `JSON.parse(x) as T`, `await r.json() as
+  Body`, or `process.env.X!` far from boot is a finding.
+- **P3 (Errors are typed, not thrown).** Flag `throw new Error(...)`
+  outside startup validation, any `catch {}` or `catch (e) { return
+  null }`, and any failure-capable function returning bare `Promise<T>`
+  without an error channel in the type.
+- **P4 (Exhaustiveness over optionality).** Every new `switch` over a
+  union ends with `default: return absurd(x)` (or equivalent). Every
+  new if-else chain terminates. Missing `never`-check on an internal
+  discriminant is a finding even if the compiler still passes.
+
+When operating as the aggregate dispatcher, record findings in a
+"P1-P4 craft notes" section of the aggregate comment so the author knows
+which violations came from the safer floor vs. the composed gstack
+skills. If no composed skills ran (e.g. environment missing), these
+four checks are the minimum the aggregate still carries.
 
 ## Forbidden verdicts
 

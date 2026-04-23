@@ -17,14 +17,45 @@ source "$HERE/../test-helpers.sh"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 SKILLS_DIR="$REPO_ROOT/skills"
 
-# Forbidden *usage* patterns. Combined into one alternation so each
-# SKILL.md is scanned once rather than once per pattern.
-FORBIDDEN_ALT='(^[[:space:]]*(import|const|let|var)[[:space:]].*[[:quote:]]@moltzap/)|(^[[:space:]]*(import|const|let|var)[[:space:]].*[[:quote:]]@modelcontextprotocol/)|(require\(['"'"'"]@moltzap/)|(require\(['"'"'"]@modelcontextprotocol/)|(bun[[:space:]]+run[[:space:]]+.*src/bridge\.ts)|(bun[[:space:]]+run[[:space:]]+.*src/moltzap/)'
+# Forbidden *usage* patterns (POSIX-compatible — grep -E rejects the
+# non-portable `[[:quote:]]` class). Any line in a SKILL.md that looks
+# like an import, require, or bun-run of a MoltZap SDK / MCP SDK /
+# zapbot bridge path is an SPEC §5(d) bullet 1 violation.
+#
+# We use a literal single-or-double quote class `['"]` (escaped for
+# shell double-quoted string via concatenation).
+FORBIDDEN_ALT='(^[[:space:]]*(import|const|let|var)[[:space:]].*['"'"'"]@moltzap/)|(^[[:space:]]*(import|const|let|var)[[:space:]].*['"'"'"]@modelcontextprotocol/)|(require\(['"'"'"]@moltzap/)|(require\(['"'"'"]@modelcontextprotocol/)|(bun[[:space:]]+run[[:space:]]+[^[:space:]]*src/bridge\.ts)|(bun[[:space:]]+run[[:space:]]+[^[:space:]]*src/moltzap/)'
+
+_scan_for_forbidden() {
+  # Run grep per-file in a loop. Returns offender-lines on stdout (empty
+  # if none); returns exit 2 if grep itself errored on any file (bad
+  # regex, IO). Kept explicit rather than piping through xargs so
+  # "no matches" (grep exit 1) is distinguishable from regex failure
+  # (grep exit >=2).
+  local dir="$1"
+  local any_error=0
+  while IFS= read -r -d '' f; do
+    local out
+    out=$(grep -EHn -- "$FORBIDDEN_ALT" "$f" 2>/dev/null)
+    local rc=$?
+    if [ "$rc" -ge 2 ]; then
+      any_error=1
+    elif [ "$rc" -eq 0 ] && [ -n "$out" ]; then
+      printf '%s\n' "$out"
+    fi
+  done < <(find "$dir" -type f -name "SKILL.md" -print0)
+  if [ "$any_error" -ne 0 ]; then return 2; fi
+  return 0
+}
 
 test_no_skill_md_invokes_forbidden_transport() {
   local offenders
-  offenders=$(find "$SKILLS_DIR" -type f -name "SKILL.md" -print0 \
-               | xargs -0 grep -EHn -- "$FORBIDDEN_ALT" 2>/dev/null || true)
+  offenders=$(_scan_for_forbidden "$SKILLS_DIR")
+  local scan_rc=$?
+  if [ "$scan_rc" -ge 2 ]; then
+    echo "    FAIL: grep regex error scanning $SKILLS_DIR"
+    return 1
+  fi
   if [ -z "$offenders" ]; then
     return 0
   fi
@@ -33,7 +64,32 @@ test_no_skill_md_invokes_forbidden_transport() {
   return 1
 }
 
+test_purity_regex_catches_planted_import() {
+  # Plant a forbidden import in a tmp SKILL.md fixture, point the
+  # SKILLS_DIR at it, and verify the test fails. This guards the regex
+  # against future drift.
+  local fixture
+  fixture=$(mktemp -d)
+  mkdir -p "$fixture/fake-skill"
+  cat > "$fixture/fake-skill/SKILL.md" <<'FAKE'
+---
+name: fake-skill
+---
+# fake skill
+import { connect } from "@moltzap/app-sdk";
+FAKE
+  local result
+  result=$(_scan_for_forbidden "$fixture")
+  rm -rf "$fixture"
+  if [ -z "$result" ]; then
+    echo "    FAIL: regex failed to catch planted \`import '@moltzap/app-sdk'\`"
+    return 1
+  fi
+  return 0
+}
+
 echo "[test-safer-peer-message-skill-purity]"
 run_test "no SKILL.md invokes a forbidden transport" test_no_skill_md_invokes_forbidden_transport
+run_test "regex catches a planted forbidden import" test_purity_regex_catches_planted_import
 
 report
