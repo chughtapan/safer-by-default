@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# safer-peer-message — the single safer-skill-visible primitive for sending a
+# typed MoltZap peer message to a role-addressed recipient in the same
+# roster (SPEC r4.1 §5(d); Goal 4).
+#
+# ARCHITECT PHASE: public CLI signature only; body is "not implemented".
+# The implement-staff PR wires this to zapbot's MoltZap bridge via the
+# encoded `PeerMessage` shape in `zapbot/src/orchestrator/peer-message.ts`.
+#
+# The grep-purity rule (SPEC r4.1 acceptance (d) bullet 1, clarified per
+# residual codex concern #1): SKILL.md prompt files invoke THIS binary by
+# name and MUST NOT import or reference `@moltzap/app-sdk`,
+# `@modelcontextprotocol/sdk`, `src/bridge.ts`, or `src/moltzap/*`. The
+# grep test `test/safer-peer-message-skill-purity.test.ts` enforces it.
+#
+# Public signature:
+#
+#   safer-peer-message \
+#       --to-role {architect|implementer|reviewer|orchestrator} \
+#       [--to-session <ao-session-name>] \
+#       --kind {artifact-published|status-update|review-request|architect-peer-ping|retire-notice} \
+#       [--artifact-url <url>] \
+#       [--correlation-id <id>] \
+#       --body-file <path>     # or --body-stdin
+#
+# Exit codes:
+#   0    Delivered (stdout: `{"_tag":"Delivered","atMs":<n>}`)
+#   10   ReroutedToOrchestrator (recipient retired; stdout: route JSON)
+#   20   ChannelDisallowed (role-pair predicate rejected the pair)
+#   21   RecipientRetired (routing unavailable; escalate upstream)
+#   22   DecodeFailed (input did not match PeerMessage schema)
+#   30   TransportFailed (MoltZap bridge returned OutboundFailed)
+#   64   UsageError (flags malformed)
+#
+# SEE ALSO:
+#   - SPEC r4.1 §5(d)
+#   - architect design doc: https://github.com/chughtapan/safer-by-default/issues/148
+#   - zapbot/src/orchestrator/peer-message.ts (encode/decode)
+
+set -euo pipefail
+
+echo "safer-peer-message: not implemented (architect stub, sbd#148)" >&2
+exit 1
