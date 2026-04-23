@@ -82,6 +82,31 @@ test_usage_worker_without_session_role() {
   assert_equal "$rc" "64" "worker without MOLTZAP_SESSION_ROLE is UsageError"
 }
 
+test_usage_worker_cannot_spoof_orchestrator() {
+  # SPEC §5(a) / Invariant 2: a worker session MUST NOT mint itself as
+  # the orchestrator. MOLTZAP_SESSION_ROLE=orchestrator with
+  # AO_CALLER_TYPE=worker is a UsageError.
+  local rc; rc=$(run_cli \
+    --env MOLTZAP_LOCAL_SENDER_ID=sender-w --env AO_SESSION=sess-w \
+    --env AO_CALLER_TYPE=worker --env MOLTZAP_SESSION_ROLE=orchestrator \
+    --to-role orchestrator --kind status-update --body-stdin)
+  assert_equal "$rc" "64" "worker cannot spoof orchestrator role"
+}
+
+test_usage_unreadable_body_file() {
+  # Create a file with no read permission and confirm UsageError (64),
+  # not the set-e generic exit 1 from cat.
+  local tmpf; tmpf=$(mktemp)
+  chmod 000 "$tmpf"
+  local rc; rc=$(run_cli \
+    --env MOLTZAP_LOCAL_SENDER_ID=sender-a --env AO_SESSION=sess-a \
+    --env AO_CALLER_TYPE=worker --env MOLTZAP_SESSION_ROLE=architect \
+    --to-role orchestrator --kind status-update --body-file "$tmpf")
+  chmod 644 "$tmpf" 2>/dev/null || true
+  rm -f "$tmpf"
+  assert_equal "$rc" "64" "unreadable --body-file is UsageError"
+}
+
 test_transport_failed_without_shim() {
   local rc; rc=$(run_cli \
     --env MOLTZAP_LOCAL_SENDER_ID=sender-a --env AO_SESSION=sess-a \
@@ -100,6 +125,8 @@ run_test "missing MoltZap env is TransportFailed"       test_transport_failed_mi
 run_test "architect→implementer is ChannelDisallowed"   test_channel_disallowed_architect_to_implementer
 run_test "reviewer→reviewer is ChannelDisallowed"       test_channel_disallowed_reviewer_sideways
 run_test "worker without session role is UsageError"    test_usage_worker_without_session_role
+run_test "worker cannot spoof orchestrator role"        test_usage_worker_cannot_spoof_orchestrator
+run_test "unreadable --body-file is UsageError"         test_usage_unreadable_body_file
 run_test "valid call without transport shim is TF"      test_transport_failed_without_shim
 
 report

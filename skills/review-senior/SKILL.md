@@ -151,6 +151,52 @@ emit `DONE_WITH_CONCERNS` with:
 invalidate that gate. A missing gstack skill in the environment is a
 configuration problem that must be surfaced, not a reason to approve.
 
+### Fallback mode (no gstack available)
+
+If NO composed gstack skills are available (full environment miss, not
+partial), do NOT block the review. Other shipped skills — notably
+`skills/orchestrate/SKILL.md` and `skills/stamina/SKILL.md` — treat
+`/safer:review-senior` as the fallback reviewer; returning only
+`BLOCKED` breaks those consumers.
+
+Fallback reviewer workflow (only when every gstack skill in the
+applicable table row is missing):
+
+1. Run `safer-diff-scope --pr "$PR"` and record the observed shape.
+2. Read the full diff via `gh pr diff "$PR"`.
+3. Read the sub-issue body for acceptance criteria.
+4. Walk each craft principle (P1–P4, above) against the diff; record
+   findings with `file:line`.
+5. Check scope alignment: each acceptance criterion is addressed, each
+   addressed criterion is evidenced in the diff.
+6. Check tests: success branch, each error tag, each named invariant.
+7. Write a native GitHub PR review via `gh pr review`:
+   - `--approve` when craft is green, scope aligns, and every
+     acceptance criterion is directly verifiable from the diff or
+     closed by an already-posted `/safer:verify` comment.
+   - `HOLD` (published via `gh pr review --comment` with body prefixed
+     `## Verdict\nHOLD`) when craft is green but a measured-threshold
+     criterion is unproven.
+   - `--request-changes` on craft violation, scope mismatch,
+     non-measurement criterion unmet, gutted tests, or tests missing
+     for non-trivial logic.
+8. Post a verdict comment on the sub-issue and transition the label
+   (`review` → `verifying` on approve/HOLD; `review` → `implementing`
+   on request-changes).
+
+Fallback mode is the read-only posture of the Iron Rule above: you
+still do not edit source files. The fallback produces a review; it
+does not patch the diff.
+
+Unavailability tagging:
+
+- Full miss (fallback fires): emit `DONE_WITH_CONCERNS` with a note
+  that the aggregate verdict was produced by the fallback reviewer
+  rather than the composed gstack pipeline, so team-lead can upgrade
+  the environment before future runs.
+- Partial miss (some composed skills present, some missing): run the
+  available ones, emit `DONE_WITH_CONCERNS` naming the missing skill.
+
 ## Input contract
 
 ```

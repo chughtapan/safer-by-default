@@ -131,7 +131,12 @@ fi
 if [ "$READ_STDIN" = "1" ]; then
   BODY_TEXT=$(cat)
 else
+  # Validate existence AND readability as UsageError (64). Without the
+  # -r check, a path that exists but is not readable (e.g. permission-
+  # restricted) would fall through to `cat` and exit 1 under set -e,
+  # missing the documented UsageError path.
   [ -f "$BODY_FILE" ] || die_usage "--body-file does not exist: $BODY_FILE"
+  [ -r "$BODY_FILE" ] || die_usage "--body-file is not readable: $BODY_FILE"
   BODY_TEXT=$(cat -- "$BODY_FILE")
 fi
 
@@ -145,19 +150,46 @@ if [ -z "${MOLTZAP_LOCAL_SENDER_ID:-}" ] ||
   exit "$EXIT_TRANSPORT_FAILED"
 fi
 
-# FROM_ROLE: map AO_CALLER_TYPE + optional MOLTZAP_SESSION_ROLE override.
-FROM_ROLE="${MOLTZAP_SESSION_ROLE:-${AO_CALLER_TYPE}}"
-case "$FROM_ROLE" in
-  orchestrator|architect|implementer|reviewer) ;;
+# FROM_ROLE: derive from AO_CALLER_TYPE, with MOLTZAP_SESSION_ROLE only
+# allowed to REFINE the worker role (architect|implementer|reviewer).
+# SPEC §5(a): a worker can never mint itself as orchestrator; the
+# orchestrator identity is seeded by zapbot at boot, not by a session
+# env var. Enforce that at the CLI boundary (Invariant 2).
+case "$AO_CALLER_TYPE" in
+  orchestrator)
+    # Orchestrator sessions do not need MOLTZAP_SESSION_ROLE; if set,
+    # it must match "orchestrator" (no refinement exists for the
+    # orchestrator role).
+    if [ -n "${MOLTZAP_SESSION_ROLE:-}" ] && [ "${MOLTZAP_SESSION_ROLE}" != "orchestrator" ]; then
+      echo "$PROG: MOLTZAP_SESSION_ROLE=${MOLTZAP_SESSION_ROLE} contradicts AO_CALLER_TYPE=orchestrator" >&2
+      exit "$EXIT_USAGE"
+    fi
+    FROM_ROLE="orchestrator"
+    ;;
   worker)
-    # Env-var misconfig caught by the CLI itself → UsageError, not a
-    # payload decode failure (nothing about the payload has been decoded
-    # at this point; the flags are well-formed, the env is incomplete).
-    echo "$PROG: MOLTZAP_SESSION_ROLE must be set to architect|implementer|reviewer when AO_CALLER_TYPE is worker" >&2
-    exit "$EXIT_USAGE"
+    # A worker MUST declare its refined role and that role MUST be a
+    # worker role (not orchestrator). This is the boundary where a
+    # compromised env cannot escalate to orchestrator identity.
+    case "${MOLTZAP_SESSION_ROLE:-}" in
+      architect|implementer|reviewer)
+        FROM_ROLE="${MOLTZAP_SESSION_ROLE}"
+        ;;
+      orchestrator)
+        echo "$PROG: MOLTZAP_SESSION_ROLE=orchestrator is forbidden when AO_CALLER_TYPE=worker (Invariant 2 / SPEC §5(a))" >&2
+        exit "$EXIT_USAGE"
+        ;;
+      "")
+        echo "$PROG: MOLTZAP_SESSION_ROLE must be set to architect|implementer|reviewer when AO_CALLER_TYPE is worker" >&2
+        exit "$EXIT_USAGE"
+        ;;
+      *)
+        echo "$PROG: unknown MOLTZAP_SESSION_ROLE: ${MOLTZAP_SESSION_ROLE}" >&2
+        exit "$EXIT_USAGE"
+        ;;
+    esac
     ;;
   *)
-    echo "$PROG: unknown MOLTZAP_SESSION_ROLE: $FROM_ROLE" >&2
+    echo "$PROG: unknown AO_CALLER_TYPE: $AO_CALLER_TYPE (expected 'orchestrator' or 'worker')" >&2
     exit "$EXIT_USAGE"
     ;;
 esac
