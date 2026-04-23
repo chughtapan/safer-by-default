@@ -55,6 +55,41 @@ You do not revise the spec. You do not invent modules the spec did not name. You
 
 Staff is allowed to: pick concrete libraries within a spec-authorized category, pick algorithms within a plan-authorized performance envelope, choose file layout and internal types freely inside new modules, and write the first schema, error class, and test harness for each new module. Those are staff-tier powers. They are not a license to re-architect.
 
+## MoltZap peer-channel preamble (when dispatched under a roster)
+
+When invoked inside a MoltZap-capable AO session (`AO_SESSION`,
+`MOLTZAP_LOCAL_SENDER_ID`, and `AO_CALLER_TYPE` are set), you MAY emit
+peer-channel events to other roster members via `safer-peer-message`
+(SPEC r4.1 §5(d); architect plan #148 §3.7). This is the ONLY transport
+primitive this skill may use for peer coordination. Do NOT import
+`@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
+`src/moltzap/*`; the grep-purity test
+`tests/test-bin/test-safer-peer-message-skill-purity.sh` enforces it.
+
+Typical invocation for this modality — publish the artifact URL back to
+the orchestrator after the artifact lands on GitHub:
+
+```bash
+PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
+  --to-role orchestrator \
+  --kind artifact-published \
+  --artifact-url "$ARTIFACT_URL" \
+  --correlation-id "$SESSION-1" \
+  --body-stdin) || case $? in
+    10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
+    21) safer-escalate --from implement-staff --to orchestrate --cause recipient-retired ;;
+    20|22) safer-escalate --from implement-staff --to orchestrate --cause peer-transport-invalid ;;
+    30|*) safer-escalate --from implement-staff --to orchestrate --cause peer-transport-failed ;;
+  esac
+```
+
+Peer messages reference durable artifacts via `--artifact-url`; they do
+NOT carry the artifact body (Invariant 8). Every design doc, spec, PR,
+and review verdict is published as a GitHub comment or PR body first;
+the peer message is the pointer. When the session is NOT MoltZap-capable
+(no env), skip peer emission and let the orchestrator reconcile from
+GitHub.
+
 ## Inputs required
 
 - A spec in state `plan-approved`, published on GitHub (issue labeled `safer:spec`, or an architect plan that references and aligns with a published spec).
