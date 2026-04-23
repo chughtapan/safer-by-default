@@ -17,14 +17,20 @@ source "$HERE/../test-helpers.sh"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 SKILLS_DIR="$REPO_ROOT/skills"
 
-# Forbidden *usage* patterns (POSIX-compatible — grep -E rejects the
-# non-portable `[[:quote:]]` class). Any line in a SKILL.md that looks
-# like an import, require, or bun-run of a MoltZap SDK / MCP SDK /
-# zapbot bridge path is an SPEC §5(d) bullet 1 violation.
-#
-# We use a literal single-or-double quote class `['"]` (escaped for
-# shell double-quoted string via concatenation).
-FORBIDDEN_ALT='(^[[:space:]]*(import|const|let|var)[[:space:]].*['"'"'"]@moltzap/)|(^[[:space:]]*(import|const|let|var)[[:space:]].*['"'"'"]@modelcontextprotocol/)|(require\(['"'"'"]@moltzap/)|(require\(['"'"'"]@modelcontextprotocol/)|(bun[[:space:]]+run[[:space:]]+[^[:space:]]*src/bridge\.ts)|(bun[[:space:]]+run[[:space:]]+[^[:space:]]*src/moltzap/)'
+# Forbidden *usage* patterns. Assembled from an array for readability;
+# each entry is one alternative in the final grep -E alternation. The
+# quote class `['\"]` (escaped for the heredoc below) matches either
+# single or double quotes.
+FORBIDDEN_PATTERNS=(
+  "^[[:space:]]*(import|const|let|var)[[:space:]].*['\"]@moltzap/"
+  "^[[:space:]]*(import|const|let|var)[[:space:]].*['\"]@modelcontextprotocol/"
+  "require\\(['\"]@moltzap/"
+  "require\\(['\"]@modelcontextprotocol/"
+  "bun[[:space:]]+run[[:space:]]+[^[:space:]]*src/bridge\\.ts"
+  "bun[[:space:]]+run[[:space:]]+[^[:space:]]*src/moltzap/"
+)
+# Join with `|` into a single alternation.
+FORBIDDEN_ALT="$(IFS='|'; echo "${FORBIDDEN_PATTERNS[*]}")"
 
 _scan_for_forbidden() {
   # Run grep per-file in a loop. Returns offender-lines on stdout (empty

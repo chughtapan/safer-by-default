@@ -71,12 +71,15 @@ test_channel_disallowed_reviewer_sideways() {
   assert_equal "$rc" "20" "reviewer→reviewer is ChannelDisallowed"
 }
 
-test_decode_failed_worker_without_session_role() {
+test_usage_worker_without_session_role() {
+  # Env-var misconfig caught at the CLI layer is UsageError, not a
+  # payload DecodeFailed — the flags are well-formed; the session env
+  # is incomplete.
   local rc; rc=$(run_cli \
     --env MOLTZAP_LOCAL_SENDER_ID=sender-w --env AO_SESSION=sess-w \
     --env AO_CALLER_TYPE=worker \
     --to-role orchestrator --kind status-update --body-stdin)
-  assert_equal "$rc" "22" "worker without session role is DecodeFailed"
+  assert_equal "$rc" "64" "worker without MOLTZAP_SESSION_ROLE is UsageError"
 }
 
 test_transport_failed_without_shim() {
@@ -96,7 +99,7 @@ run_test "no body source is UsageError"                 test_usage_no_body_sourc
 run_test "missing MoltZap env is TransportFailed"       test_transport_failed_missing_env
 run_test "architect→implementer is ChannelDisallowed"   test_channel_disallowed_architect_to_implementer
 run_test "reviewer→reviewer is ChannelDisallowed"       test_channel_disallowed_reviewer_sideways
-run_test "worker without session role is DecodeFailed"  test_decode_failed_worker_without_session_role
+run_test "worker without session role is UsageError"    test_usage_worker_without_session_role
 run_test "valid call without transport shim is TF"      test_transport_failed_without_shim
 
 report

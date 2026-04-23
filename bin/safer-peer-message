@@ -150,12 +150,15 @@ FROM_ROLE="${MOLTZAP_SESSION_ROLE:-${AO_CALLER_TYPE}}"
 case "$FROM_ROLE" in
   orchestrator|architect|implementer|reviewer) ;;
   worker)
+    # Env-var misconfig caught by the CLI itself → UsageError, not a
+    # payload decode failure (nothing about the payload has been decoded
+    # at this point; the flags are well-formed, the env is incomplete).
     echo "$PROG: MOLTZAP_SESSION_ROLE must be set to architect|implementer|reviewer when AO_CALLER_TYPE is worker" >&2
-    exit "$EXIT_DECODE_FAILED"
+    exit "$EXIT_USAGE"
     ;;
   *)
     echo "$PROG: unknown MOLTZAP_SESSION_ROLE: $FROM_ROLE" >&2
-    exit "$EXIT_DECODE_FAILED"
+    exit "$EXIT_USAGE"
     ;;
 esac
 
@@ -192,23 +195,16 @@ case "$KIND:$FROM_ROLE:$TO_ROLE" in
     ;;
 esac
 
-# Milliseconds since epoch. macOS `date` doesn't support %N, so probe
-# once: GNU date → use %s%N/1_000_000; BSD date → use %s (seconds) plus
-# an in-process microsecond counter via `$RANDOM` to keep correlation
-# IDs unique within a session. Millisecond precision on BSD is close
-# enough for the sentAtMs field; the orchestrator uses it for ordering,
-# not for sub-millisecond scheduling.
-if date +%s%N 2>/dev/null | grep -qE '^[0-9]+$'; then
-  # GNU date returns "nanoseconds since epoch" — e.g. 1776984788741123456.
-  # Verify it didn't literal-emit the format string (BSD date echoes %N).
-  _GNU_NS=$(date +%s%N)
-  if [ "${_GNU_NS#*N}" = "$_GNU_NS" ]; then
-    NOW_MS=$(( _GNU_NS / 1000000 ))
-    CORR_SUFFIX=$(printf '%s' "$_GNU_NS" | tail -c 10)
-  else
-    NOW_MS=$(( $(date +%s) * 1000 ))
-    CORR_SUFFIX="${RANDOM}${RANDOM}"
-  fi
+# Milliseconds since epoch. macOS `date` doesn't support %N (literal-
+# echoes "N"); GNU date emits nanoseconds. Probe in one call: if the
+# output is all digits, it's GNU nanoseconds; otherwise fall back to
+# `date +%s` × 1000 and $RANDOM for correlation suffix. Millisecond
+# precision is what the sentAtMs / orderability contract requires;
+# sub-ms ordering was never guaranteed.
+_DATE_N=$(date +%s%N 2>/dev/null)
+if [[ "$_DATE_N" =~ ^[0-9]+$ ]]; then
+  NOW_MS=$(( _DATE_N / 1000000 ))
+  CORR_SUFFIX=${_DATE_N: -10}
 else
   NOW_MS=$(( $(date +%s) * 1000 ))
   CORR_SUFFIX="${RANDOM}${RANDOM}"
