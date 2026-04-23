@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 # _safer-zapbot-env.sh — source this to resolve zapbot config.
 #
-# Self-source zapbot config: explicit env var > .env > config.json (zapbot#302 forward-compat)
-# Uses subshell isolation to prevent .env from spoofing bootstrap locals.
-# Sets ZAPBOT_API_KEY in the calling environment.
-# Exit: always 0.
+# Read ZAPBOT_API_KEY from ~/.zapbot/config.json "apiKey" field.
+# Single source of truth: config.json. No explicit env override.
 
-_sbd_explicit_key="${ZAPBOT_API_KEY:-}"
-_sbd_was_set="${ZAPBOT_API_KEY+set}"
-ZAPBOT_API_KEY=$(_sbd_explicit_key="$_sbd_explicit_key" _sbd_was_set="$_sbd_was_set" bash << 'ZAPBOT_BOOTSTRAP'
-  [ -f "$HOME/.zapbot/.env" ] && { set -a; . "$HOME/.zapbot/.env"; set +a; }
-  if [ "$_sbd_was_set" = "set" ]; then
-    echo "$_sbd_explicit_key"
-  elif [ -z "${ZAPBOT_API_KEY:-}" ] && [ -f "$HOME/.zapbot/config.json" ]; then
-    _api_key=$(jq -r '.apiKey // empty' "$HOME/.zapbot/config.json" 2>/dev/null)
-    [ -n "$_api_key" ] && echo "$_api_key" || echo ""
-  else
-    echo "${ZAPBOT_API_KEY:-}"
-  fi
-ZAPBOT_BOOTSTRAP
-)
-export ZAPBOT_API_KEY
-unset _sbd_explicit_key _sbd_was_set
+if [ ! -f "$HOME/.zapbot/config.json" ]; then
+  echo "safer-zapbot-env: $HOME/.zapbot/config.json not found" >&2
+  exit 1
+fi
+if ! command -v jq >/dev/null 2>&1; then
+  echo "safer-zapbot-env: jq required to read $HOME/.zapbot/config.json" >&2
+  exit 1
+fi
+_key=$(jq -er '
+  if (.apiKey | type) == "string" and (.apiKey | length) > 0
+  then .apiKey else empty end
+' "$HOME/.zapbot/config.json") || {
+  echo "safer-zapbot-env: apiKey missing or not a non-empty string in $HOME/.zapbot/config.json" >&2
+  exit 1
+}
+export ZAPBOT_API_KEY="$_key"
+unset _key
