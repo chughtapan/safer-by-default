@@ -1,0 +1,132 @@
+Spike: participantFilter "all" + invitedAgentIds roster-growth (sbd#181)
+Source: ~/moltzap working tree (NOT npm). Read-only investigation; no probe needed.
+Date: 2026-04-24
+
+================================================================
+QUESTION
+================================================================
+When AppSession is created with participantFilter:"all" + invitedAgentIds:[a1,a2],
+what happens if a3 is spawned mid-session and needs to join?
+Does conversations/addParticipant admit a3, or does the app require fresh apps/create?
+
+================================================================
+APPROACH
+================================================================
+Read source for:
+1. apps/* RPC handlers — what public methods exist for session lifecycle.
+2. createSession + admitAgent + admitAgentToSession — what participantFilter does.
+3. conversations/addParticipant handler + service — what gates apply.
+Source was unambiguous. No runtime probe needed.
+
+================================================================
+EVIDENCE 1 — apps/* RPC surface (NO public roster-growth method)
+================================================================
+File: ~/moltzap/packages/server/src/app/handlers/apps.handlers.ts
+Methods registered:
+  apps/register
+  apps/create
+  apps/attestSkill
+  apps/closeSession
+  apps/getSession
+  apps/listSessions
+
+There is NO apps/inviteAgent, apps/admitAgent, apps/addParticipant.
+The only writers of app_session_participants are:
+  - apps/create (initial bulk insert, status="pending")     [app-host.ts:693]
+  - private admitAgentToSession (status="admitted")          [app-host.ts:2091]
+  - rejectAgent (status="rejected")                          [app-host.ts:2220]
+
+admitAgentToSession is private; only callsite is admitAgent (private),
+only callsite is admitAgentsAsync (private), only callsite is forkDaemon
+inside createSession over uniqueInvitedIds. Closed loop.
+
+================================================================
+EVIDENCE 2 — participantFilter is a SUBSCRIPTION RULE, not an admission gate
+================================================================
+File: ~/moltzap/packages/server/src/app/app-host.ts:2091-2125 (admitAgentToSession)
+
+  for (const convDef of manifest.conversations ?? []) {
+    const filter = convDef.participantFilter ?? "all";
+    const convId = session.conversations[convDef.key];
+    if (!convId) continue;
+    if (filter === "all") {
+      yield* this.db.insertInto("conversation_participants").values({
+        conversation_id: convId,
+        agent_id: agentId,
+        role: "member",
+      })...
+      this.subscribeToConversation(agentId, convId);
+    }
+  }
+
+participantFilter is consulted exactly once per agent, at admission time,
+to decide whether session-admitted agents are auto-subscribed to that
+conversation. It is NOT consulted by conversations/addParticipant.
+
+================================================================
+EVIDENCE 3 — conversations/addParticipant gates
+================================================================
+File: ~/moltzap/packages/server/src/services/conversation.service.ts:488-548
+
+  addParticipant(conversationId, agentId, requesterAgentId):
+    1. requireRole(conversationId, requesterAgentId, ["owner", "admin"])
+    2. participants.requireExists(agentId)              // agent row exists
+    3. count < MAX_GROUP_PARTICIPANTS
+    4. INSERT conversation_participants role="member" (idempotent)
+    5. subscribeAgentsToConversation([agentId], conversationId)
+
+NOT consulted:
+  - manifest.participantFilter
+  - app_session_participants table
+  - manifest.permissions / capability requirements (skillUrl)
+  - userService.validateUser
+  - on_join hook
+  - app/participantAdmitted event broadcast
+
+Initiator is created with role="owner" on every manifest conversation
+[app-host.ts:649], so the initiator can always satisfy the role check
+on session-owned conversations.
+
+================================================================
+EVIDENCE 4 — apps/getSession gates on app_session_participants
+================================================================
+File: ~/moltzap/packages/server/src/app/app-host.ts:1108-1126
+
+  isInitiator || (participant && participant.status === "admitted")
+
+An agent added via conversations/addParticipant has NO app_session_participants
+row, so apps/getSession returns "Only the initiator or admitted participants..."
+forbidden error for that agent.
+
+================================================================
+EVIDENCE 5 — addParticipant has no session-link enforcement
+================================================================
+Grep for isAttachedToActiveSession in conversation.service.ts:
+  - Used in archive() [line 402]
+  - NOT used in addParticipant() [line 488]
+
+So even though the conversation is part of an active app session,
+addParticipant proceeds without consulting the session at all.
+
+================================================================
+SUMMARY OF ADMISSION SEMANTICS
+================================================================
+
+Effect of conversations/addParticipant(convId, a3, initiator):
+  + a3 inserted into conversation_participants (role=member)
+  + a3's WS connections subscribed to convId
+  + a3 can send/receive messages in that conversation
+  - a3 NOT in app_session_participants (cannot apps/getSession)
+  - a3 NOT capability-checked (skillUrl attestation skipped)
+  - a3 NOT user-validated (userService.validateUser skipped)
+  - a3 NOT permission-granted (app_permission_grants entries skipped)
+  - on_join hook NOT fired
+  - app/participantAdmitted event NOT broadcast
+  - participantFilter is irrelevant (only governs auto-subscription
+    at session-admission time, which a3 never went through)
+
+Effect if instead the app tries fresh apps/create with [a1,a2,a3]:
+  + Whole new session, new conversations, new IDs
+  + a3 gets full session-level admission with all gates
+  - Loses prior conversation history (new conversation IDs)
+  - Costs the orchestrator + a1 + a2 a fresh admission cycle
