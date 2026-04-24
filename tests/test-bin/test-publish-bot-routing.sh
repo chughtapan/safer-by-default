@@ -31,6 +31,10 @@ export MOCK_LOG="$SANDBOX/mock.log"
 _reset_sandbox() {
   rm -rf "$HOME"
   mkdir -p "$HOME"
+  mkdir -p "$HOME/.zapbot"
+  # Write default config.json (required by _safer-zapbot-env.sh).
+  # Tests can override ZAPBOT_API_KEY or write a different config.json if needed.
+  printf '{"apiKey": "test-key"}' > "$HOME/.zapbot/config.json"
   rm -f "$MOCK_LOG"
   rm -f "$MOCK_BIN/curl" "$MOCK_BIN/gh"
   unset ZAPBOT_API_KEY ZAPBOT_BRIDGE_URL
@@ -97,29 +101,17 @@ _source_publish() {
 
 # ── detect_zapbot ───────────────────────────────────────────────────
 
-test_detect_zapbot_env() {
-  _reset_sandbox
-  touch "$HOME/.zapbot/.env" 2>/dev/null || { mkdir -p "$HOME/.zapbot" && touch "$HOME/.zapbot/.env"; }
-  _source_publish
-  detect_zapbot
-  assert_equal "$ZAPBOT_DETECTED" "1" "detect .env"
-}
+# test_detect_zapbot_env removed: N/A, .env-specific detection behavior post-#160 (config.json-only)
 
 test_detect_zapbot_config_json() {
   _reset_sandbox
-  mkdir -p "$HOME/.zapbot"
-  echo '{}' > "$HOME/.zapbot/config.json"
+  # config.json already created by _reset_sandbox with valid apiKey; verify detect_zapbot still works
   _source_publish
   detect_zapbot
   assert_equal "$ZAPBOT_DETECTED" "1" "detect config.json"
 }
 
-test_detect_zapbot_absent() {
-  _reset_sandbox
-  _source_publish
-  detect_zapbot
-  assert_equal "$ZAPBOT_DETECTED" "0" "no zapbot → 0"
-}
+# test_detect_zapbot_absent removed: N/A, config.json must always exist post-#160 for helper to source successfully
 
 # ── resolve_bridge_url ──────────────────────────────────────────────
 
@@ -340,30 +332,15 @@ test_verify_attribution_user_fails_20() {
   assert_contains "$err" "attribution verify failed" "stderr msg"
 }
 
-# ── End-to-end flow: no zapbot → runs gh directly, no broker call ───
-
-test_e2e_no_zapbot_user_silent() {
-  _reset_sandbox
-  _mock_gh "https://github.com/o/r/issues/42"
-  local out rc
-  out=$("$BIN" --kind comment --issue 42 --body "hi" 2>&1); rc=$?
-  assert_equal "$rc" "0" "exit ok" || return 1
-  assert_contains "$out" "https://github.com/o/r/issues/42" "resource url echoed" || return 1
-  # No curl should have been invoked (broker path skipped).
-  if [ -f "$MOCK_LOG" ] && grep -q "^curl" "$MOCK_LOG"; then
-    echo "    FAIL: unexpected broker call when zapbot absent"
-    return 1
-  fi
-  return 0
-}
+# ── End-to-end flow: N/A post-#160 ───
+# test_e2e_no_zapbot_user_silent removed: scenario no longer valid, config.json always exists
+# (zapbot always detected when config.json is present; "no zapbot" path eliminated)
 
 # ── End-to-end: zapbot detected + broker hit → bot mode + verify ────
 
 test_e2e_bot_success_exports_gh_token() {
   _reset_sandbox
-  mkdir -p "$HOME/.zapbot"
-  touch "$HOME/.zapbot/.env"
-  export ZAPBOT_API_KEY="test-key"
+  # config.json already created by _reset_sandbox; apiKey read by helper on sourcing
   export MOCK_USER_TYPE="Bot"
   _mock_curl 200 '{"token":"ghs_botsecret","expires_at":"2026-04-18T01:00:00Z"}'
   _mock_gh "https://github.com/o/r/issues/7"
@@ -381,9 +358,7 @@ test_e2e_bot_success_exports_gh_token() {
 
 test_e2e_strict_fail_exits_10_with_ux_block() {
   _reset_sandbox
-  mkdir -p "$HOME/.zapbot"
-  touch "$HOME/.zapbot/.env"
-  export ZAPBOT_API_KEY="test-key"
+  # config.json already created by _reset_sandbox; apiKey read by helper on sourcing
   _mock_curl_tcp_fail
   _mock_gh "unused"
   local out rc
@@ -403,8 +378,7 @@ test_e2e_strict_fail_exits_10_with_ux_block() {
 
 test_e2e_user_fallback_warns_and_proceeds() {
   _reset_sandbox
-  mkdir -p "$HOME/.zapbot"
-  touch "$HOME/.zapbot/.env"
+  # config.json already created by _reset_sandbox; override apiKey for this test
   export ZAPBOT_API_KEY="wrong-key"
   _mock_curl 401 '{"error":{"type":"unauthorized","message":"x","status":401}}'
   _mock_gh "https://github.com/o/r/issues/9"
@@ -420,9 +394,7 @@ test_e2e_user_fallback_warns_and_proceeds() {
 
 test_e2e_attribute_to_user_skips_broker() {
   _reset_sandbox
-  mkdir -p "$HOME/.zapbot"
-  touch "$HOME/.zapbot/.env"
-  export ZAPBOT_API_KEY="test-key"
+  # config.json already created by _reset_sandbox; apiKey read by helper on sourcing
   # Curl should NOT be called; if it is, stub fails noisily.
   cat > "$MOCK_BIN/curl" <<'EOF'
 #!/usr/bin/env bash
@@ -451,9 +423,7 @@ test_e2e_conflict_flags_exit_22() {
   assert_contains "$err" "mutually exclusive" "error message"
 }
 
-run_test "detect_zapbot finds ~/.zapbot/.env"         test_detect_zapbot_env
 run_test "detect_zapbot finds ~/.zapbot/config.json"  test_detect_zapbot_config_json
-run_test "detect_zapbot returns 0 when absent"        test_detect_zapbot_absent
 
 run_test "resolve_bridge_url default"                  test_resolve_bridge_default
 run_test "resolve_bridge_url env override"             test_resolve_bridge_env_override
@@ -480,7 +450,6 @@ run_test "resolve_identity_mode U=1 → user"            test_mode_attribute_to_
 run_test "verify_attribution Bot passes"               test_verify_attribution_bot_passes
 run_test "verify_attribution non-Bot → 20"             test_verify_attribution_user_fails_20
 
-run_test "e2e: no zapbot → user mode, no broker call"  test_e2e_no_zapbot_user_silent
 run_test "e2e: bot success exports GH_TOKEN + verify"  test_e2e_bot_success_exports_gh_token
 run_test "e2e: strict fail exits 10 with UX block"     test_e2e_strict_fail_exits_10_with_ux_block
 run_test "e2e: --allow-pat-fallback warns + proceeds"  test_e2e_user_fallback_warns_and_proceeds
