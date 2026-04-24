@@ -1,0 +1,81 @@
+moltzap tail feasibility — source-evidence trace
+==================================================
+
+Question: Can `moltzap tail <conversationId>` be implemented client-side
+against the existing message-distribution code, or does it require a new
+scoped-subscribe RPC?
+
+Method: read packages/server/src/ along the path
+  hello → connection state → messages/send → broadcaster
+and packages/protocol/src/schema/events.ts for event shape.
+No live experiment needed; source is unambiguous.
+
+----------------------------------------------------------------------
+1. Auth-time auto-subscription (auth.handlers.ts:86-91)
+
+   conn.auth = auth;
+   const convIds = yield* deps.conversationService
+     .getConversationIds(auth.agentId);
+   for (const id of convIds) conn.conversationIds.add(id);
+
+   ⇒ At `hello`, the server fetches ALL conversation IDs the agent
+     participates in and stamps them onto the connection's
+     conversationIds Set. No per-conversation subscribe RPC required.
+
+----------------------------------------------------------------------
+2. New-conversation subscription (conversations.handlers.ts:194-198,
+   ws/connection.ts:57-70)
+
+   for (const conn of deps.connections.getByAgent(participant.id)) {
+     conn.conversationIds.add(params.conversationId);
+   }
+
+   plus ConnectionManager.subscribeAgentsToConversation() called from
+   conversations/create flow.
+
+   ⇒ Conversations created/joined AFTER hello are also added to the
+     live connection, so a long-lived `tail` never goes blind.
+
+----------------------------------------------------------------------
+3. Send → broadcast path (message.service.ts:201-207,
+   ws/broadcaster.ts:12-31)
+
+   const event = eventFrame(EventNames.MessageReceived, { message });
+   const delivered = this.broadcaster.broadcastToConversation(
+     conversationId, event, excludeConnectionId);
+
+   broadcastToConversation:
+     for each connection:
+       if conn.conversationIds.has(conversationId) && conn.auth
+          && !conn.mutedConversations.has(conversationId):
+         write(JSON.stringify(event))
+
+   ⇒ Every authenticated participant receives "messages/received"
+     pushes for every message in conversations they are part of,
+     unless they have explicitly muted that conversation.
+
+----------------------------------------------------------------------
+4. Event payload includes conversationId
+   (protocol/src/schema/events.ts:33-36, schema/messages.ts:42)
+
+   MessageReceivedEventSchema = { message: MessageSchema }
+   MessageSchema includes conversationId
+
+   ⇒ Client can filter the WS stream with
+       event.name === "messages/received"
+       && event.payload.message.conversationId === <target>
+
+----------------------------------------------------------------------
+Conclusion
+
+`tail` is a pure client-side filter on the WS event stream that the
+server already pushes by default. No new RPC, no protocol surface,
+no server change required.
+
+Edge cases (all client-decidable, no server change):
+  - Muted conversation: broadcaster suppresses the push. If `tail`
+    must show muted convs, user un-mutes first (existing RPC).
+  - Backfill last N: combine startup `messages/list` with the live
+    stream. No server work.
+  - Tailing a conversation the agent is NOT a participant in: not
+    possible by design; auth boundary. Out of scope for v1 tail.

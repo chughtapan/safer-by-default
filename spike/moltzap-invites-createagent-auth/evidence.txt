@@ -1,0 +1,108 @@
+Spike: invites/createAgent auth model — agent-callable or admin-only?
+Session: 2026-04-24
+Probe: read ~/moltzap/packages/server/src/ and ~/moltzap/packages/protocol/src/
+
+================================================================
+1. Protocol schema — placeholder, not a real contract
+================================================================
+
+File: ~/moltzap/packages/protocol/src/schema/methods/invites.ts
+
+  export const InvitesCreateAgent = defineRpc({
+    name: "invites/createAgent",
+    params: Type.Object({}, { additionalProperties: false }),
+    // Result shape hasn't been formalized yet. Keep it open rather than
+    // locking in a shape we haven't designed.
+    result: Type.Object({}, { additionalProperties: true }),
+  });
+
+Params schema is empty `{}` with no additional properties.
+Result schema is empty `{}` open-bag.
+Comment calls out that the result shape "hasn't been formalized yet."
+
+================================================================
+2. Server handler registry — no invites handler registered
+================================================================
+
+File: ~/moltzap/packages/server/src/app/server.ts, lines 161-189
+
+  const methods: RpcMethodRegistry = {
+    ...createCoreAuthHandlers({ ... }),
+    ...createConversationHandlers({ ... }),
+    ...createMessageHandlers({ ... }),
+    ...createPresenceHandlers({ ... }),
+    ...createAppHandlers({ ... }),
+    ...createSystemHandlers(),
+  };
+
+Handler modules on disk:
+  ~/moltzap/packages/server/src/app/handlers/
+    apps.handlers.ts
+    auth.handlers.ts
+    conversations.handlers.ts
+    messages.handlers.ts
+    presence.handlers.ts
+    system.handlers.ts
+
+No invites.handlers.ts. No `invites/createAgent` handler wired into the
+registry. A runtime call would hit router.ts:24-32 and return
+`MethodNotFound` ("Unknown method: invites/createAgent").
+
+================================================================
+3. CLI already encodes the product answer
+================================================================
+
+File: ~/moltzap/packages/client/src/cli/commands/invite.ts
+
+  export const inviteCommand = Command.make("invite", {}, () =>
+    Effect.sync(() => {
+      console.log(
+        "Invite management is available through the MoltZap web dashboard at https://moltzap.xyz.",
+      );
+      console.log(
+        "Agents cannot create invites directly — ask your human owner to create one.",
+      );
+    }),
+  );
+
+The existing `moltzap invite` CLI command is a stub that redirects to
+the web dashboard. Product stance is explicit: agents cannot self-invite.
+
+================================================================
+4. Test helper uses direct DB seeding, not RPC
+================================================================
+
+File: ~/moltzap/packages/server/src/__tests__/integration/helpers.ts:102
+
+  export async function createAgentInvite(...)
+
+Integration tests seed invites directly through the DB layer — further
+confirmation that no production RPC path exists.
+
+================================================================
+5. Registration flow (adjacent surface) — invite is consumed, not created
+================================================================
+
+File: ~/moltzap/packages/server/src/app/server.ts, lines 205-252
+
+  const registerRoute = HttpRouter.post(
+    "/api/v1/auth/register",
+    ... if (config.registrationSecret) {
+          const inviteCode = (body as { inviteCode?: string }).inviteCode;
+          if (!inviteCode || !safeEqual(inviteCode, config.registrationSecret)) {
+            return ... { status: 403 };
+          }
+        } ...
+  );
+
+The HTTP /register endpoint consumes an invite code. Nothing on the
+server surface mints one over RPC or HTTP.
+
+================================================================
+Summary
+================================================================
+
+`invites/createAgent` exists in the protocol schema as a placeholder
+only. It has no server handler, no admin path, no HTTP route. It is
+not agent-callable, not admin-callable, not callable at all today.
+Invite creation is a web-dashboard-only concern by product design.
