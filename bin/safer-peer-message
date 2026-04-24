@@ -142,12 +142,15 @@ fi
 
 # Empty body is a UsageError: peer-message.ts `decodePeerMessage`
 # accepts any string for `body` so we must reject here rather than
-# letting a zero-length payload slip through (stamina round 3
-# bypass #3). Allow explicitly whitespace-only bodies only — a
-# literal empty string is treated as missing content.
-if [ -z "$BODY_TEXT" ]; then
-  die_usage "body must be non-empty (use --body-stdin with content or --body-file)"
+# letting a zero-length or whitespace-only payload slip through
+# (stamina round 3 bypass #3). Reject both empty and whitespace-only
+# bodies: a status update like "   \n\n" carries no semantic content
+# for the orchestrator to act on.
+_BODY_STRIPPED="${BODY_TEXT//[[:space:]]/}"
+if [ -z "$_BODY_STRIPPED" ]; then
+  die_usage "body must contain non-whitespace content (use --body-stdin with content or --body-file)"
 fi
+unset _BODY_STRIPPED
 
 # Transport env is required. These come from the AO session's MoltZap
 # bootstrap. Missing env means the caller is not inside a MoltZap-capable
