@@ -95,14 +95,36 @@ test_usage_worker_cannot_spoof_orchestrator() {
   assert_equal "$rc" "64" "worker cannot spoof orchestrator role"
 }
 
-test_usage_orchestrator_claim_without_token() {
-  # AO_CALLER_TYPE=orchestrator alone is no longer trusted. Without
-  # MOLTZAP_ORCHESTRATOR_TOKEN (boot-seeded by zapbot), reject.
+test_usage_orchestrator_caller_forbidden() {
+  # AO_CALLER_TYPE=orchestrator is rejected outright — this CLI is for
+  # worker sessions only; the orchestrator path uses the zapbot bridge
+  # directly (SPEC §5(a) / Invariant 2). Token-based local "proof"
+  # would be forgeable without shared-secret infrastructure.
   local rc; rc=$(run_cli \
     --env MOLTZAP_LOCAL_SENDER_ID=sender-o --env AO_SESSION=sess-o \
     --env AO_CALLER_TYPE=orchestrator \
     --to-role architect --kind review-request --body-stdin)
-  assert_equal "$rc" "64" "orchestrator claim without token is UsageError"
+  assert_equal "$rc" "64" "orchestrator caller is unconditionally forbidden"
+}
+
+test_usage_orchestrator_caller_forbidden_even_with_token() {
+  # Even with a non-empty MOLTZAP_ORCHESTRATOR_TOKEN (which would be
+  # easy to forge), AO_CALLER_TYPE=orchestrator must be rejected.
+  local rc; rc=$(run_cli \
+    --env MOLTZAP_LOCAL_SENDER_ID=sender-o --env AO_SESSION=sess-o \
+    --env AO_CALLER_TYPE=orchestrator --env MOLTZAP_ORCHESTRATOR_TOKEN=forged-secret \
+    --to-role architect --kind review-request --body-stdin)
+  assert_equal "$rc" "64" "token cannot unlock orchestrator caller role"
+}
+
+test_channel_disallowed_same_role_sideways() {
+  # Worker implementer→implementer (not allowed; only architect↔architect
+  # is a sideways peer pair).
+  local rc; rc=$(run_cli \
+    --env MOLTZAP_LOCAL_SENDER_ID=sender-i --env AO_SESSION=sess-i \
+    --env AO_CALLER_TYPE=worker --env MOLTZAP_SESSION_ROLE=implementer \
+    --to-role implementer --kind status-update --body-stdin)
+  assert_equal "$rc" "20" "implementer→implementer sideways is ChannelDisallowed"
 }
 
 test_usage_empty_body_stdin() {
@@ -150,7 +172,9 @@ run_test "architect→implementer is ChannelDisallowed"   test_channel_disallowe
 run_test "reviewer→reviewer is ChannelDisallowed"       test_channel_disallowed_reviewer_sideways
 run_test "worker without session role is UsageError"    test_usage_worker_without_session_role
 run_test "worker cannot spoof orchestrator role"        test_usage_worker_cannot_spoof_orchestrator
-run_test "orchestrator claim needs boot-seeded token"   test_usage_orchestrator_claim_without_token
+run_test "orchestrator caller is forbidden"             test_usage_orchestrator_caller_forbidden
+run_test "orchestrator caller forbidden even with token" test_usage_orchestrator_caller_forbidden_even_with_token
+run_test "implementer→implementer sideways is ChannelDisallowed" test_channel_disallowed_same_role_sideways
 run_test "empty body is UsageError"                     test_usage_empty_body_stdin
 run_test "unreadable --body-file is UsageError"         test_usage_unreadable_body_file
 run_test "valid call without transport shim is TF"      test_transport_failed_without_shim

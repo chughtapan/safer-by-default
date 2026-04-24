@@ -169,22 +169,20 @@ fi
 # env var. Enforce that at the CLI boundary (Invariant 2).
 case "$AO_CALLER_TYPE" in
   orchestrator)
-    # Orchestrator claim is privileged: require non-env-mediated proof
-    # (Invariant 2 / SPEC §5(a) — an env-var alone is insufficient;
-    # zapbot seeds MOLTZAP_ORCHESTRATOR_TOKEN at boot for the
-    # orchestrator session and not for workers). Absent the token,
-    # treat the claim as untrusted and reject.
-    if [ -z "${MOLTZAP_ORCHESTRATOR_TOKEN:-}" ]; then
-      echo "$PROG: AO_CALLER_TYPE=orchestrator requires MOLTZAP_ORCHESTRATOR_TOKEN (boot-seeded by zapbot); env-only claim rejected" >&2
-      exit "$EXIT_USAGE"
-    fi
-    # If MOLTZAP_SESSION_ROLE is set, it must match "orchestrator" (no
-    # refinement exists for the orchestrator role).
-    if [ -n "${MOLTZAP_SESSION_ROLE:-}" ] && [ "${MOLTZAP_SESSION_ROLE}" != "orchestrator" ]; then
-      echo "$PROG: MOLTZAP_SESSION_ROLE=${MOLTZAP_SESSION_ROLE} contradicts AO_CALLER_TYPE=orchestrator" >&2
-      exit "$EXIT_USAGE"
-    fi
-    FROM_ROLE="orchestrator"
+    # This CLI is for WORKER sessions only. The orchestrator talks to
+    # workers directly via the zapbot bridge + MoltZap SDK (bridge-
+    # internal code path, not this shell wrapper); there is no
+    # architectural reason for an orchestrator session to invoke
+    # safer-peer-message.
+    #
+    # A token-based local "proof" is not verifiable at the CLI layer
+    # (no shared-secret infrastructure); any env-mediated orchestrator
+    # claim is therefore forgeable and must be rejected outright
+    # (Invariant 2 / SPEC §5(a)). Stamina round 3 finding: the prior
+    # "non-empty token" gate was weak defense-in-depth but not true
+    # authentication.
+    echo "$PROG: AO_CALLER_TYPE=orchestrator is forbidden — the orchestrator path uses the zapbot bridge directly, not this CLI (SPEC §5(a) / Invariant 2)" >&2
+    exit "$EXIT_USAGE"
     ;;
   worker)
     # A worker MUST declare its refined role and that role MUST be a
@@ -218,18 +216,33 @@ esac
 # zapbot/src/moltzap/role-topology.ts). The bridge enforces the definitive
 # check; this CLI-level check catches obvious misuse before a transport
 # round-trip.
+# Role-pair gate. From role is one of architect|implementer|reviewer
+# (orchestrator is forbidden upstream). To role is any of the four.
+# Orchestrator→orchestrator and to-role=FROM_ROLE (sideways same-role
+# unless architect-peer) must be rejected explicitly.
 CHANNEL=""
+# Block orchestrator→orchestrator and worker→worker-same-role (except
+# architect↔architect) before the kind-specific branches so wildcards
+# below cannot accept them.
+if [ "$TO_ROLE" = "orchestrator" ] && [ "$FROM_ROLE" = "orchestrator" ]; then
+  echo "$PROG: ChannelDisallowed: orchestrator→orchestrator is not a peer pair" >&2
+  exit "$EXIT_CHANNEL_DISALLOWED"
+fi
+if [ "$FROM_ROLE" = "$TO_ROLE" ] && [ "$FROM_ROLE" != "architect" ]; then
+  echo "$PROG: ChannelDisallowed: same-role sideways peer ($FROM_ROLE→$TO_ROLE) is not allowed" >&2
+  exit "$EXIT_CHANNEL_DISALLOWED"
+fi
 case "$KIND:$FROM_ROLE:$TO_ROLE" in
-  artifact-published:*:orchestrator|\
-  status-update:*:orchestrator|\
-  retire-notice:*:orchestrator)
+  artifact-published:architect:orchestrator|\
+  artifact-published:implementer:orchestrator|\
+  artifact-published:reviewer:orchestrator|\
+  status-update:architect:orchestrator|\
+  status-update:implementer:orchestrator|\
+  status-update:reviewer:orchestrator|\
+  retire-notice:architect:orchestrator|\
+  retire-notice:implementer:orchestrator|\
+  retire-notice:reviewer:orchestrator)
     CHANNEL="worker-to-orchestrator"
-    ;;
-  artifact-published:orchestrator:*|\
-  status-update:orchestrator:*|\
-  review-request:orchestrator:*|\
-  retire-notice:orchestrator:*)
-    CHANNEL="orchestrator-to-worker"
     ;;
   architect-peer-ping:architect:architect)
     CHANNEL="architect-peer"
