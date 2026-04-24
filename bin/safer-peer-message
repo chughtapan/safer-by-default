@@ -1,0 +1,331 @@
+#!/usr/bin/env bash
+#
+# safer-peer-message — single safer-skill-visible primitive for sending a
+# typed MoltZap peer message to a role-addressed recipient in the same
+# roster (SPEC r4.1 §5(d); Goal 4).
+#
+# Wire format: JSON `PeerMessage` (OQ2) consumed by
+# `zapbot/src/orchestrator/peer-message.ts:decodePeerMessage`.
+#
+# Grep-purity rule (SPEC r4.1 acceptance (d) bullet 1): SKILL.md prompt files
+# invoke THIS binary by name and MUST NOT import or reference
+# `@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
+# `src/moltzap/*`. The grep test
+# `tests/test-bin/test-safer-peer-message-skill-purity.sh` enforces it.
+#
+# Public signature:
+#
+#   safer-peer-message \
+#       --to-role {architect|implementer|reviewer|orchestrator} \
+#       [--to-session <ao-session-name>] \
+#       --kind {artifact-published|status-update|review-request|architect-peer-ping|retire-notice} \
+#       [--artifact-url <url>] \
+#       [--correlation-id <id>] \
+#       --body-file <path>     # or --body-stdin
+#
+# `--to-session`: specific-recipient hint. Written into the PeerMessage's
+# `to.senderId` field (PeerRecipient has no separate session field; zapbot's
+# roster manager keys senderId off the session name, so in practice the
+# caller passes the ao-session-name as the hint). Absent this flag, the
+# message is addressed by role only (senderId=null); the roster manager
+# resolves to a concrete recipient at send time.
+#
+# Exit codes:
+#   0    Delivered (stdout: `{"_tag":"Delivered","atMs":<n>}`)
+#   10   ReroutedToOrchestrator (recipient retired; stdout: route JSON)
+#   20   ChannelDisallowed (role-pair predicate rejected the pair)
+#   21   RecipientRetired (routing unavailable; escalate upstream)
+#   22   DecodeFailed (input did not match PeerMessage schema)
+#   30   TransportFailed (MoltZap bridge returned OutboundFailed)
+#   64   UsageError (flags malformed)
+
+set -euo pipefail
+
+PROG=$(basename "$0")
+
+EXIT_DELIVERED=0
+EXIT_REROUTED=10
+EXIT_CHANNEL_DISALLOWED=20
+EXIT_RECIPIENT_RETIRED=21
+EXIT_DECODE_FAILED=22
+EXIT_TRANSPORT_FAILED=30
+EXIT_USAGE=64
+
+usage() {
+  cat >&2 <<USAGE
+usage: $PROG \\
+    --to-role {architect|implementer|reviewer|orchestrator} \\
+    [--to-session <ao-session-name>] \\
+    --kind {artifact-published|status-update|review-request|architect-peer-ping|retire-notice} \\
+    [--artifact-url <url>] \\
+    [--correlation-id <id>] \\
+    (--body-file <path> | --body-stdin)
+
+Exit codes: 0 Delivered · 10 ReroutedToOrchestrator · 20 ChannelDisallowed
+            · 21 RecipientRetired · 22 DecodeFailed · 30 TransportFailed
+            · 64 UsageError
+USAGE
+}
+
+die_usage() {
+  echo "$PROG: $*" >&2
+  usage
+  exit "$EXIT_USAGE"
+}
+
+# ── Flag parsing ──────────────────────────────────────────────────
+
+TO_ROLE=""
+TO_SESSION=""
+KIND=""
+ARTIFACT_URL=""
+CORRELATION_ID=""
+BODY_FILE=""
+READ_STDIN=0
+
+while (( $# > 0 )); do
+  flag="$1"
+  case "$flag" in
+    --to-role|--to-session|--kind|--artifact-url|--correlation-id|--body-file)
+      # Every value-taking flag must be followed by a value; otherwise the
+      # shift-2 below would crash under set -e with a non-UsageError exit.
+      if [ $# -lt 2 ]; then die_usage "missing value for $flag"; fi
+      value="$2"
+      case "$flag" in
+        --to-role)        TO_ROLE="$value" ;;
+        --to-session)     TO_SESSION="$value" ;;
+        --kind)           KIND="$value" ;;
+        --artifact-url)   ARTIFACT_URL="$value" ;;
+        --correlation-id) CORRELATION_ID="$value" ;;
+        --body-file)      BODY_FILE="$value" ;;
+      esac
+      shift 2
+      ;;
+    --body-stdin) READ_STDIN=1; shift ;;
+    -h|--help)    usage; exit "$EXIT_USAGE" ;;
+    *)            die_usage "unknown flag: $flag" ;;
+  esac
+done
+
+[ -z "$TO_ROLE" ] && die_usage "--to-role is required"
+[ -z "$KIND" ] && die_usage "--kind is required"
+
+case "$TO_ROLE" in
+  architect|implementer|reviewer|orchestrator) ;;
+  *) die_usage "invalid --to-role: $TO_ROLE" ;;
+esac
+
+case "$KIND" in
+  artifact-published|status-update|review-request|architect-peer-ping|retire-notice) ;;
+  *) die_usage "invalid --kind: $KIND" ;;
+esac
+
+if [ -n "$BODY_FILE" ] && [ "$READ_STDIN" = "1" ]; then
+  die_usage "--body-file and --body-stdin are mutually exclusive"
+fi
+if [ -z "$BODY_FILE" ] && [ "$READ_STDIN" != "1" ]; then
+  die_usage "one of --body-file or --body-stdin is required"
+fi
+
+# Read body text.
+if [ "$READ_STDIN" = "1" ]; then
+  BODY_TEXT=$(cat)
+else
+  # Validate existence AND readability as UsageError (64). Without the
+  # -r check, a path that exists but is not readable (e.g. permission-
+  # restricted) would fall through to `cat` and exit 1 under set -e,
+  # missing the documented UsageError path.
+  [ -f "$BODY_FILE" ] || die_usage "--body-file does not exist: $BODY_FILE"
+  [ -r "$BODY_FILE" ] || die_usage "--body-file is not readable: $BODY_FILE"
+  BODY_TEXT=$(cat -- "$BODY_FILE")
+fi
+
+# Empty body is a UsageError: peer-message.ts `decodePeerMessage`
+# accepts any string for `body` so we must reject here rather than
+# letting a zero-length or whitespace-only payload slip through
+# (stamina round 3 bypass #3). Reject both empty and whitespace-only
+# bodies: a status update like "   \n\n" carries no semantic content
+# for the orchestrator to act on.
+_BODY_STRIPPED="${BODY_TEXT//[[:space:]]/}"
+if [ -z "$_BODY_STRIPPED" ]; then
+  die_usage "body must contain non-whitespace content (use --body-stdin with content or --body-file)"
+fi
+unset _BODY_STRIPPED
+
+# Transport env is required. These come from the AO session's MoltZap
+# bootstrap. Missing env means the caller is not inside a MoltZap-capable
+# AO session.
+if [ -z "${MOLTZAP_LOCAL_SENDER_ID:-}" ] ||
+   [ -z "${AO_SESSION:-}" ] ||
+   [ -z "${AO_CALLER_TYPE:-}" ]; then
+  echo "$PROG: MoltZap session env missing (MOLTZAP_LOCAL_SENDER_ID, AO_SESSION, AO_CALLER_TYPE required)" >&2
+  exit "$EXIT_TRANSPORT_FAILED"
+fi
+
+# FROM_ROLE: derive from AO_CALLER_TYPE, with MOLTZAP_SESSION_ROLE only
+# allowed to REFINE the worker role (architect|implementer|reviewer).
+# SPEC §5(a): a worker can never mint itself as orchestrator; the
+# orchestrator identity is seeded by zapbot at boot, not by a session
+# env var. Enforce that at the CLI boundary (Invariant 2).
+case "$AO_CALLER_TYPE" in
+  orchestrator)
+    # This CLI is for WORKER sessions only. The orchestrator talks to
+    # workers directly via the zapbot bridge + MoltZap SDK (bridge-
+    # internal code path, not this shell wrapper); there is no
+    # architectural reason for an orchestrator session to invoke
+    # safer-peer-message.
+    #
+    # A token-based local "proof" is not verifiable at the CLI layer
+    # (no shared-secret infrastructure); any env-mediated orchestrator
+    # claim is therefore forgeable and must be rejected outright
+    # (Invariant 2 / SPEC §5(a)). Stamina round 3 finding: the prior
+    # "non-empty token" gate was weak defense-in-depth but not true
+    # authentication.
+    echo "$PROG: AO_CALLER_TYPE=orchestrator is forbidden — the orchestrator path uses the zapbot bridge directly, not this CLI (SPEC §5(a) / Invariant 2)" >&2
+    exit "$EXIT_USAGE"
+    ;;
+  worker)
+    # A worker MUST declare its refined role and that role MUST be a
+    # worker role (not orchestrator). This is the boundary where a
+    # compromised env cannot escalate to orchestrator identity.
+    case "${MOLTZAP_SESSION_ROLE:-}" in
+      architect|implementer|reviewer)
+        FROM_ROLE="${MOLTZAP_SESSION_ROLE}"
+        ;;
+      orchestrator)
+        echo "$PROG: MOLTZAP_SESSION_ROLE=orchestrator is forbidden when AO_CALLER_TYPE=worker (Invariant 2 / SPEC §5(a))" >&2
+        exit "$EXIT_USAGE"
+        ;;
+      "")
+        echo "$PROG: MOLTZAP_SESSION_ROLE must be set to architect|implementer|reviewer when AO_CALLER_TYPE is worker" >&2
+        exit "$EXIT_USAGE"
+        ;;
+      *)
+        echo "$PROG: unknown MOLTZAP_SESSION_ROLE: ${MOLTZAP_SESSION_ROLE}" >&2
+        exit "$EXIT_USAGE"
+        ;;
+    esac
+    ;;
+  *)
+    echo "$PROG: unknown AO_CALLER_TYPE: $AO_CALLER_TYPE (expected 'orchestrator' or 'worker')" >&2
+    exit "$EXIT_USAGE"
+    ;;
+esac
+
+# Role-pair gate (subset of the allowsRolePair predicate in
+# zapbot/src/moltzap/role-topology.ts). The bridge enforces the definitive
+# check; this CLI-level check catches obvious misuse before a transport
+# round-trip.
+# Role-pair gate. From role is one of architect|implementer|reviewer
+# (orchestrator is forbidden upstream). To role is any of the four.
+# Orchestrator→orchestrator and to-role=FROM_ROLE (sideways same-role
+# unless architect-peer) must be rejected explicitly.
+CHANNEL=""
+# Block orchestrator→orchestrator and worker→worker-same-role (except
+# architect↔architect) before the kind-specific branches so wildcards
+# below cannot accept them.
+if [ "$TO_ROLE" = "orchestrator" ] && [ "$FROM_ROLE" = "orchestrator" ]; then
+  echo "$PROG: ChannelDisallowed: orchestrator→orchestrator is not a peer pair" >&2
+  exit "$EXIT_CHANNEL_DISALLOWED"
+fi
+if [ "$FROM_ROLE" = "$TO_ROLE" ] && [ "$FROM_ROLE" != "architect" ]; then
+  echo "$PROG: ChannelDisallowed: same-role sideways peer ($FROM_ROLE→$TO_ROLE) is not allowed" >&2
+  exit "$EXIT_CHANNEL_DISALLOWED"
+fi
+case "$KIND:$FROM_ROLE:$TO_ROLE" in
+  artifact-published:architect:orchestrator|\
+  artifact-published:implementer:orchestrator|\
+  artifact-published:reviewer:orchestrator|\
+  status-update:architect:orchestrator|\
+  status-update:implementer:orchestrator|\
+  status-update:reviewer:orchestrator|\
+  retire-notice:architect:orchestrator|\
+  retire-notice:implementer:orchestrator|\
+  retire-notice:reviewer:orchestrator)
+    CHANNEL="worker-to-orchestrator"
+    ;;
+  architect-peer-ping:architect:architect)
+    CHANNEL="architect-peer"
+    ;;
+  review-request:reviewer:architect|\
+  review-request:reviewer:implementer)
+    CHANNEL="review-to-author"
+    ;;
+  status-update:implementer:architect)
+    CHANNEL="implementer-to-architect"
+    ;;
+  *)
+    echo "$PROG: ChannelDisallowed: no channel for kind=$KIND from=$FROM_ROLE to=$TO_ROLE" >&2
+    exit "$EXIT_CHANNEL_DISALLOWED"
+    ;;
+esac
+
+# Milliseconds since epoch. macOS `date` doesn't support %N (literal-
+# echoes "N"); GNU date emits nanoseconds. Probe in one call: if the
+# output is all digits, it's GNU nanoseconds; otherwise fall back to
+# `date +%s` × 1000 and $RANDOM for correlation suffix. Millisecond
+# precision is what the sentAtMs / orderability contract requires;
+# sub-ms ordering was never guaranteed.
+_DATE_N=$(date +%s%N 2>/dev/null)
+if [[ "$_DATE_N" =~ ^[0-9]+$ ]]; then
+  NOW_MS=$(( _DATE_N / 1000000 ))
+  CORR_SUFFIX=${_DATE_N: -10}
+else
+  NOW_MS=$(( $(date +%s) * 1000 ))
+  CORR_SUFFIX="${RANDOM}${RANDOM}"
+fi
+
+if [ -z "$CORRELATION_ID" ]; then
+  CORRELATION_ID="${AO_SESSION}-${CORR_SUFFIX}"
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "$PROG: jq required (boundary encode for PeerMessage)" >&2
+  exit "$EXIT_TRANSPORT_FAILED"
+fi
+
+# Single jq template: nullable --arg values are converted to JSON null
+# inside the template when the bash string is empty.
+PAYLOAD=$(jq -n \
+  --arg kind "$KIND" \
+  --arg channel "$CHANNEL" \
+  --arg from_role "$FROM_ROLE" \
+  --arg from_session "$AO_SESSION" \
+  --arg from_sender "$MOLTZAP_LOCAL_SENDER_ID" \
+  --arg to_role "$TO_ROLE" \
+  --arg to_session "$TO_SESSION" \
+  --arg artifact_url "$ARTIFACT_URL" \
+  --arg body "$BODY_TEXT" \
+  --arg correlation "$CORRELATION_ID" \
+  --argjson sent_at "$NOW_MS" \
+  '{
+    _tag: "PeerMessage",
+    kind: $kind,
+    channel: $channel,
+    from: { role: $from_role, session: $from_session, senderId: $from_sender },
+    to:   { role: $to_role,
+            senderId: (if $to_session == "" then null else $to_session end) },
+    body: $body,
+    artifactUrl: (if $artifact_url == "" then null else $artifact_url end),
+    correlationId: $correlation,
+    sentAtMs: $sent_at
+  }')
+
+if ! command -v safer-peer-outbound-client >/dev/null 2>&1; then
+  echo "$PROG: safer-peer-outbound-client not on PATH — cannot deliver" >&2
+  exit "$EXIT_TRANSPORT_FAILED"
+fi
+
+if ! RESPONSE=$(printf '%s' "$PAYLOAD" | safer-peer-outbound-client 2>/dev/null); then
+  echo "$PROG: safer-peer-outbound-client failed" >&2
+  exit "$EXIT_TRANSPORT_FAILED"
+fi
+
+case "$(printf '%s' "$RESPONSE" | jq -r '._tag // empty')" in
+  Delivered)               printf '%s\n' "$RESPONSE"; exit "$EXIT_DELIVERED" ;;
+  ReroutedToOrchestrator)  printf '%s\n' "$RESPONSE"; exit "$EXIT_REROUTED" ;;
+  RecipientRetired)        printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_RECIPIENT_RETIRED" ;;
+  ChannelDisallowed)       printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_CHANNEL_DISALLOWED" ;;
+  DecodeFailed)            printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_DECODE_FAILED" ;;
+  *)                       printf '%s\n' "$RESPONSE" >&2; exit "$EXIT_TRANSPORT_FAILED" ;;
+esac

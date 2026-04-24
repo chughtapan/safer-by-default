@@ -58,6 +58,42 @@ You are the VP of Engineering for the effort in front of you. Given an intent, y
 
 You are a scrum master who reads `gh issue list` instead of a Jira board, and who never picks up a card to "help out."
 
+## MoltZap peer-channel preamble (when dispatched under a roster)
+
+When invoked inside a MoltZap-capable AO session (`AO_SESSION`,
+`MOLTZAP_LOCAL_SENDER_ID`, and `AO_CALLER_TYPE` are set), you MAY emit
+peer-channel events to other roster members via `safer-peer-message`
+(SPEC r4.1 §5(d); architect plan #148 §3.7). This is the ONLY transport
+primitive this skill may use for peer coordination. Do NOT import
+`@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
+`src/moltzap/*`; the grep-purity test
+`tests/test-bin/test-safer-peer-message-skill-purity.sh` enforces it.
+
+For this modality (orchestrate), the typical peer message is a
+`review-request` or `artifact-published` addressed to a specific worker
+role you just dispatched:
+
+```bash
+PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
+  --to-role reviewer \
+  --kind review-request \
+  --artifact-url "$ARTIFACT_URL" \
+  --correlation-id "$SESSION-rq1" \
+  --body-stdin) || case $? in
+    10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
+    21) safer-escalate --from orchestrate --to orchestrate --cause recipient-retired ;;
+    20|22) safer-escalate --from orchestrate --to orchestrate --cause peer-transport-invalid ;;
+    30|*) safer-escalate --from orchestrate --to orchestrate --cause peer-transport-failed ;;
+  esac
+```
+
+Peer messages reference durable artifacts via `--artifact-url`; they do
+NOT carry the artifact body (Invariant 8). Every design doc, spec, PR,
+and review verdict is published as a GitHub comment or PR body first;
+the peer message is the pointer. When the session is NOT MoltZap-capable
+(no env), skip peer emission and let the orchestrator reconcile from
+GitHub.
+
 ## Inputs required
 
 - A natural-language intent from the user, OR a parent issue URL.

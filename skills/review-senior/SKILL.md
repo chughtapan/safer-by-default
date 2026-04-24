@@ -1,22 +1,20 @@
 ---
 name: review-senior
-version: 0.1.0
+version: 0.2.0
 description: |
-  Pre-merge code review for a PR. Reads the diff and the sub-issue acceptance
-  criteria, then writes a native GitHub PR review (approve, request changes,
-  or comment) with inline findings. Checks craft principles, scope alignment,
-  and tests. Use when a PR is ready for senior review and before merge. Do NOT
-  use to apply fixes; the author applies fixes. Review is a reading modality,
-  not a writing one.
+  Dispatcher for pre-merge artifact review. Routes a PR, design doc, spec,
+  plan, UI-touching change, or LLM-prompt change to the correct composed
+  gstack skill set per the SPEC r4.1 §5(h) routing table. Does NOT itself
+  read diffs or write reviews; the composed gstack skills do that. Single
+  review skill per Invariant 11; adding a second is a SPEC-revision trigger.
 triggers:
-  - review this PR
-  - senior code review
-  - check the diff
+  - review this
+  - senior review
+  - dispatch review
+  - route for review
   - pre-merge review
-  - review before merge
-  - diff review
-  - code review senior
-  - approve or reject PR
+  - review senior
+  - safer review
 allowed-tools:
   - Bash
   - Read
@@ -28,386 +26,340 @@ allowed-tools:
 
 ## Read first
 
-Read `PRINCIPLES.md` at the plugin root. Your projection of the principles onto this modality:
-
-- **Principle 1 (Types beat tests)** the review asks whether the diff pushed constraints into the type system. Runtime assertions where types would have sufficed are findings.
-- **Principle 2 (Validate at boundaries)** any new ingress point (HTTP handler, JSON parser, env-var read, file-read) must decode with a schema. Missing boundary schemas are findings.
-- **Principle 3 (Typed errors)** `throw new Error`, silent `catch {}`, and bare `Promise<T>` returns from failure-capable functions are findings.
-- **Principle 4 (Exhaustiveness)** new switches end in a `never` default. New if-else chains terminate. Missing exhaustiveness is a finding.
-- **Principle 6 (Budget Gate)** the diff shape must match the claimed modality. A diff tagged `implement-junior` that touches 4 modules is a Budget Gate violation.
-- **Principle 8 (Ratchet)** a structural issue in the diff does not get patched inline. Flag for ratchet up; request a new `architect` or `spec` sub-task.
+Read `PRINCIPLES.md` at the plugin root. Single-skill rule (Invariant 11):
+this is the ONLY safer review skill. Adding a second is a SPEC-revision
+trigger.
 
 ## Iron rule
 
 > **You comment; you do not edit. The author applies fixes.**
 
-If the instinct to "just fix this one line" appears, it is the stop rule firing. Write the comment; let the author push the fix. Every edit you make is a lie in the review history about who wrote what.
-
-## Forbidden verdicts
-
-**APPROVE requires every acceptance criterion to be either (a) directly verified by the reviewer in the PR diff, or (b) closed by a verify-modality comment already posted on the sub-issue or PR at review time.**
-
-If an acceptance criterion names a numeric threshold (mutation score ≥X%, coverage ≥Y%, latency ≤Z, throughput ≥R) and the PR only claims the number without a measurement artifact, the verdict MUST be `HOLD`, not `APPROVE`.
-
-`HOLD` is correct-but-unmeasured. `REQUEST-CHANGES` is broken-or-wrong. Consumers route them to different modalities; mixing them misleads the consumer.
-
-**Forbidden verdict patterns:**
-
-- Returning APPROVE with a deferred measurement condition the reviewer cannot confirm.
-- Returning APPROVE with "verify next" phrasing — if verify has not run, the verdict is HOLD.
-- Returning APPROVE citing the author's claim of a metric (e.g., "author reports 85% mutation") — the claim is not the measurement.
+`/safer:review-senior` itself never writes to the diff. It dispatches
+composed gstack skills; some of those (notably `/review`) may write
+their own comments and some legacy flows write edits. The safer-side
+posture is read-only review: you aggregate verdicts and publish a
+comment, never a patch. If the instinct to "just fix this one line"
+appears, it is the stop rule firing. Write the comment; let the author
+push the fix.
 
 ## Role
 
-You are a senior reviewer. Given a PR and a sub-issue (or an acceptance criteria list), you:
+**Dispatch, don't review.** Route the artifact to the correct composed
+gstack skill set. No code-level dispatcher exists in safer-by-default; the
+routing table below IS the dispatcher, interpreted by the orchestrator
+prompt (zapbot `src/orchestrator/control-event.ts`) and by a human reader.
 
-1. Classify the diff shape against the claimed modality.
-2. Read the diff start to finish.
-3. Check craft principles line by line.
-4. Check scope alignment against acceptance criteria.
-5. Check tests.
-6. Write the review via `gh pr review`: approve, request changes, or comment.
-7. Post a verdict on the sub-issue if orchestrated.
+Out-of-band gstack invocations (calling `/review`, `/simplify`, `/codex`,
+`/plan-eng-review`, `/plan-design-review` directly instead of through
+this dispatcher) are forbidden by Acceptance (e) bullet 4: the convergence
+gate the orchestrator reads is this skill's verdict, not the individual
+gstack verdicts.
 
-You do not edit source files. You do not push to the branch. You do not run the code under investigation except to check a specific finding (running tests is the `verify` modality's budget).
+## Routing table (SPEC r4.1 §5(h))
 
-## Inputs required
+| Artifact kind | Composed gstack skills |
+|---|---|
+| PR diff | `/review` + `/simplify` + `/codex` |
+| Plan / spec / design doc | `/plan-eng-review` + `/codex` |
+| UI-touching change (PR or design doc) | add `/plan-design-review` |
+| LLM prompt change | add the repo's eval suites per `CLAUDE.md` |
 
-- A PR number or URL.
-- The sub-issue URL if operating under `orchestrate`, or an explicit acceptance-criteria list otherwise.
-- `gh` CLI authenticated.
+Dispatch by **artifact kind**, not by **modality**. A design doc produced
+by `/safer:architect` routes under row 2 regardless of which modality
+authored it. A PR that happens to include UI copy routes under rows 1 + 3.
+A PR that introduces a new LLM prompt routes under rows 1 + 4.
 
-### Preamble (run first)
+The routing table is additive. A UI-touching PR runs rows 1 and 3; a
+spec that describes an LLM prompt runs rows 2 and 4.
+
+## Craft checks the reviewer still owns (Principles 1-4)
+
+gstack `/review` looks at structural issues, `/simplify` at reuse /
+efficiency, `/codex` at independent cross-model signal. None of them
+know the safer craft floor (see `PRINCIPLES.md`). Before publishing the
+aggregate verdict, run these four checks against the diff or artifact
+yourself and fold findings into the aggregate body:
+
+- **P1 (Types beat tests).** New constraints should be encoded in types
+  (branded types, discriminated unions, `NonEmptyArray`, literal-string
+  unions), not enforced by runtime `assert`/`.length > 0`/`if (!x) throw`
+  patterns a type would have made unnecessary. Flag `as T` casts across
+  module boundaries.
+- **P2 (Validate at boundaries).** Every new ingress point (HTTP handler,
+  JSON parser, env-var read, file read, MoltZap inbound, CLI flag decode)
+  must decode through a schema. `JSON.parse(x) as T`, `await r.json() as
+  Body`, or `process.env.X!` far from boot is a finding.
+- **P3 (Errors are typed, not thrown).** Flag `throw new Error(...)`
+  outside startup validation, any `catch {}` or `catch (e) { return
+  null }`, and any failure-capable function returning bare `Promise<T>`
+  without an error channel in the type.
+- **P4 (Exhaustiveness over optionality).** Every new `switch` over a
+  union ends with `default: return absurd(x)` (or equivalent). Every
+  new if-else chain terminates. Missing `never`-check on an internal
+  discriminant is a finding even if the compiler still passes.
+
+When operating as the aggregate dispatcher, record findings in a
+"P1-P4 craft notes" section of the aggregate comment so the author knows
+which violations came from the safer floor vs. the composed gstack
+skills. If no composed skills ran (e.g. environment missing), these
+four checks are the minimum the aggregate still carries.
+
+## Forbidden verdicts
+
+The aggregate verdict this dispatcher publishes MUST NOT mis-report. Even
+when the composed gstack skills are not directly under this skill's
+control, the dispatcher owns the aggregate tag.
+
+Forbidden aggregate-verdict patterns:
+
+- Returning APPROVE with a deferred measurement condition the reviewer cannot confirm.
+- Returning APPROVE citing the author's claim of a metric ("author reports
+  ≥80% mutation"); a claim is not a measurement. If a composed skill
+  returned HOLD pending measurement, the aggregate is HOLD, never APPROVE.
+- Returning APPROVE when any composed gstack skill was unavailable and
+  the row's coverage is therefore incomplete; use DONE_WITH_CONCERNS
+  instead (see Unavailability rule below).
+
+### HOLD vs REQUEST-CHANGES
+
+Two failure modes at aggregation, two verdicts, two consumer actions.
+
+- **HOLD** the diff is *correct but unmeasured*. A composed gstack skill
+  returned HOLD because an acceptance criterion names a measured threshold
+  the reviewer cannot confirm from the diff alone.
+  - Consumer action: dispatch `/safer:verify`.
+  - Label transition: `review` → `verifying`.
+- **REQUEST-CHANGES** the diff is *broken or wrong*. A composed skill
+  found a craft violation, scope mismatch, missing implementation, gutted
+  tests, or a non-measurement criterion unmet.
+  - Consumer action: dispatch `/safer:implement-*`.
+  - Label transition: `review` → `implementing`.
+
+HOLD is not a soft REQUEST-CHANGES. REQUEST-CHANGES is not a harsh HOLD.
+Pick the aggregate verdict that matches the failure mode.
+
+## Unavailability rule (loud)
+
+When a composed gstack skill is missing from the operating environment,
+emit `DONE_WITH_CONCERNS` with:
+
+- the missing skill name,
+- the reason logged back on the artifact thread.
+
+**Silent skip is FORBIDDEN.** The orchestrator's convergence gate
+(Acceptance (e)) reads the verdict produced here; a silent skip would
+invalidate that gate. A missing gstack skill in the environment is a
+configuration problem that must be surfaced, not a reason to approve.
+
+### Fallback mode (no gstack available)
+
+If NO composed gstack skills are available (full environment miss, not
+partial), do NOT block the review. Other shipped skills — notably
+`skills/orchestrate/SKILL.md` and `skills/stamina/SKILL.md` — treat
+`/safer:review-senior` as the fallback reviewer; returning only
+`BLOCKED` breaks those consumers.
+
+Fallback reviewer workflow (only when every gstack skill in the
+applicable table row is missing):
+
+1. Run `safer-diff-scope --pr "$PR"` and record the observed shape.
+2. Read the full diff via `gh pr diff "$PR"`.
+3. Read the sub-issue body for acceptance criteria.
+4. Walk each craft principle (P1–P4, above) against the diff; record
+   findings with `file:line`.
+5. Check scope alignment: each acceptance criterion is addressed, each
+   addressed criterion is evidenced in the diff.
+6. Check tests: success branch, each error tag, each named invariant.
+7. Write a native GitHub PR review via `gh pr review`:
+   - `--approve` when craft is green, scope aligns, and every
+     acceptance criterion is directly verifiable from the diff or
+     closed by an already-posted `/safer:verify` comment.
+   - `HOLD` (published via `gh pr review --comment` with body prefixed
+     `## Verdict\nHOLD`) when craft is green but a measured-threshold
+     criterion is unproven.
+   - `--request-changes` on craft violation, scope mismatch,
+     non-measurement criterion unmet, gutted tests, or tests missing
+     for non-trivial logic.
+8. Post a verdict comment on the sub-issue and transition the label
+   (`review` → `verifying` on approve/HOLD; `review` → `implementing`
+   on request-changes).
+
+Fallback mode is the read-only posture of the Iron Rule above: you
+still do not edit source files. The fallback produces a review; it
+does not patch the diff.
+
+Unavailability tagging:
+
+- Full miss (fallback fires): emit `DONE_WITH_CONCERNS` with a note
+  that the aggregate verdict was produced by the fallback reviewer
+  rather than the composed gstack pipeline, so team-lead can upgrade
+  the environment before future runs.
+- Partial miss (some composed skills present, some missing): run the
+  available ones, emit `DONE_WITH_CONCERNS` naming the missing skill.
+
+## Input contract
+
+```
+--artifact <url>   GitHub issue-comment URL, sub-issue body URL, or PR URL
+--kind <pr|design|spec|plan|ui|prompt>   (optional; inferred if omitted)
+```
+
+`--kind` inference rules (when the flag is omitted):
+
+- URL matches `/pull/\d+` → `pr` (rows 1; add 3 if the PR touches
+  `{css,scss,tsx,jsx,html,svg}` or `design/**`; add 4 if it touches
+  `skills/**/SKILL.md`, `prompts/**`, `eval/**`, or an LLM-prompt file).
+- URL matches `/issues/\d+#issuecomment-` → read the comment's `safer:*`
+  label on the parent issue. `safer:spec` → `spec`; `safer:architect` →
+  `design`; anything else → `plan`.
+- URL matches `/issues/\d+` → `plan`.
+
+## Workflow
+
+### Phase 1 — Load the artifact and classify
 
 ```bash
 gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated"; exit 1; }
 eval "$(safer-slug 2>/dev/null)" || true
 SESSION="$$-$(date +%s)"
-safer-telemetry-log --event-type safer.skill_run --modality review-senior --session "$SESSION" 2>/dev/null || true
-_UPD=$(safer-update-check 2>/dev/null || true)
-[ -n "$_UPD" ] && echo "$_UPD"
-[ -z "${PR:-}" ] && { echo "ERROR: set PR=<number> before invoking"; exit 1; }
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "unknown/unknown")
-echo "REPO: $REPO  PR: $PR  SESSION: $SESSION"
+safer-telemetry-log --event-type safer.skill_run --modality review-senior \
+  --session "$SESSION" 2>/dev/null || true
+
+ARTIFACT="${ARTIFACT:?set ARTIFACT=<url>}"
+KIND_OVERRIDE="${KIND:-}"
 ```
 
-If `safer-slug`, `safer-telemetry-log`, or `safer-update-check` is missing, continue. Review stands on its own.
+Classify the artifact per the inference rules above (or honour
+`KIND_OVERRIDE`). Record the classification plus the composed gstack
+skill set in a comment on the artifact thread; that comment is the
+audit trail even if the dispatch itself fails.
 
-## Scope
+### Phase 2 — Dispatch the composed skills
 
-**In scope:**
-- Reading the full diff via `gh pr diff $PR` and the changed files in context via `gh pr view $PR --json files` then `Read`.
-- Classifying the diff with `safer-diff-scope --pr $PR` and comparing to the claimed modality.
-- Reading the sub-issue body for acceptance criteria.
-- Writing a `gh pr review` with inline findings via `gh pr review --comment --body-file` (or `--approve`, `--request-changes`).
-- Posting a verdict comment on the sub-issue.
-- Transitioning the sub-issue label (e.g., `review` to `verifying`) on approve, or back to `implementing` on request-changes.
+Invoke each composed gstack skill in order. Each produces its own verdict
+(APPROVE / REQUEST-CHANGES / HOLD / COMMENT). Collect them.
 
-**Forbidden:**
-- Editing any source file.
-- Pushing to the PR branch.
-- Merging the PR.
-- Running the full test suite (that is `verify`'s budget).
-- Rewriting the author's code "to illustrate" a suggestion. A prose comment with a `file:line` is enough; do not paste a diff the reviewer wrote.
-- Reviewing a PR whose scope does not match its claimed modality. Request the split first.
+For PR rows, the composed skills post their verdicts as inline comments
+or PR reviews; for design/plan/spec rows, the composed skills post
+threaded comments on the artifact URL.
 
-## Scope budget
+Partial-miss handling (SOME composed skills missing): emit
+`DONE_WITH_CONCERNS` with the missing skill name; continue dispatch
+to the skills that ARE available (do NOT stop on the first miss).
+Do NOT attempt to "do the work" of a missing skill here — that
+collapses the separation between dispatcher and reviewer.
 
-A review produces exactly one artifact: a native GitHub PR review. The review has:
+Full-miss handling (EVERY composed skill in the row is missing):
+fall through to the **Fallback reviewer workflow** above ("Fallback
+mode (no gstack available)"). This is the explicit consumer contract
+with `skills/orchestrate/SKILL.md` and `skills/stamina/SKILL.md`:
+they treat review-senior as the fallback reviewer; emitting `BLOCKED`
+here breaks them.
 
-1. **Verdict** one of `--approve`, `--request-changes`, or `--comment`.
-2. **Summary body** at most one page of prose: what the diff does, whether it matches the claimed modality, whether acceptance criteria are met, whether craft principles were followed.
-3. **Inline comments** at most 20 inline findings. If you have more than 20, the PR is too large to review at senior tier; request a split.
+### Phase 3 — Aggregate the verdict
 
-The review does not have: prose essays, speculation about future changes, or suggestions unrelated to the diff. Stay in the diff.
+Combine per-skill verdicts into one artifact verdict. Rules:
 
-## Workflow
+- Any `REQUEST-CHANGES` among composed skills → artifact verdict
+  `REQUEST-CHANGES`.
+- Any `HOLD` (correct-but-unmeasured) from a composed skill → artifact
+  verdict `HOLD`.
+- Any `DONE_WITH_CONCERNS` from missing-skill unavailability → artifact
+  verdict `DONE_WITH_CONCERNS` (the missing skill is a real concern).
+- All `APPROVE` with none of the above → artifact verdict `APPROVE`.
 
-### Phase 1 — Classify the diff
+Publish the aggregate via `gh pr review` (for PR rows) or
+`safer-publish --kind comment --issue "$ISSUE" --body-file <file>`
+(for design/plan/spec rows).
 
-```bash
-safer-diff-scope --pr "$PR" > /tmp/safer-scope-$PR.json
-```
+### Phase 4 — Transition the sub-issue label
 
-Read the output. It reports `tier`, `files_changed`, `modules_touched`, `public_surface_changed`, and `new_deps`. Compare to the claimed modality from the sub-issue label:
+When operating under `/safer:orchestrate`:
 
-| Claimed | Tolerated shape | Mismatch trigger |
-|---|---|---|
-| `implement-junior` | 1 module, internals only, no public-surface change, no new deps | any cross-module, any public-surface change, any new dep |
-| `implement-senior` | cross-module within an approved plan | new module or new architectural pattern |
-| `implement-staff` | new modules per approved spec | revising the spec |
-
-If the diff shape does not match the claimed modality, that is finding #1. The review verdict is `--request-changes` and the request is: relabel and split, not patch in place. Do not accept a mismatched diff even if the code is otherwise correct.
-
-### Phase 2 — Read the diff start to finish
-
-```bash
-gh pr diff "$PR" > /tmp/safer-diff-$PR.patch
-```
-
-Read the full patch. Do not skim. Do not read only the additions. Reading the deletions is how you catch:
-
-- Tests that were gutted to silence failures.
-- Invariants that were encoded in code and are now gone.
-- Validation that was removed without a replacement.
-
-For each changed file, open it via `Read` at head to see the surrounding context. A diff read without its context is a diff read badly.
-
-### Phase 3 — Check craft principles
-
-Walk the diff with each principle as a checklist.
-
-**Principle 1 Types beat tests.**
-- Are new constraints encoded in types (branded types, discriminated unions, `NonEmptyArray`, literal-string unions), or enforced by runtime checks that a type would make unnecessary?
-- New tests asserting `.length > 0` where the type could have been `NonEmptyArray<T>`? Flag.
-- `string` where a union of literals or a branded type would be more specific? Flag.
-
-**Principle 2 Validate at boundaries.**
-- Any new HTTP handler, message consumer, file reader, or env-var read? Is the incoming data decoded with a schema, or cast with `as T`?
-- `JSON.parse(x) as Event` or `await r.json() as Body`? Flag.
-- `process.env.X!` or `process.env.X ?? ""` at a read site far from boot? Flag.
-
-**Principle 3 Typed errors.**
-- Any new `throw new Error("...")`? Flag, unless the function is explicitly throw-and-crash (startup validation at boot).
-- Any `catch {}` or `catch (e) { return null }`? Flag.
-- Any failure-capable function returning bare `Promise<T>` without an error channel in the type? Flag.
-
-**Principle 4 Exhaustiveness.**
-- Every new `switch` over a union has a default that calls `absurd(x)` or equivalent?
-- Every new if-else chain terminates in an explicit else?
-- Every `Option.match` / `Either.match` / `Result.match` handles both branches?
-- Missing `never` check? Flag.
-
-Record each finding with `file:line` and the principle it violates.
-
-### Phase 4 — Check scope alignment
-
-Read the sub-issue body. Extract the acceptance criteria checklist. For each criterion:
-
-- Is it addressed by the diff? (yes / partial / no)
-- Is the evidence in the diff, or does it depend on an untested assumption?
-
-A diff that does not address every acceptance criterion is `--request-changes`. A diff that addresses every criterion plus unrelated changes is also `--request-changes`: the unrelated changes are scope creep. The sub-issue is the contract.
-
-### Phase 5 — Check tests
-
-- Does the diff include tests for the new logic? Pure rearrangements and type-only changes are exempt; logic changes are not.
-- Are existing tests still present and meaningful, or were any gutted?
-- If tests were removed, is the removal justified in the PR body?
-- Do the tests hit the actual boundaries (schema decode, typed error branches, exhaustive switches), or do they test only the happy path?
-
-Missing tests for non-trivial logic is a finding, not an automatic block. Weigh severity in the verdict.
-
-### Phase 6 — Write the review
-
-Decide the verdict:
-
-- **`--approve`** the diff matches the claimed modality, craft principles are followed, and every acceptance criterion is either directly verified in the diff or closed by an already-posted verify-modality comment. No findings, or only nit-level findings.
-- **`HOLD`** (published via `gh pr review --comment` with body prefixed `## Verdict\nHOLD`) the diff matches the claimed modality and craft is green, but one or more acceptance criteria name a measured threshold the PR does not prove with a posted measurement artifact. HOLD is the trigger for team-lead to dispatch `/safer:verify`. HOLD is not `--request-changes`: the code is not broken, it is unmeasured.
-- **`--request-changes`** any of: scope mismatch, craft principle violation with clear fix, non-measurement acceptance criterion unmet, tests missing for non-trivial logic, existing tests gutted.
-- **`--comment`** findings exist but the reviewer is not the decision authority. Rare at senior tier; default to one of the first three.
-
-**Verdict decision table:**
-
-| Condition | Verdict |
-|---|---|
-| Diff shape matches claimed modality; craft green; every acceptance criterion directly verifiable from diff AND met | `--approve` |
-| Same as above, plus a prior `/safer:verify` comment on the sub-issue/PR closes any measured criterion | `--approve` |
-| Diff shape matches; craft green; one or more acceptance criteria names a measured threshold with no posted measurement artifact | `HOLD` |
-| Scope mismatch, craft violation with clear fix, non-measurement criterion unmet, or tests gutted | `--request-changes` |
-| Reviewer is not decision authority (rare at senior tier) | `--comment` |
-
-### HOLD vs REQUEST-CHANGES
-
-Two failure modes, two verdicts, two consumer actions.
-
-- **HOLD** the diff is *correct but unmeasured*. An acceptance criterion names a measured threshold the reviewer cannot confirm from the diff alone.
-  - Consumer (team-lead) action: dispatch `/safer:verify`.
-  - Label transition: `review` → `verifying`.
-  - Publish: `gh pr review --comment` with body `## Verdict\nHOLD`.
-- **REQUEST-CHANGES** the diff is *broken or wrong*. Craft violation, scope mismatch, missing implementation, gutted tests, or a non-measurement criterion unmet.
-  - Consumer action: dispatch `/safer:implement-*`.
-  - Label transition: `review` → `implementing`.
-  - Publish: `gh pr review --request-changes`.
-
-HOLD is not a soft REQUEST-CHANGES. REQUEST-CHANGES is not a harsh HOLD. Pick the verdict that matches the failure mode. Mixing them misleads the consumer and routes work to the wrong modality.
-
-Write the review body to a temp file:
-
-```bash
-TMP=$(mktemp)
-cat > "$TMP" <<EOF
-## Verdict
-<approve | request-changes | comment>
-
-## Scope
-Claimed modality: <M>
-Observed shape: <tier=X, files=Y, modules=Z>
-Match: <yes | no, with reason>
-
-## Craft findings
-<P1 / P2 / P3 / P4 findings, each with file:line>
-
-## Scope alignment
-<per-acceptance-criterion check>
-
-## Tests
-<summary>
-
-## Notes
-<optional: nit-level or forward-looking items; clearly labeled>
-EOF
-
-gh pr review "$PR" --request-changes --body-file "$TMP"
-# or --approve, or --comment
-rm -f "$TMP"
-```
-
-For specific findings that need an inline anchor, post inline comments:
-
-```bash
-gh api repos/$REPO/pulls/$PR/comments \
-  -f body="<finding>" \
-  -f commit_id="$SHA" \
-  -f path="<file>" \
-  -f line="<line>" \
-  -f side="RIGHT"
-```
-
-Use inline comments for `file:line` findings. Use the summary body for scope, tests, and overall verdict.
-
-### Phase 7 — Publish verdict and transition labels
-
-Post a verdict comment on the sub-issue:
-
-```bash
-safer-publish --kind comment --issue "$SUBISSUE" --body-file /tmp/safer-verdict-$PR.md
-```
-
-Transition labels:
-
-- On `--approve`: `safer-transition-label --issue "$SUBISSUE" --from review --to verifying` (verify runs next).
-- On `HOLD`: `safer-transition-label --issue "$SUBISSUE" --from review --to verifying`. Attach to the verdict body: "route to /safer:verify; measurement pending for criterion: <name>."
-- On `--request-changes`: `safer-transition-label --issue "$SUBISSUE" --from review --to implementing` (author revises).
-- On `--comment`: no state change; the orchestrator decides.
-
-Emit the end event:
-
-```bash
-safer-telemetry-log --event-type safer.skill_end --modality review-senior \
-  --session "$SESSION" --outcome success --issue "$SUBISSUE" --pr "$PR" 2>/dev/null || true
-```
+- `APPROVE`: `safer-transition-label --from review --to verifying`
+- `HOLD`: `safer-transition-label --from review --to verifying` (verify
+  next, measurement pending).
+- `REQUEST-CHANGES`: `safer-transition-label --from review --to
+  implementing`.
+- `DONE_WITH_CONCERNS` with missing gstack skill: stay at `review`;
+  team-lead resolves the environment issue.
 
 ## Stop rules
 
-Each stop rule fires on a specific condition. When fired, produce an escalation artifact via `safer-escalate --from review-senior --to <target> --cause <CAUSE>`.
-
-1. **You edited source.** Iron rule violation. Discard the edit. Redo the finding as an inline comment. The review cannot ship with reviewer-authored code in the diff. Status: internal failure; redo.
-2. **Scope mismatch.** The diff shape does not match the claimed modality. Status: `--request-changes` with "split and relabel" as the recommendation. Flag for re-triage on the parent epic.
-3. **PR too large for senior tier.** More than 20 inline findings, or more than 400 lines of non-trivial logic changes, or more than 3 modules meaningfully touched. Status: `--request-changes` with "split" as the recommendation. Do not attempt to review the whole diff.
-4. **Structural issue revealed by the diff.** The diff is otherwise clean but it reveals that the module's shape is wrong (e.g., a missing boundary schema that would require re-architecting). Status: `--request-changes` with ratchet-up recommendation: open a new `architect` sub-task; do not merge this diff until the architecture is revised.
-5. **Spec ambiguity.** The diff is clean but it implements one of two reasonable interpretations; the sub-issue acceptance criteria do not disambiguate. Status: `--comment` with the ambiguity; route to `spec` on the parent epic.
-6. **Missing sub-issue or acceptance criteria.** The PR has no linked sub-issue and no explicit acceptance criteria. Status: `NEEDS_CONTEXT` to the author or orchestrator; do not review without a contract.
+1. **Artifact kind cannot be inferred.** The URL is neither a PR, an
+   issue, nor an issue-comment. → `NEEDS_CONTEXT` with the URL and the
+   list of valid shapes.
+2. **All composed gstack skills are missing.** The operating environment
+   has no reviewer skills at all. → `BLOCKED`. The team-lead must install
+   gstack or the plugin must be reconfigured.
+3. **A composed skill returns a malformed verdict.** (Not APPROVE /
+   REQUEST-CHANGES / HOLD / COMMENT / DONE_WITH_CONCERNS.) → `ESCALATED`
+   with the raw verdict. Do not coerce.
+4. **The artifact URL returns 404 or requires auth we do not have.** →
+   `BLOCKED` with the HTTP status. Do not review what we cannot read.
 
 ## Completion status
 
-Every invocation ends with exactly one status marker on the last line of your response:
+Every invocation ends with exactly one status marker on the last line:
 
-- `DONE` review posted; verdict is `--approve`; label transitioned to `verifying`.
-- `HOLD` review posted with `## Verdict\nHOLD` body; diff is correct but one or more measured-threshold criteria are unproven; label transitioned to `verifying`; route named is `/safer:verify`. HOLD is a valid terminal output for review-senior.
-- `DONE_WITH_CONCERNS` review posted; verdict is `--approve` but with concerns listed; state each.
-- `ESCALATED` stop rule fired; routed to `architect`, `spec`, or orchestrator re-triage.
-- `BLOCKED` cannot review without missing context (sub-issue, acceptance criteria).
-- `NEEDS_CONTEXT` ambiguity only the author or user can resolve.
-
-A `--request-changes` outcome is a valid `DONE` for this modality: the review is the artifact, not the merged PR.
-
-## Escalation artifact template
-
-```markdown
-# Escalation from review-senior
-
-**Status:** <ESCALATED|BLOCKED|NEEDS_CONTEXT>
-
-**Cause:** <one line>
-
-## Context
-- PR: #<N>
-- Sub-issue: #<M>
-- Claimed modality: <X>
-- Observed shape: <safer-diff-scope output>
-
-## Finding
-<one-paragraph statement of the structural issue, spec ambiguity, or scope mismatch>
-
-## Recommended route
-<architect | spec | re-triage | split>
-
-## Confidence
-<LOW|MED|HIGH> <evidence>
-```
-
-Post as a comment on the sub-issue and cross-link on the PR.
-
-## Publication map
-
-| Artifact | Destination |
-|---|---|
-| Verdict (approve/request-changes/comment) | Native GitHub PR review via `gh pr review` |
-| Inline findings | Inline review comments via `gh api` |
-| Sub-issue verdict | Comment on the sub-issue |
-| Label transition | `safer-transition-label` on the sub-issue |
-| Escalation artifact | Comment on the sub-issue; cross-link on the PR |
-
-Nothing review-senior produces lives outside GitHub.
+- `DONE` — dispatch complete; aggregate verdict published.
+- `HOLD` review posted with `## Verdict\nHOLD` body; the aggregate verdict
+  is HOLD (a composed skill returned HOLD); label transitioned to
+  `verifying`; consumer route is `/safer:verify`. HOLD is a valid
+  terminal output for review-senior.
+- `DONE_WITH_CONCERNS` — dispatch complete, with either (a) the
+  aggregate verdict itself being DONE_WITH_CONCERNS, or (b) one or more
+  composed gstack skills unavailable.
+- `ESCALATED` — stop rule 3 fired.
+- `BLOCKED` — stop rule 2 or 4 fired.
+- `NEEDS_CONTEXT` — stop rule 1 fired.
 
 ## Anti-patterns
 
-- **"I'll push a commit with the fix so the author does not have to."** Iron rule violation. Write the comment.
-- **"The diff is 700 lines but I can review it carefully."** No. Request a split; senior-tier review has a 400-line ceiling on logic changes.
-- **"The scope mismatch is minor; I'll approve with a comment."** No. Scope mismatch is `--request-changes` every time. The Budget Gate is not negotiable.
-- **"The craft issue is subtle; I'll skip flagging it to keep the review focused."** Subtle is the most valuable kind to flag. The author will not catch what you skip.
-- **"I'll suggest a library swap in the review."** Out of scope. The review reads the diff; architectural suggestions route to `architect`.
-- **"I'll paste a rewritten version of the function in the comment."** Prose + `file:line` is enough. Pasting diffs blurs authorship.
-- **"No linked sub-issue; I'll review anyway."** Without acceptance criteria, there is nothing to review against. `NEEDS_CONTEXT`.
-- **"The diff looks clean and the author claims ≥80% mutation score, so APPROVE with 'verify next'."** No. APPROVE is misleading when a measurement is deferred; consumers merge on APPROVE. Use HOLD with an explicit verify-dispatch recommendation. Team-lead reads HOLD as "dispatch verify," not "do nothing."
-- **"Author reports the number in the PR body; that closes the criterion."** No. The author's claim is not the measurement. A verify comment with the measured number is the measurement. HOLD until that comment exists.
-- **"HOLD and REQUEST-CHANGES mean the same thing to me; I'll pick whichever."** No. They route to different modalities. HOLD → verify; REQUEST-CHANGES → implement-*. Pick the verdict that matches the failure mode.
+- **"I'll read the diff myself and write the review."** No. The review
+  is performed by the composed gstack skills; `review-senior` dispatches.
+  The architect design explicitly rules out a code-level dispatcher in
+  safer-by-default (Invariant 11); the rulebook *is* the dispatcher.
+- **"`/simplify` isn't installed, so I'll just approve on the other two."**
+  No. Silent skip is forbidden. Emit DONE_WITH_CONCERNS so the
+  orchestrator can see that convergence is unmeasured.
+- **"I'll rewrite the routing table to cover a new case I just noticed."**
+  No. The routing table lives in SPEC r4.1 §5(h). Route to `/safer:spec`
+  if a new case is needed (Principle 8, Ratchet).
+- **"This PR is small; I'll skip `/codex`."** No. Every row in the
+  routing table is mandatory for its kind. `/codex` is an independent
+  cross-model pass toward the stamina budget (PRINCIPLES.md →
+  Durability).
 
 ## Checklist before declaring `DONE`
 
-- [ ] `safer-diff-scope` ran; observed shape matches claimed modality (or mismatch is the primary finding).
-- [ ] Full diff read, including deletions.
-- [ ] Each craft principle (P1 to P4) checked against the diff; findings recorded with `file:line`.
-- [ ] Each acceptance criterion from the sub-issue ticked against the diff.
-- [ ] Test coverage assessed; missing tests for non-trivial logic flagged.
-- [ ] `gh pr review` posted with verdict and summary body.
-- [ ] Inline comments posted for each `file:line` finding.
-- [ ] Verdict comment posted on the sub-issue.
-- [ ] Label transitioned on the sub-issue.
-- [ ] No source files edited during review (`git status` clean of reviewer-authored changes).
+- [ ] Artifact classified (or user-supplied `--kind` honoured).
+- [ ] Every composed gstack skill in the table row(s) invoked.
+- [ ] Every composed verdict collected and aggregated.
+- [ ] Aggregate verdict published to the artifact thread (PR review or
+      issue comment).
+- [ ] Label transitioned (when orchestrated).
 - [ ] `safer.skill_end` event emitted.
-- [ ] Status marker on the last line of your reply.
+- [ ] Status marker on the last line.
 
 ## Communication discipline
 
-Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+Before you post a status marker or close your turn, **SendMessage to
+`team-lead` immediately** with a one-line summary and the artifact URL:
 
 ```
 SendMessage({
   to: "team-lead",
   summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>."
+  message: "STATUS: DONE. Artifact: <URL>. Aggregate verdict: <X>."
 })
 ```
 
-Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
-
-If you were invoked outside an orchestrate context (no team), skip this step.
-
+If invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` to Voice. Review comments are terse, concrete, and end with what to do. Not "this might be improved by..." but "move this check to the schema at `src/api/body.ts:18`; the runtime check at line 42 becomes unnecessary."
-
-Quality judgments are direct. "This cast hides a boundary." "This catch swallows the typed error." "This switch will fail on the next union addition." The author is a junior; write for them.
+See `PRINCIPLES.md` → Voice. The aggregate verdict comment names the
+composed skills that ran, the per-skill verdicts, and the aggregate rule
+that selected the final verdict. One paragraph; no prose essays. The
+consumer is the orchestrator, which routes on the verdict tag.

@@ -51,6 +51,41 @@ Architect takes a published spec and lays out the shape of code that satisfies i
 
 Architect does not write function bodies, pick algorithms beyond naming them ("uses a bounded LRU cache"; the implementation of the cache is downstream), run tests, or modify existing code beyond adding interface stubs on a dedicated branch. Architect does not revise the spec. If the spec has a gap, the ratchet sends it back to `/safer:spec`.
 
+## MoltZap peer-channel preamble (when dispatched under a roster)
+
+When invoked inside a MoltZap-capable AO session (`AO_SESSION`,
+`MOLTZAP_LOCAL_SENDER_ID`, and `AO_CALLER_TYPE` are set), you MAY emit
+peer-channel events to other roster members via `safer-peer-message`
+(SPEC r4.1 §5(d); architect plan #148 §3.7). This is the ONLY transport
+primitive this skill may use for peer coordination. Do NOT import
+`@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
+`src/moltzap/*`; the grep-purity test
+`tests/test-bin/test-safer-peer-message-skill-purity.sh` enforces it.
+
+Typical invocation for this modality — publish the artifact URL back to
+the orchestrator after the artifact lands on GitHub:
+
+```bash
+PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
+  --to-role orchestrator \
+  --kind artifact-published \
+  --artifact-url "$ARTIFACT_URL" \
+  --correlation-id "$SESSION-1" \
+  --body-stdin) || case $? in
+    10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
+    21) safer-escalate --from architect --to orchestrate --cause recipient-retired ;;
+    20|22) safer-escalate --from architect --to orchestrate --cause peer-transport-invalid ;;
+    30|*) safer-escalate --from architect --to orchestrate --cause peer-transport-failed ;;
+  esac
+```
+
+Peer messages reference durable artifacts via `--artifact-url`; they do
+NOT carry the artifact body (Invariant 8). Every design doc, spec, PR,
+and review verdict is published as a GitHub comment or PR body first;
+the peer message is the pointer. When the session is NOT MoltZap-capable
+(no env), skip peer emission and let the orchestrator reconcile from
+GitHub.
+
 ## Inputs required
 
 - A published spec. The spec is either a GitHub issue labeled `safer:spec` in state `plan-approved`, or a sub-issue body with the 7-section spec structure, or a comment on a parent epic carrying that structure.
