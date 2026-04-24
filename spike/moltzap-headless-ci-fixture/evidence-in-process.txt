@@ -1,0 +1,35 @@
+[08:04:00.002] [32mINFO[39m (2316710): [36mMoltZap core server listening[39m
+    [35mport[39m: 45417
+[08:04:00.436] [32mINFO[39m (alice/2316710): [36mAgent registered[39m
+    [35magentId[39m: "293b0f28-a5a5-4346-b6b1-f9c9a626209a"
+[08:04:00.506] [32mINFO[39m (bob/2316710): [36mAgent registered[39m
+    [35magentId[39m: "2a1e19cf-bff4-43d9-b195-d84be75018f4"
+[08:04:10.752] [32mINFO[39m (2316710): [36mMoltZap core server listening[39m
+    [35mport[39m: 36763
+[08:04:11.183] [32mINFO[39m (alice/2316710): [36mAgent registered[39m
+    [35magentId[39m: "3d3016c7-0414-4c01-b914-7118bdd1cb56"
+[08:04:11.454] [32mINFO[39m (bob/2316710): [36mAgent registered[39m
+    [35magentId[39m: "ba0cebba-a6f6-4daf-9cde-8927c541b366"
+{
+  "r1": {
+    "label": "run1",
+    "bootMs": 28935,
+    "regMs": 357,
+    "stopMs": 557,
+    "agents": 2,
+    "aliceId": "293b0f28-a5a5-4346-b6b1-f9c9a626209a",
+    "bobId": "2a1e19cf-bff4-43d9-b195-d84be75018f4"
+  },
+  "r2": {
+    "label": "run2",
+    "bootMs": 9854,
+    "regMs": 514,
+    "stopMs": 528,
+    "agents": 2,
+    "aliceId": "3d3016c7-0414-4c01-b914-7118bdd1cb56",
+    "bobId": "ba0cebba-a6f6-4daf-9cde-8927c541b366"
+  }
+}
+
+isolation=YES
+agent_count_each_run=2,2 (expected 2,2)

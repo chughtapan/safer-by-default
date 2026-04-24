@@ -1,0 +1,31 @@
+[run1] boot_ms=12337 pid=2308911
+[run1] register_ms=136 aliceId=e66d41d2-6b35-49cc-8039-b36c0aecff21 bobId=51ecbf26-0444-4c07-bbf9-d49e3bccb7bc
+[run1] kill_ms=176 exit={"code":null,"sig":"SIGTERM"}
+[run2] boot_ms=15046 pid=2309588
+[run2] register_ms=315 aliceId=26f02ca5-e283-4a4e-be7e-631141b8dbbd bobId=2603bf64-85ac-4073-a8e2-bcd06f279ccf
+[run2] kill_ms=322 exit={"code":null,"sig":"SIGTERM"}
+
+=== RESULTS ===
+{
+  "r1": {
+    "label": "run1",
+    "bootMs": 12337,
+    "registerMs": 136,
+    "killMs": 176,
+    "aliceId": "e66d41d2-6b35-49cc-8039-b36c0aecff21",
+    "bobId": "51ecbf26-0444-4c07-bbf9-d49e3bccb7bc",
+    "stderrTail": ""
+  },
+  "r2": {
+    "label": "run2",
+    "bootMs": 15046,
+    "registerMs": 315,
+    "killMs": 322,
+    "aliceId": "26f02ca5-e283-4a4e-be7e-631141b8dbbd",
+    "bobId": "2603bf64-85ac-4073-a8e2-bcd06f279ccf",
+    "stderrTail": ""
+  }
+}
+
+restartable_no_state_leak=YES
+boot_under_30s_both=YES
