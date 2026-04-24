@@ -12,6 +12,8 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 CLI="$REPO_ROOT/bin/safer-peer-message"
 
 # run_cli [--env K=V ...] <flag> <arg> ... → echoes the CLI's exit code.
+# stdin is piped "test body\n" so --body-stdin callers always have a
+# non-empty body (empty-body is its own UsageError branch).
 run_cli() {
   local env_args=()
   while [ "${1:-}" = "--env" ]; do
@@ -19,7 +21,7 @@ run_cli() {
     shift 2
   done
   local rc=0
-  env -i HOME="$HOME" PATH="$PATH" "${env_args[@]}" "$CLI" "$@" >/dev/null 2>&1 </dev/null || rc=$?
+  env -i HOME="$HOME" PATH="$PATH" "${env_args[@]}" "$CLI" "$@" >/dev/null 2>&1 <<< "test body" || rc=$?
   echo "$rc"
 }
 
@@ -93,6 +95,28 @@ test_usage_worker_cannot_spoof_orchestrator() {
   assert_equal "$rc" "64" "worker cannot spoof orchestrator role"
 }
 
+test_usage_orchestrator_claim_without_token() {
+  # AO_CALLER_TYPE=orchestrator alone is no longer trusted. Without
+  # MOLTZAP_ORCHESTRATOR_TOKEN (boot-seeded by zapbot), reject.
+  local rc; rc=$(run_cli \
+    --env MOLTZAP_LOCAL_SENDER_ID=sender-o --env AO_SESSION=sess-o \
+    --env AO_CALLER_TYPE=orchestrator \
+    --to-role architect --kind review-request --body-stdin)
+  assert_equal "$rc" "64" "orchestrator claim without token is UsageError"
+}
+
+test_usage_empty_body_stdin() {
+  # Empty stdin body is UsageError (not accepted silently).
+  # Bypass run_cli's default "test body" stdin and pipe empty.
+  local rc=0
+  env -i HOME="$HOME" PATH="$PATH" \
+    MOLTZAP_LOCAL_SENDER_ID=sender-a AO_SESSION=sess-a \
+    AO_CALLER_TYPE=worker MOLTZAP_SESSION_ROLE=architect \
+    "$CLI" --to-role orchestrator --kind status-update --body-stdin \
+    >/dev/null 2>&1 </dev/null || rc=$?
+  assert_equal "$rc" "64" "empty body is UsageError"
+}
+
 test_usage_unreadable_body_file() {
   # Create a file with no read permission and confirm UsageError (64),
   # not the set-e generic exit 1 from cat.
@@ -126,6 +150,8 @@ run_test "architect→implementer is ChannelDisallowed"   test_channel_disallowe
 run_test "reviewer→reviewer is ChannelDisallowed"       test_channel_disallowed_reviewer_sideways
 run_test "worker without session role is UsageError"    test_usage_worker_without_session_role
 run_test "worker cannot spoof orchestrator role"        test_usage_worker_cannot_spoof_orchestrator
+run_test "orchestrator claim needs boot-seeded token"   test_usage_orchestrator_claim_without_token
+run_test "empty body is UsageError"                     test_usage_empty_body_stdin
 run_test "unreadable --body-file is UsageError"         test_usage_unreadable_body_file
 run_test "valid call without transport shim is TF"      test_transport_failed_without_shim
 

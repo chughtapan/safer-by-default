@@ -140,6 +140,15 @@ else
   BODY_TEXT=$(cat -- "$BODY_FILE")
 fi
 
+# Empty body is a UsageError: peer-message.ts `decodePeerMessage`
+# accepts any string for `body` so we must reject here rather than
+# letting a zero-length payload slip through (stamina round 3
+# bypass #3). Allow explicitly whitespace-only bodies only — a
+# literal empty string is treated as missing content.
+if [ -z "$BODY_TEXT" ]; then
+  die_usage "body must be non-empty (use --body-stdin with content or --body-file)"
+fi
+
 # Transport env is required. These come from the AO session's MoltZap
 # bootstrap. Missing env means the caller is not inside a MoltZap-capable
 # AO session.
@@ -157,9 +166,17 @@ fi
 # env var. Enforce that at the CLI boundary (Invariant 2).
 case "$AO_CALLER_TYPE" in
   orchestrator)
-    # Orchestrator sessions do not need MOLTZAP_SESSION_ROLE; if set,
-    # it must match "orchestrator" (no refinement exists for the
-    # orchestrator role).
+    # Orchestrator claim is privileged: require non-env-mediated proof
+    # (Invariant 2 / SPEC §5(a) — an env-var alone is insufficient;
+    # zapbot seeds MOLTZAP_ORCHESTRATOR_TOKEN at boot for the
+    # orchestrator session and not for workers). Absent the token,
+    # treat the claim as untrusted and reject.
+    if [ -z "${MOLTZAP_ORCHESTRATOR_TOKEN:-}" ]; then
+      echo "$PROG: AO_CALLER_TYPE=orchestrator requires MOLTZAP_ORCHESTRATOR_TOKEN (boot-seeded by zapbot); env-only claim rejected" >&2
+      exit "$EXIT_USAGE"
+    fi
+    # If MOLTZAP_SESSION_ROLE is set, it must match "orchestrator" (no
+    # refinement exists for the orchestrator role).
     if [ -n "${MOLTZAP_SESSION_ROLE:-}" ] && [ "${MOLTZAP_SESSION_ROLE}" != "orchestrator" ]; then
       echo "$PROG: MOLTZAP_SESSION_ROLE=${MOLTZAP_SESSION_ROLE} contradicts AO_CALLER_TYPE=orchestrator" >&2
       exit "$EXIT_USAGE"

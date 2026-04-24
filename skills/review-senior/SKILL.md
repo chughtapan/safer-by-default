@@ -243,12 +243,18 @@ For PR rows, the composed skills post their verdicts as inline comments
 or PR reviews; for design/plan/spec rows, the composed skills post
 threaded comments on the artifact URL.
 
-If the environment lacks a composed skill (gstack not installed, or the
-plugin is a different version), emit `DONE_WITH_CONCERNS` with the
-missing skill name and STOP further dispatch for that row. Do NOT
-attempt to "do the work" of the missing skill here — that collapses
-the separation between `review-senior` (dispatcher) and the gstack
-reviewers (reviewers).
+Partial-miss handling (SOME composed skills missing): emit
+`DONE_WITH_CONCERNS` with the missing skill name; continue dispatch
+to the skills that ARE available (do NOT stop on the first miss).
+Do NOT attempt to "do the work" of a missing skill here — that
+collapses the separation between dispatcher and reviewer.
+
+Full-miss handling (EVERY composed skill in the row is missing):
+fall through to the **Fallback reviewer workflow** above ("Fallback
+mode (no gstack available)"). This is the explicit consumer contract
+with `skills/orchestrate/SKILL.md` and `skills/stamina/SKILL.md`:
+they treat review-senior as the fallback reviewer; emitting `BLOCKED`
+here breaks them.
 
 ### Phase 3 — Aggregate the verdict
 
