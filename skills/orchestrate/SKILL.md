@@ -589,6 +589,7 @@ Record the returned job id on the parent epic (comment) so the next operator can
    Guardrails (the loop enforces these before touching anything):
    - Never delete `team-lead` from the roster. Never kill the team-lead pane.
    - Path (b) requires BOTH pane-alive AND sub-issue-terminal. Neither alone is enough.
+   - **Path (b) does NOT apply to teammates waiting on user input.** A teammate whose latest SendMessage to team-lead reported `NEEDS_CONTEXT` or `BLOCKED` AND who has not received a team-lead reply since that marker MUST NOT be killed, even if their sub-issue label is `safer:<modality>,review` and would otherwise look terminal. The "terminal" predicate excludes this case. Reasoning: interactive skills run hold-scope autonomous and escalate taste decisions or pending input up to the orchestrator; the orchestrator surfaces those to the user via `AskUserQuestion`. The teammate is alive and load-bearing while it waits for the reply; killing it loses the in-progress reasoning context. (Driven by the runtime contract in WS3 spec v2's Goal 7 / Invariant 4.)
    - Path (a) requires only pane-missing from `$ALIVE`. A teammate whose work is incomplete but whose process died is still removed — their pane is gone either way, and the work needs to be re-dispatched.
    - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
 
@@ -749,6 +750,7 @@ Stop iterating the moment any of these fire: `budget` reaches 0, the Agent tool 
 
 - Kill the team-lead pane, or delete `team-lead` from the roster.
 - Kill or delete a teammate whose `isActive == true`, or whose sub-issue is not terminal. Both conditions must hold, or the loop leaves them.
+- Kill or delete a teammate whose latest team-lead message was `NEEDS_CONTEXT` or `BLOCKED` and is still awaiting a team-lead reply. Waiting-on-orchestrator state is alive state, not terminal state. The pane holds load-bearing in-progress reasoning context that gets lost on kill.
 - Merge a PR with failing tests, failing CI, or unresolved review comments.
 - Gate a sub-issue whose acceptance criteria require judgment the loop cannot encode (design review, spec approval, any criterion the modality's `review` step delegates to `/safer:review-senior`).
 - Write code, edit files, or run `/safer:<modality>` skills in-session. Dispatch via teammate only.
