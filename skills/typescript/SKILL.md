@@ -151,15 +151,29 @@ Then defer to user sovereignty if they insist. Name exactly what is being skippe
 
 The plugin is the lint floor. If code trips any of its rules, the code is below the floor. Fix the code; do not suppress the rule without a written reason.
 
-Each rule maps back to a principle:
+The rule table below is generated from ACG's source by `bin/safer-acg-sync`, joined against a hand-curated rationale-map at `skills/typescript/acg-rationale.json`. Updated when `skills/setup/SKILL.md`'s install line changes; PRINCIPLES.md heading rename/renumber is a separate mechanical anchor-repair (no rule rows, rationales, presets, or severities change).
 
-- **`async-keyword`, `promise-type`, `then-chain`** follow from **principle 3** (typed errors). `Promise<T>` erases the error channel; `async`/`await` is the sugar that hides it.
-- **`bare-catch`** follows from **principle 3 and principle 4** (typed errors + exhaustiveness). A silent catch hides both the error and the branch.
-- **`record-cast`** follows from **principle 2** (validate at boundaries). The cast papers over a missing schema at the edge.
-- **`no-manual-enum-cast`** follows from **principle 1 and principle 2** (types beat tests + validation). Hand-written unions drift; generated or schema-derived ones do not.
-- **`no-raw-sql`** follows from **principle 1 and principle 2** (types beat tests + boundary validation). Raw SQL defeats the compiler; a typed builder makes the schema load-bearing.
-- **`no-vitest-mocks`** follows from integration-test integrity (not one of the four, but implied by principle 2: the mock is a fiction at the boundary).
-- **`no-hardcoded-secrets`** follows from **principle 2** (validate at the environment boundary). A hardcoded secret bypasses the schema entirely.
+<!-- BEGIN: acg-mapping -->
+**Resolved version:** `eslint-plugin-agent-code-guard@^0.0.2` (from `skills/setup/SKILL.md`) → ACG `v0.0.2` ships **13 rules**.
+
+| Rule | Preset | Severity | Principle anchor(s) | Rationale | Before/After |
+|---|---|---|---|---|---|
+| `no-vitest-mocks` | `integrationTests` | error | **P2** | An integration test that mocks the boundary asserts your code works against your mock, not the real thing. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-vitest-mocks.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-vitest-mocks.md) |
+| `async-keyword` | `recommended` | error | **P3** | `async`/`await` is the sugar that hides the erased error channel of `Promise<T>`. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/async-keyword.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/async-keyword.md) |
+| `bare-catch` | `recommended` | error | **P3**, **P4** | A silent catch hides both the error AND the branch; exhaustiveness cannot apply. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/bare-catch.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/bare-catch.md) |
+| `no-coverage-threshold-gate` | `recommended` | warn | **P1** | Coverage % is a diagnostic, never a CI gate (Inozemtseva & Holmes ICSE 2014). Acts on the wrong signal. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-coverage-threshold-gate.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-coverage-threshold-gate.md) |
+| `no-hardcoded-assertion-literals` | `recommended` | warn | **P1** | Assertions hardcoding a literal (e.g., `expect(...).toBe(42)` where 42 is the implementation's output) compress the same information as a property; the property has higher coverage. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-hardcoded-assertion-literals.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-hardcoded-assertion-literals.md) |
+| `no-hardcoded-secrets` | `recommended` | error | **P2** | A hardcoded secret bypasses the env-boundary schema; secrets must be decoded at boot, not embedded in source. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-hardcoded-secrets.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-hardcoded-secrets.md) |
+| `no-manual-enum-cast` | `recommended` | error | **P1**, **P2** | Hand-written unions drift from their source; generated or schema-derived enums do not. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-manual-enum-cast.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-manual-enum-cast.md) |
+| `no-raw-sql` | `recommended` | error | **P1**, **P2** | Raw SQL defeats the compiler; a typed builder makes the schema load-bearing at compile time. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-raw-sql.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-raw-sql.md) |
+| `no-raw-throw-new-error` | `recommended` | error | **P3** | `throw new Error("bad")` has no type, no handling contract, no receipt for the caller; tagged errors do. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-raw-throw-new-error.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-raw-throw-new-error.md) |
+| `no-test-skip-only` | `recommended` | error | **P1** | Test-hygiene corollary of principle 1: a `.skip` or `.only` shipped to main is a test that does not test. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/no-test-skip-only.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/no-test-skip-only.md) |
+| `promise-type` | `recommended` | error | **P3** | `Promise<T>` erases the error channel; tagged-error or `Effect<T, E, R>` keep it visible. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/promise-type.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/promise-type.md) |
+| `record-cast` | `recommended` | error | **P2** | `as Record<string, unknown>` papers over a missing schema at the boundary; decode instead. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/record-cast.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/record-cast.md) |
+| `then-chain` | `recommended` | error | **P3** | `.then()` chains hide the error channel and reorder control flow; same erasure as `Promise<T>`. | `node_modules/eslint-plugin-agent-code-guard/docs/rules/then-chain.md` / [doc](https://github.com/chughtapan/agent-code-guard/blob/v0.0.2/docs/rules/then-chain.md) |
+
+*Maintenance:* hand-maintained rationale-map in `skills/typescript/acg-rationale.json`. Updated by `bin/safer-acg-sync` when `skills/setup/SKILL.md`'s ACG install line changes. The local `node_modules/...` path is canonical; the GitHub URL is convenience-only.
+<!-- END: acg-mapping -->
 
 Each rule ships a `Before` / `After` example at `node_modules/eslint-plugin-agent-code-guard/docs/rules/<rule-name>.md`. Read the relevant doc before attempting a fix.
 

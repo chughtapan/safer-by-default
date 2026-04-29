@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# safer-acg-sync — regenerate the ACG rule table in skills/typescript/SKILL.md.
+#
+# Reads:
+#   skills/setup/SKILL.md — for the install line `eslint-plugin-agent-code-guard@<spec>`.
+#   The resolved ACG source — either local node_modules or GitHub at the matching tag.
+#   skills/typescript/acg-rationale.json — hand-curated rule rationale + principle anchors.
+#
+# Writes:
+#   skills/typescript/SKILL.md — between `<!-- BEGIN: acg-mapping -->` and
+#   `<!-- END: acg-mapping -->` markers, the rendered table.
+#
+# Fails (exit 1) if ACG ships a rule that the rationale-map doesn't cover.
+# Warns (stderr) if rationale-map entries exist with no matching ACG rule.
+#
+# Usage: ./bin/safer-acg-sync   (run from the safer-by-default repo root)
+#
+# Trigger: when skills/setup/SKILL.md's install line for eslint-plugin-agent-code-guard
+# changes. PRINCIPLES.md heading rename/renumber is a separate mechanical anchor-repair.
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SETUP_SKILL="$REPO_ROOT/skills/setup/SKILL.md"
+TS_SKILL="$REPO_ROOT/skills/typescript/SKILL.md"
+RATIONALE="$REPO_ROOT/skills/typescript/acg-rationale.json"
+
+# ---- Step 1: find the install spec ----
+INSTALL_LINE=$(grep -E 'eslint-plugin-agent-code-guard@' "$SETUP_SKILL" | head -1 || true)
+if [ -z "$INSTALL_LINE" ]; then
+  echo "ERROR: no eslint-plugin-agent-code-guard@<spec> line found in $SETUP_SKILL" >&2
+  exit 2
+fi
+SPEC=$(echo "$INSTALL_LINE" | grep -oE 'eslint-plugin-agent-code-guard@[^ "'"'"']+' | sed 's/eslint-plugin-agent-code-guard@//' | head -1)
+# Resolve ^0.0.2 → 0.0.2 (lowest-bound resolution per WS4 v6 spec).
+TAG="v$(echo "$SPEC" | sed 's/^[\^~>=<]//;s/[<>=].*//')"
+
+echo "install-line spec: $SPEC"
+echo "resolved tag:      $TAG"
+
+# ---- Step 2: fetch the ACG source for that tag ----
+ACG_INDEX="$(mktemp)"
+trap 'rm -f "$ACG_INDEX"' EXIT
+
+if [ -f "$REPO_ROOT/node_modules/eslint-plugin-agent-code-guard/dist/index.js" ]; then
+  cp "$REPO_ROOT/node_modules/eslint-plugin-agent-code-guard/dist/index.js" "$ACG_INDEX"
+  echo "source:            local node_modules"
+else
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "ERROR: gh CLI required to fetch ACG source from GitHub" >&2
+    exit 2
+  fi
+  gh api "repos/chughtapan/agent-code-guard/contents/src/index.ts?ref=$TAG" \
+    --jq '.content' 2>/dev/null | base64 -d > "$ACG_INDEX" 2>/dev/null
+  if [ ! -s "$ACG_INDEX" ]; then
+    echo "ERROR: failed to fetch chughtapan/agent-code-guard@$TAG src/index.ts" >&2
+    exit 2
+  fi
+  echo "source:            chughtapan/agent-code-guard@$TAG (GitHub)"
+fi
+
+# ---- Step 3: enumerate rules + their preset assignments + severities ----
+# Rules in ACG's index appear as `"agent-code-guard/<rule>": "error"` or `"warn"` lines
+# inside a `configs.<preset>.rules: { ... }` block. State-machine awk extracts them
+# along with which preset block they're in.
+RULES_TMP="$(mktemp)"
+trap 'rm -f "$ACG_INDEX" "$RULES_TMP"' EXIT
+
+awk '
+  /recommended: *\{/ { preset = "recommended" }
+  /integrationTests: *\{/ { preset = "integrationTests" }
+  /rules: *\{/ { in_rules = 1; next }
+  in_rules && /^[[:space:]]*\},/ { in_rules = 0; next }
+  in_rules && match($0, /"agent-code-guard\/[a-z-]+":[[:space:]]*"(error|warn)"/) {
+    chunk = substr($0, RSTART, RLENGTH)
+    # extract rule name
+    n = index(chunk, "/")
+    rest = substr(chunk, n + 1)
+    e = index(rest, "\"")
+    rule = substr(rest, 1, e - 1)
+    # extract severity (last quoted token)
+    sev = (chunk ~ /"warn"/) ? "warn" : "error"
+    printf "%s\t%s\t%s\n", preset, rule, sev
+  }
+' "$ACG_INDEX" >> "$RULES_TMP"
+
+RULE_COUNT=$(wc -l < "$RULES_TMP" | tr -d ' ')
+echo "rule count:        $RULE_COUNT"
+
+if [ "$RULE_COUNT" -eq 0 ]; then
+  echo "ERROR: failed to parse any rules from ACG source" >&2
+  exit 2
+fi
+
+# ---- Step 4: load rationale-map + check coverage ----
+if [ ! -f "$RATIONALE" ]; then
+  echo "ERROR: $RATIONALE missing — create it with rule rationale entries" >&2
+  exit 2
+fi
+
+UNMAPPED=()
+while IFS=$'\t' read -r preset rule severity; do
+  if ! jq -e --arg r "$rule" '.[$r]' "$RATIONALE" >/dev/null 2>&1; then
+    UNMAPPED+=("$rule")
+  fi
+done < "$RULES_TMP"
+
+if [ "${#UNMAPPED[@]}" -gt 0 ]; then
+  echo "ERROR: rules in ACG@$TAG with no entry in $RATIONALE:" >&2
+  for r in "${UNMAPPED[@]}"; do echo "  - $r" >&2; done
+  echo "Add rationale entries for these rules and re-run." >&2
+  exit 1
+fi
+
+# Warn on orphan rationale entries (in map, not in ACG).
+ACG_RULES_SORTED=$(cut -f2 "$RULES_TMP" | sort -u)
+MAP_RULES_SORTED=$(jq -r 'keys[]' "$RATIONALE" | sort -u)
+ORPHANS=$(comm -23 <(echo "$MAP_RULES_SORTED") <(echo "$ACG_RULES_SORTED"))
+if [ -n "$ORPHANS" ]; then
+  echo "WARNING: rationale-map entries with no matching ACG@$TAG rule:" >&2
+  echo "$ORPHANS" | sed 's/^/  - /' >&2
+  echo "(kept in map for historical reference; consider removing if not needed)" >&2
+fi
+
+# ---- Step 5: render the table ----
+TABLE="$(mktemp)"
+trap 'rm -f "$ACG_INDEX" "$RULES_TMP" "$TABLE"' EXIT
+
+cat > "$TABLE" <<EOF
+**Resolved version:** \`eslint-plugin-agent-code-guard@$SPEC\` (from \`skills/setup/SKILL.md\`) → ACG \`$TAG\` ships **$RULE_COUNT rules**.
+
+| Rule | Preset | Severity | Principle anchor(s) | Rationale | Before/After |
+|---|---|---|---|---|---|
+EOF
+
+while IFS=$'\t' read -r preset rule severity; do
+  anchors=$(jq -r --arg r "$rule" '.[$r].principle_anchors | map("**P" + . + "**") | join(", ")' "$RATIONALE")
+  rationale=$(jq -r --arg r "$rule" '.[$r].rationale' "$RATIONALE")
+  local_path="\`node_modules/eslint-plugin-agent-code-guard/docs/rules/$rule.md\`"
+  github_url="https://github.com/chughtapan/agent-code-guard/blob/$TAG/docs/rules/$rule.md"
+  echo "| \`$rule\` | \`$preset\` | $severity | $anchors | $rationale | $local_path / [doc]($github_url) |" >> "$TABLE"
+done < <(sort "$RULES_TMP")
+
+cat >> "$TABLE" <<EOF
+
+*Maintenance:* hand-maintained rationale-map in \`skills/typescript/acg-rationale.json\`. Updated by \`bin/safer-acg-sync\` when \`skills/setup/SKILL.md\`'s ACG install line changes. The local \`node_modules/...\` path is canonical; the GitHub URL is convenience-only.
+EOF
+
+# ---- Step 6: splice into skills/typescript/SKILL.md between markers ----
+if ! grep -q '<!-- BEGIN: acg-mapping -->' "$TS_SKILL"; then
+  echo "ERROR: $TS_SKILL missing <!-- BEGIN: acg-mapping --> marker" >&2
+  exit 2
+fi
+
+awk -v table_file="$TABLE" '
+  /<!-- BEGIN: acg-mapping -->/ {
+    print
+    while ((getline line < table_file) > 0) print line
+    close(table_file)
+    skip = 1
+    next
+  }
+  /<!-- END: acg-mapping -->/ {
+    skip = 0
+    print
+    next
+  }
+  !skip { print }
+' "$TS_SKILL" > "$TS_SKILL.tmp" && mv "$TS_SKILL.tmp" "$TS_SKILL"
+
+echo "wrote table:       $TS_SKILL between markers"
+echo "done."
