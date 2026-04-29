@@ -476,3 +476,18 @@ Post on the target; leave the consolidated comment in place; do not delete the p
 See `PRINCIPLES.md > Voice`. Stamina's output is terse and structural. The consolidated comment is a routing table, not an essay. Per-reviewer findings live with the reviewer; stamina reports who ran, what they said, and the consensus outcome.
 
 Stamina's voice is the voice of the dispatcher, not the critic. If your output reads like a review, you are in the wrong modality. The next agent reading the consolidated comment is the orchestrator (`/safer:orchestrate` Phase 5c) or the user. Write so each can route on the verdict without reconstructing your reasoning.
+
+---
+
+## Composition with gstack
+
+This skill is a fan-out review adapter. It dispatches multiple review skills and gates on consensus.
+
+For plan-class artifacts (`--plan` mode):
+- `/safer:dogfood` — cold-start read of the spec or plan.
+- `/safer:review-senior` — acceptance-vs-residuals review.
+- `/codex review` — cross-model adversarial review.
+
+For PRs (`--pr` mode): superset of the plan set, plus `/review`, `/simplify`, `/security-review`. `/autoplan` is the canonical zapbot-remote-friendly fan-out target when the artifact warrants it.
+
+All composed targets run hold-scope autonomous; user-facing prompts route up to `/safer:orchestrate`. The N count and consensus rule live in `PRINCIPLES.md` → Durability.

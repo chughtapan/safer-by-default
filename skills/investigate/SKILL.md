@@ -411,3 +411,11 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md` to Voice. Write for the cold-start reader. The next agent applying the fix has none of your context. Every `file:line` pointer, every isolation row, every bit of evidence is what lets them pick up the work without asking you.
 
 Do not narrate the investigation in prose. The writeup is structured sections, not a story. The next agent is a junior.
+
+---
+
+## Composition with gstack
+
+`/safer:investigate` and gstack's `/investigate` are different skills (name collision documented in `PRINCIPLES.md` → Composing with gstack). Always qualify with the plugin prefix in safer docs; bare `/investigate` is disallowed.
+
+This skill does not compose with gstack workflows directly. After a reproduction artifact lands and the implementation modality (`/safer:implement-*`) takes over, that modality may compose with gstack guards (`/freeze`, `/careful`, `/guard`).

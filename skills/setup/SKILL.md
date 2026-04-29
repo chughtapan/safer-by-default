@@ -602,3 +602,20 @@ If any box is unchecked, the status is not `DONE`.
 See `PRINCIPLES.md` voice section. Setup is high-traffic and interactive. Show the user exactly what you are about to do before doing it. Use `AskUserQuestion` for every decision that is not inferable from disk. Numbers over adjectives: "47 errors before, 112 after", not "some new errors." End with the receipt block and the status marker.
 
 The next agent touching this repo reads `eslint.config.js` and `tsconfig.json`, not this session. Make those two files speak clearly.
+
+---
+
+## Composition with gstack
+
+This skill is the bootstrap-stage audit and supports two modes via `--mode {green-field|brown-field}`:
+
+- **green-field mode** (no source past scaffolding): writes config + doctrine + scaffolds tooling.
+- **brown-field mode** (existing repo): produces a phased migration plan and ratchets to `/safer:spec → /safer:architect → /safer:implement-*` for any code edits. The ratchet is a control-flow note — those modalities are downstream destinations, not composition targets. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
+
+In either mode the skill invokes these gstack targets via orchestrator-mediated gates (the skill body contains no user-facing prompts):
+
+- `/setup-deploy` — deploy-target detection and configuration. Non-interactive (with credentials). Eligible for zapbot-remote.
+- `/setup-gbrain` — memory / MCP setup. Non-interactive. Eligible for zapbot-remote.
+- `/setup-browser-cookies` — cookie import for authenticated QA flows. Non-interactive. Eligible for zapbot-remote.
+- `/codex --mode consult` — per-recommendation second opinions during the audit. Non-interactive. Eligible for zapbot-remote.
+- `/autoplan` — recommendation-set confirmation when the audit produces a multi-step plan. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.

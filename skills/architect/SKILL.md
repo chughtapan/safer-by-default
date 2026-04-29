@@ -398,3 +398,16 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md → Voice`. Architect's output is terse and structural. The design doc is a contract, not an essay. Your reply to the caller confirms publication; the design doc is the artifact.
 
 The next agent reading this design doc is an implementer with no session context. Write so they can execute their sub-task without asking you questions. That is the Cold Start Test applied to architecture.
+
+---
+
+## Composition with gstack
+
+This skill may invoke or accept input from these gstack targets:
+
+- `/plan-eng-review` — engineering review pass on a draft architect plan. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
+- `/plan-design-review` — designer's-eye review of UI-touching plans. Two-gate. Eligible for zapbot-remote.
+- `/plan-devex-review` — DX review of developer-facing plans (APIs, CLIs). Two-gate. Eligible for zapbot-remote.
+- `/frontend-design`, `/design-consultation`, `/design-shotgun` — module-design absorption (Tier 2 deferred). Two-gate. Eligible for zapbot-remote.
+
+These are review and input skills that run hold-scope autonomous. User-facing prompts inside the gstack skill body are forbidden under safer's runtime contract; taste decisions escalate to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`.
