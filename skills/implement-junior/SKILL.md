@@ -220,6 +220,8 @@ Expected output: `tier: junior`. If the output is `senior` or `staff`, stop. Do 
 
 ### Phase 7 — Open the PR
 
+Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 ```bash
 git add <module files>
 git commit -m "impl: <one-line summary>"

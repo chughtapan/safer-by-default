@@ -288,6 +288,8 @@ If `/codex` is unavailable, log "codex diff review: unavailable — skipped" on 
 
 ### Phase 9 — Open the PR
 
+Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 ```bash
 git add <new files + package.json + lockfile>
 git commit -m "impl: <one-line spec summary>"

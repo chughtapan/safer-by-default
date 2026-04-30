@@ -258,6 +258,8 @@ here breaks them.
 
 ### Phase 3 — Aggregate the verdict
 
+Code references in the verdict body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 Combine per-skill verdicts into one artifact verdict. Rules:
 
 - Any `REQUEST-CHANGES` among composed skills → artifact verdict

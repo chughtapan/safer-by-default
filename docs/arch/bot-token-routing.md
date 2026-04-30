@@ -30,7 +30,9 @@ scripts in this repo are flat files, matching the convention.
 #            ~/.zapbot/config.json; either match counts.
 detect_zapbot
 
-# resolve_bridge_url — same ladder as zapbot-publish.sh:11-20.
+# resolve_bridge_url — same ladder as zapbot's bin/zapbot-publish.sh:11-20
+#                      (cross-repo reference; that file lives in the zapbot
+#                      codebase, not in this repo).
 #
 # Inputs: none. Reads cwd/agent-orchestrator.yaml, $ZAPBOT_BRIDGE_URL.
 # Outputs: echoes the resolved URL on stdout. Never empty on a 0 exit.
@@ -153,8 +155,10 @@ Interface stubs live on branch `arch/token-broker` in the zapbot repo:
   - Discriminated union: `InstallationTokenError`.
 
 Reuse, per spec invariant 2: `deps.mintToken` is `getInstallationToken` from
-`src/github/client.ts:200-218` — the existing `_authInstance` singleton. No
-new mint path. The route never touches `createAppAuth` directly.
+zapbot's `src/github/client.ts:200-218` (cross-repo reference; that file
+lives in the zapbot codebase, not in this repo) — the existing
+`_authInstance` singleton. No new mint path. The route never touches
+`createAppAuth` directly.
 
 ## Data flow
 
@@ -180,7 +184,8 @@ safer-publish
   │                            ▼
   │                          getInstallationToken()
   │                            (existing _authInstance singleton,
-  │                             src/github/client.ts:200-218)
+  │                             in zapbot's src/github/client.ts:200-218 —
+  │                             cross-repo, lives in the zapbot codebase)
   │                            ▼
   │                          @octokit/auth-app mints / returns cached
   │                            ▼
@@ -436,11 +441,13 @@ change to `handle_fallback_flags`).
 HIGH — every interface is derivable from the spec's acceptance criteria;
 every data-flow arrow corresponds to a function call across two named
 modules; every failure branch is enumerated with its exit code. The zapbot
-mint path (`_authInstance` singleton) is read-verified at
-`src/github/client.ts:200-218`. The bridge fetch-handler pattern is
-read-verified in `test/bridge-endpoints.test.ts` (inline pathname switch;
-Bun.serve). The bridge-URL ladder is read-verified in
-`bin/zapbot-publish.sh:11-20`. No unresolved spec ambiguity.
+mint path (`_authInstance` singleton) is read-verified in zapbot's
+`src/github/client.ts:200-218` (cross-repo; that path lives in the zapbot
+codebase, not in this repo). The bridge fetch-handler pattern is
+read-verified in zapbot's `test/bridge-endpoints.test.ts` (also cross-repo;
+inline pathname switch; Bun.serve). The bridge-URL ladder is read-verified
+in zapbot's `bin/zapbot-publish.sh:11-20` (cross-repo). No unresolved spec
+ambiguity.
 
 ---
 
