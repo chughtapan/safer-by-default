@@ -607,10 +607,12 @@ The next agent touching this repo reads `eslint.config.js` and `tsconfig.json`, 
 
 ## Composition with gstack
 
-This skill is the bootstrap-stage audit and supports two modes via `--mode {green-field|brown-field}`:
+This skill is the bootstrap-stage audit. It auto-detects whether the target repo is green-field (no source past scaffolding) or brown-field (existing source) via the probe in Step 0 and adapts:
 
-- **green-field mode** (no source past scaffolding): writes config + doctrine + scaffolds tooling.
-- **brown-field mode** (existing repo): produces a phased migration plan and ratchets to `/safer:spec → /safer:architect → /safer:implement-*` for any code edits. The ratchet is a control-flow note — those modalities are downstream destinations, not composition targets. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
+- **Green-field path:** writes config + doctrine + scaffolds tooling.
+- **Brown-field path:** produces a phased migration plan and ratchets to `/safer:spec → /safer:architect → /safer:implement-*` for any code edits. The ratchet is a control-flow note — those modalities are downstream destinations, not composition targets. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
+
+There is no `--mode` flag; the probe decides. If the probe is ambiguous, the skill stops and asks via `AskUserQuestion`.
 
 ### Invokes
 
