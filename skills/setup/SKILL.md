@@ -619,3 +619,16 @@ In either mode the skill invokes these gstack targets via orchestrator-mediated 
 - `/setup-browser-cookies` — cookie import for authenticated QA flows. Non-interactive. Eligible for zapbot-remote.
 - `/codex --mode consult` — per-recommendation second opinions during the audit. Non-interactive. Eligible for zapbot-remote.
 - `/autoplan` — recommendation-set confirmation when the audit produces a multi-step plan. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
+
+### Per-stage recommendation table
+
+Stage classification (probe-driven, not voluntary): **greenfield** = no source past scaffolding; **early** = has source, no tests, no CI; **mid** = has tests + CI, no doctrine doc, partial type/lint floor; **mature** = doctrine + tests + CI + type/lint floor present.
+
+| Stage | Doctrine | Modality skills | Test infra | Deploy | Memory | Lint/type floor |
+|---|---|---|---|---|---|---|
+| Greenfield | install `PRINCIPLES.md`; install `ETHOS.md` if user opts in | install all safer modalities; gstack install optional per user | scaffold via `/safer:setup` (TS path) or language-equivalent; ensure CI runs the suite (Principle 1.4) | `/setup-deploy` if a deploy target is named | `/setup-gbrain` if user opts in | `/safer:setup` flips strict `tsconfig` + installs ACG (TS); language-equivalent for non-TS |
+| Early | install `PRINCIPLES.md` | install safer modalities; defer gstack non-essentials | add test runner; ensure CI executes it (Principle 1.4) | defer until production target named | defer until cross-session need | enable strict mode + ACG; baseline-freeze pre-existing violations |
+| Mid | confirm `PRINCIPLES.md` present and current | gap-fill missing modalities; ensure orchestrate registered | add property-based tests for pure functions (Principle 1.1); mutation gate on critical glob (Principle 1.3) | wire if not wired | `/setup-gbrain` if multi-session work is recurring | tighten ACG ruleset; remove baseline overrides one rule at a time per Principle 8 (Ratchet) |
+| Mature | review for drift; rotate to current `PRINCIPLES.md` | review composition-map cross-refs in skill bodies | add `testcontainers` **if a real DB / cache / queue / external-service dependency exists** (Principle 1.5); a pure-library repo at mature stage does not require `testcontainers` | review deploy hooks | review trust policy | continue removing baseline overrides one rule at a time per Principle 8 (Ratchet); `/health` reports a CI quality score; **gate CI on the score only if an explicit per-repo decision authorizes it per Principle 6 (Budget Gate)**. `/health` is gstack-conditioned; substitute the repo's quality dashboard if gstack is not installed. |
+
+This table is the v0 deliverable. New stages or new dimensions are spec-revision triggers, not PR drift.

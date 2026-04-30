@@ -390,6 +390,8 @@ The next agent reading this PR is `review-senior`. Write so they can judge the c
 
 ## Composition with gstack
 
+**Doctrine precedence inside this modality:** *safer wins on scope; gstack ETHOS wins on quality-within-scope*. The Junior Dev Rule (Principle 5) and the Budget Gate (Principle 6) are non-negotiable scope constraints; ETHOS construction defaults shape what to do *within* that scope (line-level craft, naming, test shapes).
+
 This skill may invoke these gstack guards while editing:
 
 - `/freeze` — restrict edits to a directory for the session. Non-interactive. Eligible for zapbot-remote.
