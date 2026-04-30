@@ -386,9 +386,11 @@ Before you post a status marker or close your turn, **SendMessage to `team-lead`
 SendMessage({
   to: "team-lead",
   summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>."
+  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>."
 })
 ```
+
+The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
