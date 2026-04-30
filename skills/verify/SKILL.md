@@ -227,6 +227,8 @@ The verdict is mechanical. No judgment call beyond flakiness detection. If the m
 
 ### Phase 6 — Publish the verdict
 
+Code references in the verdict body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 Write the verdict body:
 
 ```bash
@@ -410,7 +412,7 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` to Voice. The verdict is terse, mechanical, and evidence-backed. Not "looks good to me" but "SHIP: lint 0, typecheck 0, test 142/142; criteria 1-3 met with evidence at `src/foo.ts:18`, `src/foo.test.ts:42`."
+See `PRINCIPLES.md` to Voice. The verdict is terse, mechanical, and evidence-backed. Not "looks good to me" but "SHIP: lint 0, typecheck 0, test 142/142; criteria 1-3 met with evidence at `<placeholder>/foo.ts:18`, `<placeholder>/foo.test.ts:42`." *Schematic example; `<placeholder>/...` paths are illustrative placeholders, not real files in this repo (schematic-placeholder exception of the code-citation doctrine; see `PRINCIPLES.md#code-references-are-pinned`).*
 
 Quality judgments are the downstream modality's budget, not yours. You report facts. The next agent reading your verdict is a junior; they should be able to act on it (merge, re-implement, investigate) without asking you follow-up questions.
 

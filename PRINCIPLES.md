@@ -277,6 +277,25 @@ GitHub is the canonical transport because this plugin targets it by default. On 
 
 Anti-patterns: *"I wrote the decision doc in `~/scratch/`" — not canonical; publish.* *"The plan is in my conversation history" — not accessible to the next agent; publish.* *"I'll publish once polished" — unpublished polish is invisible polish.*
 
+## Code references are pinned
+
+Citations that name a line carry a commit anchor. The canonical short-form is `path/foo.ts:N[-M]@<sha7>`, where `<sha7>` is the 7-character git short-sha at the time the citation is written. Ranges use `:N-M`; the rest is unchanged.
+
+**File-only carve-out.** Citations without a line (`` `skills/verify/SKILL.md` ``) stay as-is. File moves are rare and grep-recoverable; only line-bearing citations decay.
+
+**Anti-pattern.** A bare `path:N` with no anchor. Lines shift on every PR; this repo ships several PRs per hour, so a bare line citation is stale before the next reader arrives. Reviewers reject new bare line citations.
+
+**Decay rationale.** Multiple PRs/hour render line numbers stale before the next reader arrives. The sha pins the citation to a tree the reader can resolve under `git show <sha>:<path>`.
+
+**Exceptions** (the canonical-form rule does not govern these):
+
+- **(e) Schematic placeholder paths.** A teaching example using an obviously-non-existent path (e.g., `<placeholder>/foo.ts:42`) is exempt; pinning a sha to a non-existent file produces a citation that *looks* canonical but does not resolve, strictly worse than the bare form. The canonical visual signal is the `<placeholder>` token; reviewers reject any teaching example that uses a real-looking path with a fake line.
+- **(f) Re-reference shorthand.** A basename-only re-citation (`bridge-app.ts:491`) is allowed only when the full canonical form has appeared earlier in the same artifact; the re-reference inherits that earlier anchor. A basename-only citation with no upthread canonical anchor is the anti-pattern.
+- **(g) Commit messages.** Citations inside git commit messages are out of scope. A commit message cannot pin to its own pending sha, and pinning to the parent sha anchors to pre-change code; either rule generates non-resolving citations on the very commit being described.
+- **(h) Cross-repo / out-of-tree paths.** Citations referencing files outside this repo's working tree are exempt from the canonical-form rule. Disclose the cross-repo origin in surrounding prose instead (e.g., "in zapbot's `bin/zapbot-publish.sh:11-20`") so the reader knows the path is not in this repo.
+
+**(i) Worked example.** The heading `## The debt multiplier` lives at `PRINCIPLES.md:27@e1a8578`. Resolving: `git show e1a8578:PRINCIPLES.md | sed -n '27p'` returns the exact line the citation pinned. The same line at `PRINCIPLES.md:27@<another-sha>` may differ because the file has been edited; that is the point.
+
 ## Confidence is a first-class output
 
 Every recommendation carries a confidence level (LOW / MED / HIGH) and the evidence behind it. "I think so" is not an acceptable output.

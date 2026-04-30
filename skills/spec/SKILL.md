@@ -159,6 +159,8 @@ Ask `AskUserQuestion` for at most 3 questions in one call. Prefer A/B/C options 
 
 ### Phase 4 — Draft the spec
 
+Code references in the spec body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 Write the spec document using exactly the 7-section structure above. Formatting rules:
 
 - Intent: one paragraph. Do not rewrite the user's framing; preserve their words where possible.
