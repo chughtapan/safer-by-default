@@ -4,9 +4,9 @@ version: 0.1.0
 description: |
   Fan-out review adapter. Routes a high-blast-radius artifact (plan or PR)
   through multiple heterogeneous review passes and gates on consensus. Does
-  not review; dispatches existing review skills (/simplify, /review,
-  /review-senior, /safer:dogfood, /codex, /security-review for PRs;
-  /safer:dogfood + /safer:review-senior + /codex for plans) and aggregates
+  not review; dispatches existing review skills (/review-senior,
+  /safer:dogfood, /codex, /security-review for PRs; /safer:dogfood +
+  /safer:review-senior + /codex for plans) and aggregates
   their verdicts. N is set by the blast-radius x reversibility table in
   PRINCIPLES.md > Durability. Two invocation modes: --plan <sub-issue-URL>
   and --pr <pr-URL>. Use when the caller (typically /safer:orchestrate Phase
@@ -166,7 +166,7 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 
 1. One consolidated comment per invocation. Not one per reviewer — dispatched reviewers publish their own native artifacts.
 2. N is bounded: floor N=1, ceiling N=4 table-default, N>4 requires explicit user approval (captured in `--budget` or `safer-escalate`).
-3. Review family (PR mode): `/simplify`, `/review`, `/safer:review-senior`, `/safer:dogfood`, `/codex`, `/security-review`. Fixed list; no additions in v1.
+3. Review family (PR mode): `/safer:review-senior`, `/safer:dogfood`, `/codex`, `/security-review`. Fixed list; no additions in v1. `/simplify` and `/review` are NOT in the stamina dispatch set — they run as mandatory pre-PR hygiene gates inside `/safer:implement-*` (see `skills/implement-junior/SKILL.md` Phases 6a-6b, `skills/implement-senior/SKILL.md` Phases 6a-6b, `skills/implement-staff/SKILL.md` Phases 8a + 8c) and do not count toward stamina N. Only independent reviewers count.
 4. Review family (plan mode): `/safer:dogfood`, `/safer:review-senior` (re-targeted at the plan body), `/codex` (cross-model). Fixed list; no additions in v1.
 5. Graceful degradation: if gstack is absent, the PR dispatch set reduces to `{/safer:review-senior, /safer:dogfood}` plus `/codex` if configured; the ceiling caps at N=3. Never hard-fail on a missing optional dep; always name what is missing in the consolidated comment.
 6. Persona diversity: every pass differs by *role* (acceptance-vs-diff, structural-diff, adversarial, security, simplification, cold-start-read) or by *model* (`/codex` is the cross-model channel). Two passes with the same role on the same model do not count as two passes; reject at dispatch time.

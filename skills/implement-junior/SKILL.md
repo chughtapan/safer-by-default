@@ -218,6 +218,30 @@ safer-diff-scope --head HEAD
 
 Expected output: `tier: junior`. If the output is `senior` or `staff`, stop. Do not open the PR. Your scope has already broken; escalate.
 
+### Phase 6a — Pre-PR simplify pass (mandatory)
+
+Before opening the PR, run `/simplify` on the diff:
+
+```
+/simplify
+```
+
+Apply all findings. An empty result (no findings) is a valid outcome — note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored — skipped" and the reviewer decides whether to block.
+
+**Does NOT count toward stamina N.** This is a pre-PR hygiene gate, not an independent stamina reviewer.
+
+### Phase 6b — Pre-PR review pass (mandatory)
+
+Before opening the PR, run `/review` on the diff:
+
+```
+/review
+```
+
+Apply all findings; cite skips in the PR body under "Review skips" with rationale. An empty result is a valid outcome — note "review: no findings". If `/review` errors, note "review: errored — skipped" and proceed.
+
+**Does NOT count toward stamina N.** Same reason as Phase 6a — pre-PR hygiene.
+
 ### Phase 7 — Open the PR
 
 Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.

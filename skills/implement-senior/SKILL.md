@@ -237,6 +237,20 @@ Before opening the PR, run `/simplify` on the diff:
 
 Apply all findings unless a finding would conflict with a plan-approved architect decision. For each skipped finding, cite the plan line in the PR body under "Simplify skips." An empty result (no findings) is a valid outcome — note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored — skipped" in the PR body and proceed; the reviewer decides whether to block.
 
+**Does NOT count toward stamina N.** Pre-PR hygiene gate, not an independent stamina reviewer.
+
+### Phase 6b — Pre-PR review pass (mandatory)
+
+Before opening the PR, run `/review` on the diff:
+
+```
+/review
+```
+
+Apply all findings unless a finding conflicts with a plan-approved architect decision; cite skips in the PR body under "Review skips" with the plan line. An empty result is valid — note "review: no findings" in the PR body. If `/review` errors, note "review: errored — skipped" and proceed.
+
+**Does NOT count toward stamina N.** Same reason as Phase 6a.
+
 ### Phase 7 — Open the PR
 
 Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
@@ -389,6 +403,7 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 - [ ] Tests cover each cross-module path the plan names.
 - [ ] Lint, typecheck, and tests pass across touched packages.
 - [ ] Pre-PR `/simplify` pass run; findings applied or cited with skip reason in PR body.
+- [ ] Pre-PR `/review` pass run; findings applied or cited with skip reason in PR body.
 - [ ] Draft PR opened with title prefixed `[impl-senior]` and plan-anchor table in body.
 - [ ] `/safer:review-senior` is mandatory before this PR merges (noted in PR body or enforced by orchestrate Phase 5c).
 - [ ] Sub-issue label transitioned `implementing` → `review`.
