@@ -3,7 +3,8 @@
 #
 # Reads:
 #   skills/setup/SKILL.md — for the install line `eslint-plugin-agent-code-guard@<spec>`.
-#   The resolved ACG source — either local node_modules or GitHub at the matching tag.
+#   The resolved ACG source — local node_modules (preferred, decoded via node -e)
+#     or GitHub at the matching tag (TS source, parsed via awk).
 #   skills/typescript/acg-rationale.json — hand-curated rule rationale + principle anchors.
 #
 # Writes:
@@ -16,94 +17,108 @@
 # Usage: ./bin/safer-acg-sync   (run from the safer-by-default repo root)
 #
 # Trigger: when skills/setup/SKILL.md's install line for eslint-plugin-agent-code-guard
-# changes. PRINCIPLES.md heading rename/renumber is a separate mechanical anchor-repair.
+# changes. PRINCIPLES.md heading rename/renumber requires updating the principle_slug
+# function below to match the new GitHub anchor.
 
-set -uo pipefail
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SETUP_SKILL="$REPO_ROOT/skills/setup/SKILL.md"
 TS_SKILL="$REPO_ROOT/skills/typescript/SKILL.md"
 RATIONALE="$REPO_ROOT/skills/typescript/acg-rationale.json"
 
+# ---- Preflight ----
+for cmd in jq node; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: $cmd is required but not on PATH" >&2; exit 2; }
+done
+[ -f "$SETUP_SKILL" ] || { echo "ERROR: $SETUP_SKILL missing" >&2; exit 2; }
+[ -f "$TS_SKILL"    ] || { echo "ERROR: $TS_SKILL missing"    >&2; exit 2; }
+[ -f "$RATIONALE"   ] || { echo "ERROR: $RATIONALE missing — create it with rule rationale entries" >&2; exit 2; }
+
+# ---- Single tempdir + cleanup ----
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+ACG_SRC="$TMP_DIR/acg-src"
+RULES_TSV="$TMP_DIR/rules.tsv"
+TABLE="$TMP_DIR/table.md"
+
 # ---- Step 1: find the install spec ----
 INSTALL_LINE=$(grep -E 'eslint-plugin-agent-code-guard@' "$SETUP_SKILL" | head -1 || true)
-if [ -z "$INSTALL_LINE" ]; then
-  echo "ERROR: no eslint-plugin-agent-code-guard@<spec> line found in $SETUP_SKILL" >&2
-  exit 2
-fi
+[ -n "$INSTALL_LINE" ] || { echo "ERROR: no eslint-plugin-agent-code-guard@<spec> line in $SETUP_SKILL" >&2; exit 2; }
+
 SPEC=$(echo "$INSTALL_LINE" | grep -oE 'eslint-plugin-agent-code-guard@[^ "'"'"']+' | sed 's/eslint-plugin-agent-code-guard@//' | head -1)
+[ -n "$SPEC" ] || { echo "ERROR: failed to parse install spec from line: $INSTALL_LINE" >&2; exit 2; }
+
 # Resolve ^0.0.2 → 0.0.2 (lowest-bound resolution per WS4 v6 spec).
 TAG="v$(echo "$SPEC" | sed 's/^[\^~>=<]//;s/[<>=].*//')"
 
 echo "install-line spec: $SPEC"
 echo "resolved tag:      $TAG"
 
-# ---- Step 2: fetch the ACG source for that tag ----
-ACG_INDEX="$(mktemp)"
-trap 'rm -f "$ACG_INDEX"' EXIT
+# ---- Step 2: enumerate rules ----
+# Two source paths:
+#   (a) local node_modules: decode the ACG API via node -e require(). Authoritative.
+#   (b) GitHub fallback: fetch src/index.ts and awk-parse it. Used only when the
+#       package is not installed locally. Awk on TS source is the only option here
+#       because we cannot require() a package that is not installed.
+SOURCE_KIND=""
+LOCAL_PKG_DIR="$REPO_ROOT/node_modules/eslint-plugin-agent-code-guard"
 
-if [ -f "$REPO_ROOT/node_modules/eslint-plugin-agent-code-guard/dist/index.js" ]; then
-  cp "$REPO_ROOT/node_modules/eslint-plugin-agent-code-guard/dist/index.js" "$ACG_INDEX"
-  echo "source:            local node_modules"
-else
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "ERROR: gh CLI required to fetch ACG source from GitHub" >&2
-    exit 2
-  fi
+if [ -d "$LOCAL_PKG_DIR" ] && node -e "require.resolve('eslint-plugin-agent-code-guard')" \
+    --require "$LOCAL_PKG_DIR/package.json" >/dev/null 2>&1; then
+  SOURCE_KIND="local-api"
+  echo "source:            local node_modules (decoded via node API)"
+  # Emit "<preset>\t<rule>\t<severity>" lines from the ACG configs object.
+  ( cd "$REPO_ROOT" && node -e '
+    const acg = require("eslint-plugin-agent-code-guard");
+    if (!acg.configs) { process.stderr.write("ERROR: ACG package has no .configs export\n"); process.exit(2); }
+    const presets = ["recommended", "integrationTests"];
+    for (const preset of presets) {
+      const cfg = acg.configs[preset];
+      if (!cfg || !cfg.rules) continue;
+      for (const [name, sev] of Object.entries(cfg.rules)) {
+        if (!name.startsWith("agent-code-guard/")) continue;
+        const rule = name.slice("agent-code-guard/".length);
+        const severity = Array.isArray(sev) ? sev[0] : sev;
+        process.stdout.write(preset + "\t" + rule + "\t" + severity + "\n");
+      }
+    }
+  ' ) > "$RULES_TSV"
+elif command -v gh >/dev/null 2>&1; then
+  SOURCE_KIND="github-source"
+  echo "source:            chughtapan/agent-code-guard@$TAG (GitHub TS source)"
   gh api "repos/chughtapan/agent-code-guard/contents/src/index.ts?ref=$TAG" \
-    --jq '.content' 2>/dev/null | base64 -d > "$ACG_INDEX" 2>/dev/null
-  if [ ! -s "$ACG_INDEX" ]; then
-    echo "ERROR: failed to fetch chughtapan/agent-code-guard@$TAG src/index.ts" >&2
-    exit 2
-  fi
-  echo "source:            chughtapan/agent-code-guard@$TAG (GitHub)"
+    --jq '.content' 2>/dev/null | base64 -d > "$ACG_SRC" 2>/dev/null
+  [ -s "$ACG_SRC" ] || { echo "ERROR: failed to fetch chughtapan/agent-code-guard@$TAG src/index.ts" >&2; exit 2; }
+  awk '
+    /recommended: *\{/        { preset = "recommended" }
+    /integrationTests: *\{/   { preset = "integrationTests" }
+    /rules: *\{/              { in_rules = 1; next }
+    in_rules && /^[[:space:]]*\},/ { in_rules = 0; next }
+    in_rules && match($0, /"agent-code-guard\/[a-z-]+":[[:space:]]*"(error|warn)"/) {
+      chunk = substr($0, RSTART, RLENGTH)
+      n = index(chunk, "/")
+      rest = substr(chunk, n + 1)
+      e = index(rest, "\"")
+      rule = substr(rest, 1, e - 1)
+      sev = (chunk ~ /"warn"/) ? "warn" : "error"
+      printf "%s\t%s\t%s\n", preset, rule, sev
+    }
+  ' "$ACG_SRC" > "$RULES_TSV"
+else
+  echo "ERROR: no local node_modules and gh CLI not on PATH; cannot fetch ACG source" >&2
+  exit 2
 fi
 
-# ---- Step 3: enumerate rules + their preset assignments + severities ----
-# Rules in ACG's index appear as `"agent-code-guard/<rule>": "error"` or `"warn"` lines
-# inside a `configs.<preset>.rules: { ... }` block. State-machine awk extracts them
-# along with which preset block they're in.
-RULES_TMP="$(mktemp)"
-trap 'rm -f "$ACG_INDEX" "$RULES_TMP"' EXIT
-
-awk '
-  /recommended: *\{/ { preset = "recommended" }
-  /integrationTests: *\{/ { preset = "integrationTests" }
-  /rules: *\{/ { in_rules = 1; next }
-  in_rules && /^[[:space:]]*\},/ { in_rules = 0; next }
-  in_rules && match($0, /"agent-code-guard\/[a-z-]+":[[:space:]]*"(error|warn)"/) {
-    chunk = substr($0, RSTART, RLENGTH)
-    # extract rule name
-    n = index(chunk, "/")
-    rest = substr(chunk, n + 1)
-    e = index(rest, "\"")
-    rule = substr(rest, 1, e - 1)
-    # extract severity (last quoted token)
-    sev = (chunk ~ /"warn"/) ? "warn" : "error"
-    printf "%s\t%s\t%s\n", preset, rule, sev
-  }
-' "$ACG_INDEX" >> "$RULES_TMP"
-
-RULE_COUNT=$(wc -l < "$RULES_TMP" | tr -d ' ')
+RULE_COUNT=$(wc -l < "$RULES_TSV" | tr -d ' ')
 echo "rule count:        $RULE_COUNT"
+[ "$RULE_COUNT" -gt 0 ] || { echo "ERROR: parsed zero rules from ACG source ($SOURCE_KIND)" >&2; exit 2; }
 
-if [ "$RULE_COUNT" -eq 0 ]; then
-  echo "ERROR: failed to parse any rules from ACG source" >&2
-  exit 2
-fi
-
-# ---- Step 4: load rationale-map + check coverage ----
-if [ ! -f "$RATIONALE" ]; then
-  echo "ERROR: $RATIONALE missing — create it with rule rationale entries" >&2
-  exit 2
-fi
-
+# ---- Step 3: check rationale-map coverage ----
 UNMAPPED=()
 while IFS=$'\t' read -r preset rule severity; do
-  if ! jq -e --arg r "$rule" '.[$r]' "$RATIONALE" >/dev/null 2>&1; then
-    UNMAPPED+=("$rule")
-  fi
-done < "$RULES_TMP"
+  jq -e --arg r "$rule" '.[$r]' "$RATIONALE" >/dev/null 2>&1 || UNMAPPED+=("$rule")
+done < "$RULES_TSV"
 
 if [ "${#UNMAPPED[@]}" -gt 0 ]; then
   echo "ERROR: rules in ACG@$TAG with no entry in $RATIONALE:" >&2
@@ -113,44 +128,101 @@ if [ "${#UNMAPPED[@]}" -gt 0 ]; then
 fi
 
 # Warn on orphan rationale entries (in map, not in ACG).
-ACG_RULES_SORTED=$(cut -f2 "$RULES_TMP" | sort -u)
+ACG_RULES_SORTED=$(cut -f2 "$RULES_TSV" | sort -u)
 MAP_RULES_SORTED=$(jq -r 'keys[]' "$RATIONALE" | sort -u)
-ORPHANS=$(comm -23 <(echo "$MAP_RULES_SORTED") <(echo "$ACG_RULES_SORTED"))
+ORPHANS=$(comm -23 <(echo "$MAP_RULES_SORTED") <(echo "$ACG_RULES_SORTED") || true)
 if [ -n "$ORPHANS" ]; then
   echo "WARNING: rationale-map entries with no matching ACG@$TAG rule:" >&2
   echo "$ORPHANS" | sed 's/^/  - /' >&2
   echo "(kept in map for historical reference; consider removing if not needed)" >&2
 fi
 
-# ---- Step 5: render the table ----
-TABLE="$(mktemp)"
-trap 'rm -f "$ACG_INDEX" "$RULES_TMP" "$TABLE"' EXIT
+# ---- Step 4: principle anchor mapping ----
+# GitHub auto-generates heading anchors. The slugs below are the literal anchors
+# rendered by GitHub for PRINCIPLES.md heading lines `## <N>. <title> — <subtitle>`.
+# When PRINCIPLES.md heading text changes, update the matching slug here.
+principle_short_title() {
+  case "$1" in
+    1) echo "Types beat tests" ;;
+    2) echo "Validate at every boundary" ;;
+    3) echo "Errors are typed, not thrown" ;;
+    4) echo "Exhaustiveness over optionality" ;;
+    5) echo "The Junior Dev Rule" ;;
+    6) echo "The Budget Gate" ;;
+    7) echo "The Brake" ;;
+    8) echo "The Ratchet" ;;
+    *) echo "principle $1" ;;
+  esac
+}
 
+principle_slug() {
+  case "$1" in
+    1) echo "1-types-beat-tests--move-constraints-into-the-type-system" ;;
+    2) echo "2-validate-at-every-boundary--schemas-where-data-enters-types-inside" ;;
+    3) echo "3-errors-are-typed-not-thrown--tagged-errors-or-typed-results-no-raw-throws-no-silent-catches" ;;
+    4) echo "4-exhaustiveness-over-optionality--every-branch-handled-switches-end-in-never" ;;
+    5) echo "5-the-junior-dev-rule--discipline-over-capability" ;;
+    6) echo "6-the-budget-gate--scope-is-a-hard-budget" ;;
+    7) echo "7-the-brake--stop-rules-are-literal" ;;
+    8) echo "8-the-ratchet--escalate-up-not-around" ;;
+    *) echo "" ;;
+  esac
+}
+
+render_anchors() {
+  # Input: comma-separated principle numbers, e.g. "3,4".
+  # Output: comma-separated markdown links to PRINCIPLES.md anchors.
+  local input="$1"
+  local out=""
+  local IFS=','
+  for n in $input; do
+    n="${n// /}"
+    local title
+    title=$(principle_short_title "$n")
+    local slug
+    slug=$(principle_slug "$n")
+    if [ -z "$slug" ]; then
+      [ -z "$out" ] && out="**P$n**" || out="$out, **P$n**"
+    else
+      local link="[principle $n — $title](../../PRINCIPLES.md#$slug)"
+      [ -z "$out" ] && out="$link" || out="$out, $link"
+    fi
+  done
+  echo "$out"
+}
+
+# ---- Step 5: render the table ----
+# Canonical doc location depends on which source path we used.
+# Local install: node_modules path is real and useful.
+# GitHub fallback: that path doesn't exist on disk; show only the GitHub URL.
 cat > "$TABLE" <<EOF
 **Resolved version:** \`eslint-plugin-agent-code-guard@$SPEC\` (from \`skills/setup/SKILL.md\`) → ACG \`$TAG\` ships **$RULE_COUNT rules**.
 
-| Rule | Preset | Severity | Principle anchor(s) | Rationale | Before/After |
+| Rule | Preset | Severity | Principle anchor(s) | Rationale | Doc |
 |---|---|---|---|---|---|
 EOF
 
 while IFS=$'\t' read -r preset rule severity; do
-  anchors=$(jq -r --arg r "$rule" '.[$r].principle_anchors | map("**P" + . + "**") | join(", ")' "$RATIONALE")
+  raw_anchors=$(jq -r --arg r "$rule" '.[$r].principle_anchors | map(tostring) | join(",")' "$RATIONALE")
+  anchors=$(render_anchors "$raw_anchors")
   rationale=$(jq -r --arg r "$rule" '.[$r].rationale' "$RATIONALE")
-  local_path="\`node_modules/eslint-plugin-agent-code-guard/docs/rules/$rule.md\`"
   github_url="https://github.com/chughtapan/agent-code-guard/blob/$TAG/docs/rules/$rule.md"
-  echo "| \`$rule\` | \`$preset\` | $severity | $anchors | $rationale | $local_path / [doc]($github_url) |" >> "$TABLE"
-done < <(sort "$RULES_TMP")
+  if [ "$SOURCE_KIND" = "local-api" ]; then
+    doc_cell="\`node_modules/eslint-plugin-agent-code-guard/docs/rules/$rule.md\` / [github]($github_url)"
+  else
+    doc_cell="[github]($github_url)"
+  fi
+  echo "| \`$rule\` | \`$preset\` | $severity | $anchors | $rationale | $doc_cell |" >> "$TABLE"
+done < <(sort "$RULES_TSV")
 
 cat >> "$TABLE" <<EOF
 
-*Maintenance:* hand-maintained rationale-map in \`skills/typescript/acg-rationale.json\`. Updated by \`bin/safer-acg-sync\` when \`skills/setup/SKILL.md\`'s ACG install line changes. The local \`node_modules/...\` path is canonical; the GitHub URL is convenience-only.
+*Maintenance:* hand-maintained rationale-map in \`skills/typescript/acg-rationale.json\`. Updated by \`bin/safer-acg-sync\` when \`skills/setup/SKILL.md\`'s ACG install line changes. Principle anchors link to \`PRINCIPLES.md\` headings; if a heading is renamed, update the slug map in \`bin/safer-acg-sync\`.
 EOF
 
 # ---- Step 6: splice into skills/typescript/SKILL.md between markers ----
-if ! grep -q '<!-- BEGIN: acg-mapping -->' "$TS_SKILL"; then
-  echo "ERROR: $TS_SKILL missing <!-- BEGIN: acg-mapping --> marker" >&2
-  exit 2
-fi
+grep -q '<!-- BEGIN: acg-mapping -->' "$TS_SKILL" \
+  || { echo "ERROR: $TS_SKILL missing <!-- BEGIN: acg-mapping --> marker" >&2; exit 2; }
 
 awk -v table_file="$TABLE" '
   /<!-- BEGIN: acg-mapping -->/ {
