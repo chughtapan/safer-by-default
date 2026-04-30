@@ -615,6 +615,17 @@ Record the returned job id on the parent epic (comment) so the next operator can
    4. `verifying → done` (after verify emits SHIP): post the gating comment with the verify verdict URL, close the sub-issue. On HOLD: route per Phase 6 (typically back to `/safer:implement-*` with the verify findings).
 
    The auto-gate never skips verify on implement-\* sub-issues. A sub-issue at `plan-approved` whose PR is merged and has no verify verdict on the merge commit is a candidate for auto-dispatch to verify on every tick until the verdict lands.
+
+5a. **Surface process issues from teammate SendMessages (mandatory).** Per PRINCIPLES.md → Process issues are first-class artifacts, every teammate's closing SendMessage carries a `Process issues:` field. The orchestrator scans the SendMessage stream each tick and:
+
+   - Aggregates non-empty `Process issues` entries from this tick's teammates.
+   - Surfaces them to the user as a one-line summary in the next status update — NOT buried in a verdict body, NOT silently dropped because the substantive verdict was APPROVE.
+   - For structural issues (the same `Process issues:` line recurring across multiple dispatches), files a follow-up sub-issue against the parent epic so the doctrine catches the pattern.
+
+   The failure mode this rule prevents: a teammate completes the assigned task, gets a clean APPROVE, the user moves on — and the friction the teammate hit recurs on every subsequent dispatch because no one ever named it. The orchestrator is the only seat that sees enough dispatches to spot the pattern; if the orchestrator buries it, no one fixes it.
+
+   "Empty" (`Process issues: none`) is a valid value and not surfaced. The rule fires only on non-empty entries.
+
 6. **Auto-dispatch pending work (work-queue scan).** The prior steps react to state the loop already knows about. Step 6 is the proactive scan: enumerate pending sub-issues across every repo this team serves, filter out the ones that are already in flight, prioritize what is left, and dispatch up to the per-tick cap. Without this step the orchestrator idles between user prompts even when work is queued. Step 6 is mandatory once a team is installed.
 
 **Step 6a — enumerate pending work.** Scan every repo this team watches (`~/.claude/teams/<team-name>/config.json` carries `repos: []`; fall back to the current repo if the field is absent). For each, list open sub-issues whose labels name a dispatchable modality:

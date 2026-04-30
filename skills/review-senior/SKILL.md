@@ -385,9 +385,11 @@ Before you post a status marker or close your turn, **SendMessage to
 SendMessage({
   to: "team-lead",
   summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Aggregate verdict: <X>."
+  message: "STATUS: DONE. Artifact: <URL>. Aggregate verdict: <X>. Process issues: <none | one-line list>."
 })
 ```
+
+The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 If invoked outside an orchestrate context (no team), skip this step.
 
