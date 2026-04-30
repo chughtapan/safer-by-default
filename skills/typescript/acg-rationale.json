@@ -1,0 +1,54 @@
+{
+  "async-keyword": {
+    "principle_anchors": ["3"],
+    "rationale": "`async`/`await` is the sugar that hides the erased error channel of `Promise<T>`."
+  },
+  "promise-type": {
+    "principle_anchors": ["3"],
+    "rationale": "`Promise<T>` erases the error channel; tagged-error or `Effect<T, E, R>` keep it visible."
+  },
+  "then-chain": {
+    "principle_anchors": ["3"],
+    "rationale": "`.then()` chains hide the error channel and reorder control flow; same erasure as `Promise<T>`."
+  },
+  "bare-catch": {
+    "principle_anchors": ["3", "4"],
+    "rationale": "A silent catch hides both the error AND the branch; exhaustiveness cannot apply."
+  },
+  "record-cast": {
+    "principle_anchors": ["2"],
+    "rationale": "`as Record<string, unknown>` papers over a missing schema at the boundary; decode instead."
+  },
+  "no-raw-sql": {
+    "principle_anchors": ["1", "2"],
+    "rationale": "Raw SQL defeats the compiler; a typed builder makes the schema load-bearing at compile time."
+  },
+  "no-manual-enum-cast": {
+    "principle_anchors": ["1", "2"],
+    "rationale": "Hand-written unions drift from their source; generated or schema-derived enums do not."
+  },
+  "no-vitest-mocks": {
+    "principle_anchors": ["2"],
+    "rationale": "An integration test that mocks the boundary asserts your code works against your mock, not the real thing."
+  },
+  "no-hardcoded-secrets": {
+    "principle_anchors": ["2"],
+    "rationale": "A hardcoded secret bypasses the env-boundary schema; secrets must be decoded at boot, not embedded in source."
+  },
+  "no-raw-throw-new-error": {
+    "principle_anchors": ["3"],
+    "rationale": "`throw new Error(\"bad\")` has no type, no handling contract, no receipt for the caller; tagged errors do."
+  },
+  "no-test-skip-only": {
+    "principle_anchors": ["1"],
+    "rationale": "Test-hygiene corollary of principle 1: a `.skip` or `.only` shipped to main is a test that does not test."
+  },
+  "no-coverage-threshold-gate": {
+    "principle_anchors": ["1"],
+    "rationale": "Coverage % is a diagnostic, never a CI gate (Inozemtseva & Holmes ICSE 2014). Acts on the wrong signal."
+  },
+  "no-hardcoded-assertion-literals": {
+    "principle_anchors": ["1"],
+    "rationale": "Assertions hardcoding a literal (e.g., `expect(...).toBe(42)` where 42 is the implementation's output) compress the same information as a property; the property has higher coverage."
+  }
+}
