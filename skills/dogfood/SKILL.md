@@ -497,3 +497,9 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md`, Voice section. The subagent's report is terse, concrete, and evidence-first. Every score is a number with a quoted phrase or a location. Every friction entry is a specific location and a specific reason. No "this might be improved by," no "I think the clarity could be higher."
 
 The next agent reading this report is the upstream modality's author, revising. They need to know where to cut and what to add, not to be flattered about what worked. The author is a junior; write for them.
+
+---
+
+## Composition with gstack
+
+`/safer:dogfood` is itself a composition target invoked by `/safer:review-senior` and `/safer:stamina`. It does not invoke gstack skills directly. Per design, dogfood runs on haiku as the cold-start acid test — upgrading masks portability debt.

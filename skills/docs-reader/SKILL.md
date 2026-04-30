@@ -450,3 +450,9 @@ When invoked standalone (no team), skip this step.
 See `PRINCIPLES.md → Voice`. The aggregate report is terse, structural, evidence-first. Every must-fix entry is a quoted phrase plus a specific "why." No "this might be clearer," no "consider adding." Personas write directly; the aggregator relays directly.
 
 The next reader of the aggregate report is the artifact's author, deciding what to revise. They need to know where to cut, what to add, what to leave. A junior writes for them.
+
+---
+
+## Composition with gstack
+
+`/safer-docs-reader` is an internal doc-review skill invoked by `/safer:dogfood` and during artifact handoff review. It does not compose with gstack workflows. Per the runtime contract, feedback flows up to the calling modality, never out as a user prompt.

@@ -146,6 +146,20 @@ user intent
 
 Every skill publishes its artifact to GitHub before considering itself done. Status lives in issue labels, not local files. `safer-vp` renders the project dashboard from events + `gh` outcomes.
 
+## Composing with gstack
+
+safer is the SDS modality spine. [gstack](https://github.com/chughtapan/gstack) is a parallel toolbox of interactive workflow skills (`/codex`, `/qa`, `/ship`, `/plan-*`, `/health`, etc.). They coexist; composition happens at the modality dispatch seam, not at file/config layering.
+
+**Each safer skill body owns its own composition section.** When an agent invokes `/safer:review-senior`, it reads `skills/review-senior/SKILL.md` to learn which gstack targets that skill calls (`/review`, `/simplify`, `/codex review`, `/safer:dogfood`, `/security-review`). When an agent invokes `/safer:verify`, it reads `skills/verify/SKILL.md` to learn the testing-skill delegation (`/health`, `/qa`, `/canary`, etc.). There is no central routing table — each skill's composition is local to its own body.
+
+**Why per-skill rather than centralized.** A reader (human or agent) invoking skill X needs only X's composition info, not the whole catalog. Reading a 200-line README to find one routing fact is a tax that adds up across thousands of invocations.
+
+**Doctrine precedence.** Inside an active safer modality: *safer wins on scope; gstack ETHOS wins on quality-within-scope*. Both doctrines stack at orthogonal layers — pipeline discipline (safer) and construction defaults (gstack). See `PRINCIPLES.md` → Composing with gstack.
+
+**Investigate name collision.** safer and gstack both ship a skill named `investigate`. Always qualify in safer docs: `/safer:investigate` (reproduce-and-name-the-cause); `/gstack:investigate` (gstack workflow). Bare `/investigate` is disallowed in safer docs.
+
+**Ship hop.** safer's `verify` modality emits SHIP/HOLD; the post-verify hop routes through gstack `/ship` (VERSION + CHANGELOG + PR). `/safer:orchestrate` handles that routing.
+
 ## Companion projects
 
 This plugin does not stand alone. Two companions:

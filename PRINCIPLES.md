@@ -417,6 +417,13 @@ implement-junior   implement-senior   implement-staff
                         verify
                           │
                           ▼
+                       SHIP / HOLD
+                          │
+                          ▼
+                      gstack /ship
+                  (VERSION + CHANGELOG + PR)
+                          │
+                          ▼
                          done
 
 orthogonal (invokable anywhere):
@@ -463,6 +470,18 @@ Every skill's final output carries exactly one status marker. Artifacts without 
 **On craft.** *Every error you can put in the type system is one that cannot ship.* If you are about to accept `any`, a raw throw, a bare catch, or an unchecked cast, stop. The question is whether the constraint can live higher up.
 
 **On scope.** *Capability is not an instruction. Scope is.* If you are about to act because you are able to, stop. The question is whether the action is in your scope.
+
+---
+
+## Composing with gstack
+
+safer is the SDS modality spine. gstack is a parallel toolbox of interactive workflow skills. They coexist; composition happens at the modality dispatch seam. Each safer skill body names its own composition targets — there is no central routing table to read.
+
+**Doctrine precedence.** Inside an active safer modality charter: *safer wins on scope; gstack ETHOS wins on quality-within-scope*. Outside safer modalities (pure gstack workflows), ETHOS governs unmodified. The two doctrines stack at orthogonal layers — pipeline discipline (safer) and construction defaults (gstack) — and the precedence rule is the tie-break for the bounded collisions inside `implement-*`.
+
+**Investigate name collision.** safer and gstack both ship a skill named `investigate`. In safer docs, always qualify: `/safer:investigate` for reproduce-and-name-the-cause; `/gstack:investigate` for the gstack workflow. Bare `/investigate` is disallowed in safer docs.
+
+**Where the routing lives.** Per-skill, in each `skills/<name>/SKILL.md`. An agent invoking skill X reads X's body to learn X's composition. The README is for human onboarding, not agent-time reads.
 
 ---
 

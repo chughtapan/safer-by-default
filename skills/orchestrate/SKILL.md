@@ -1209,3 +1209,17 @@ If any box is unchecked, the status is not `DONE`.
 See PRINCIPLES.md → Voice. Short paragraphs. Concrete specifics. No AI filler. No em-dashes. Direct quality judgments. End with what to do.
 
 The next agent reading your decomposition is a junior. Write the decomposition so they can execute their sub-task without asking you clarifying questions. That is the Cold Start Test applied to orchestration.
+
+---
+
+## Composition with gstack
+
+This skill is the routing layer for interactive gstack skills running under safer modalities. It invokes or routes to:
+
+- `/codex review` — spec / architect cross-model review pass. Non-interactive. Eligible for zapbot-remote.
+- `/codex --mode supervisor` — per-round research supervision. Non-interactive. Eligible for zapbot-remote.
+- `/codex --mode consult` — second opinions on unusual routing decisions. Non-interactive. Eligible for zapbot-remote.
+- `/autoplan` — canonical composition target for stamina-on-plan and zapbot-remote-friendly review fan-out. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
+- `/ship`, `/land-and-deploy`, `/landing-report` — post-verify ship hop. orchestrate routes the SHIP verdict from `/safer:verify` into gstack `/ship` (VERSION + CHANGELOG + PR + deploy verification). Non-interactive. Eligible for zapbot-remote.
+
+Per the runtime contract (`PRINCIPLES.md` → Composing with gstack), interactive skills run hold-scope autonomous and escalate to orchestrate; orchestrate is the only layer that calls `AskUserQuestion`. Teammates waiting on a user reply MUST NOT be reaped by Path (b) cleanup (see Step 5d).
