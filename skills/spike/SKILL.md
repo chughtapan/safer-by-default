@@ -375,6 +375,6 @@ The next agent reading the spike issue is deciding whether to act on the graduat
 
 ## Composition with gstack
 
-`/safer:spike` is a throwaway-code skill answering one feasibility question. It does not compose with gstack workflows during the spike itself; the writeup publishes as a sub-issue comment, and the branch stays unmerged.
+spike does not invoke or get invoked by gstack targets. The writeup publishes as a sub-issue comment; the branch stays unmerged.
 
-If the spike result triggers a feature decision, the downstream modality (`/safer:spec` or `/safer:architect`) takes over and may compose with gstack via its own composition section.
+If the spike result triggers a feature decision, the downstream modality (`/safer:spec` or `/safer:architect`) takes over and composes with gstack via its own composition section.

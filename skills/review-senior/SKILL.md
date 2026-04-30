@@ -368,12 +368,12 @@ consumer is the orchestrator, which routes on the verdict tag.
 
 ## Composition with gstack
 
-This skill is the routing layer for code review on PRs. It invokes:
+### Invokes
 
-- `/review` — gstack's pre-landing review (SQL safety, LLM trust boundaries, conditional side effects). Non-interactive. Eligible for zapbot-remote.
-- `/simplify` — diff de-duplication and simplification. Non-interactive. Eligible for zapbot-remote.
-- `/codex review` — cross-model adversarial review. Non-interactive. Eligible for zapbot-remote.
-- `/safer:dogfood` — cold-start read of the diff. Non-interactive. Eligible for zapbot-remote.
-- `/security-review` — security-focused review pass. Non-interactive. Eligible for zapbot-remote.
+- `/review` — gstack's pre-landing review (SQL safety, LLM trust boundaries, conditional side effects).
+- `/simplify` — diff de-duplication and simplification.
+- `/codex review` — cross-model adversarial review.
+- `/safer:dogfood` — cold-start read of the diff.
+- `/security-review` — security-focused review pass.
 
-For PRs touching public surface or that the routing rule escalates to staff tier, `/safer:stamina --pr` runs instead, with N≥3 independent reviewers (per `PRINCIPLES.md` → Durability).
+For PRs touching public surface or escalating to staff tier, `/safer:stamina --pr` replaces this single-reviewer path with N≥3 independent reviewers (per `PRINCIPLES.md` → Durability).

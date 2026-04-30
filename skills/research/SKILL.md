@@ -388,7 +388,7 @@ See `PRINCIPLES.md` voice section. The ledger is dense. Numbers over adjectives.
 
 ## Composition with gstack
 
-This skill invokes these gstack targets:
+### Invokes
 
-- `/office-hours` (builder mode) — builder-style brainstorming for open-ended exploration; useful as input before round 1 if the question is under-framed. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
-- `/codex --mode supervisor` — per-round supervisor stamps `continue` / `hold` / `escalate` between research rounds. Non-interactive. Eligible for zapbot-remote.
+- `/office-hours` (builder mode) — input before round 1 when the question is under-framed.
+- `/codex --mode supervisor` — per-round supervisor stamps `continue` / `hold` / `escalate` between research rounds.

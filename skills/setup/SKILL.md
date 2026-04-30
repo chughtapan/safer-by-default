@@ -612,13 +612,13 @@ This skill is the bootstrap-stage audit and supports two modes via `--mode {gree
 - **green-field mode** (no source past scaffolding): writes config + doctrine + scaffolds tooling.
 - **brown-field mode** (existing repo): produces a phased migration plan and ratchets to `/safer:spec → /safer:architect → /safer:implement-*` for any code edits. The ratchet is a control-flow note — those modalities are downstream destinations, not composition targets. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
 
-In either mode the skill invokes these gstack targets via orchestrator-mediated gates (the skill body contains no user-facing prompts):
+### Invokes
 
-- `/setup-deploy` — deploy-target detection and configuration. Non-interactive (with credentials). Eligible for zapbot-remote.
-- `/setup-gbrain` — memory / MCP setup. Non-interactive. Eligible for zapbot-remote.
-- `/setup-browser-cookies` — cookie import for authenticated QA flows. Non-interactive. Eligible for zapbot-remote.
-- `/codex --mode consult` — per-recommendation second opinions during the audit. Non-interactive. Eligible for zapbot-remote.
-- `/autoplan` — recommendation-set confirmation when the audit produces a multi-step plan. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
+- `/setup-deploy` — deploy-target detection and configuration.
+- `/setup-gbrain` — memory / MCP setup.
+- `/setup-browser-cookies` — cookie import for authenticated QA flows.
+- `/codex --mode consult` — per-recommendation second opinions during the audit.
+- `/autoplan` — recommendation-set confirmation when the audit produces a multi-step plan.
 
 ### Per-stage recommendation table
 

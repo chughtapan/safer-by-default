@@ -392,10 +392,12 @@ The next agent reading this PR is `review-senior`. Write so they can judge the c
 
 **Doctrine precedence inside this modality:** *safer wins on scope; gstack ETHOS wins on quality-within-scope*. The Junior Dev Rule (Principle 5) and the Budget Gate (Principle 6) are non-negotiable scope constraints; ETHOS construction defaults shape what to do *within* that scope (line-level craft, naming, test shapes).
 
-This skill may invoke these gstack guards while editing:
+### Invokes
 
-- `/freeze` — restrict edits to a directory for the session. Non-interactive. Eligible for zapbot-remote.
-- `/careful` — warn before destructive commands (`rm -rf`, force-push, etc.). Non-interactive. Eligible for zapbot-remote.
-- `/guard` — `/freeze` + `/careful` combined. Non-interactive. Eligible for zapbot-remote.
+- `/freeze` — restrict edits to a directory for the session.
+- `/careful` — warn before destructive commands (`rm -rf`, force-push, etc.).
+- `/guard` — `/freeze` + `/careful` combined.
 
-After the draft PR is open, `/safer:review-senior` is the mandatory next step (which itself composes with `/review`, `/simplify`, `/codex review`, `/safer:dogfood`).
+### Invoked by
+
+- `/safer:review-senior` runs after the draft PR opens (which itself composes with `/review`, `/simplify`, `/codex review`, `/safer:dogfood`).

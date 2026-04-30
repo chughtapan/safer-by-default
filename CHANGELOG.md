@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.4 — Composition cleanup; opus everywhere
+
+Tightens the per-skill `Composition with gstack` sections introduced in 0.1.3 and consolidates orchestrator dispatch on opus.
+
+- Each skill's section is now `### Invokes` and `### Invoked by` (omit either if empty). One bullet per target, target name plus when/why; no per-target metadata.
+- Stripped the universal "Eligible for zapbot-remote" tag (40/40 entries said yes; conveyed nothing).
+- Stripped per-target interactivity labels (`Non-interactive` / `Two-gate`). The classification is target metadata, not per-skill composition metadata; centralized in `PRINCIPLES.md` → Composing with gstack as one paragraph naming the user-prompting targets that escalate via `/safer:orchestrate`.
+- Architect: `/frontend-design`, `/design-consultation`, `/design-shotgun` are now live invokes, not "Tier 2 deferred".
+- `PRINCIPLES.md` modality pipeline diagram: removed the `design-module* (Tier 2)` placeholder. There is no separate `design-module` modality; architect absorbs that work and composes with the gstack design skills. Knock-on cleanup in `skills/orchestrate/SKILL.md` (Phase 5c lists) and `skills/stamina/SKILL.md` (N-count table).
+- Verify: closing redundant gstack-target list deleted. Phase 3.5 is the canonical contract.
+- Orchestrator Model routing: opus for every dispatched modality. Removed the haiku/sonnet rows and the dogfood-on-haiku acid-test sidebar. Per-modality dispatch templates updated to say `model: opus` uniformly.
+- `safer-docs-reader`: persona sub-agents now dispatch on opus.
+
 ## 0.1.3 — WS3 framing: safer ↔ gstack composition
 
 Doctrine-level decision on how safer composes with gstack. safer is the SDS modality spine; gstack is a parallel toolbox. Composition happens at the modality dispatch seam, per-skill — no central routing table.

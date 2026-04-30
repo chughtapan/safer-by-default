@@ -403,11 +403,9 @@ The next agent reading this design doc is an implementer with no session context
 
 ## Composition with gstack
 
-This skill may invoke or accept input from these gstack targets:
+### Invokes
 
-- `/plan-eng-review` — engineering review pass on a draft architect plan. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
-- `/plan-design-review` — designer's-eye review of UI-touching plans. Two-gate. Eligible for zapbot-remote.
-- `/plan-devex-review` — DX review of developer-facing plans (APIs, CLIs). Two-gate. Eligible for zapbot-remote.
-- `/frontend-design`, `/design-consultation`, `/design-shotgun` — module-design absorption (Tier 2 deferred). Two-gate. Eligible for zapbot-remote.
-
-These are review and input skills that run hold-scope autonomous. User-facing prompts inside the gstack skill body are forbidden under safer's runtime contract; taste decisions escalate to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`.
+- `/plan-eng-review` — engineering review of the draft plan before transition to `review`.
+- `/plan-design-review` — when the plan touches UI surfaces.
+- `/plan-devex-review` — when the plan touches public APIs or CLIs.
+- `/frontend-design`, `/design-consultation`, `/design-shotgun` — module-design absorption for UI-touching plans.

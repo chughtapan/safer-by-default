@@ -1200,12 +1200,12 @@ The next agent reading your decomposition is a junior. Write the decomposition s
 
 ## Composition with gstack
 
-This skill is the routing layer for interactive gstack skills running under safer modalities. It invokes or routes to:
+orchestrate is the routing layer for safer modalities and the only layer that calls `AskUserQuestion`. Teammates waiting on a user reply MUST NOT be reaped by Path (b) cleanup (see Step 5d).
 
-- `/codex review` — spec / architect cross-model review pass. Non-interactive. Eligible for zapbot-remote.
-- `/codex --mode supervisor` — per-round research supervision. Non-interactive. Eligible for zapbot-remote.
-- `/codex --mode consult` — second opinions on unusual routing decisions. Non-interactive. Eligible for zapbot-remote.
-- `/autoplan` — canonical composition target for stamina-on-plan and zapbot-remote-friendly review fan-out. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
-- `/ship`, `/land-and-deploy`, `/landing-report` — post-verify ship hop. orchestrate routes the SHIP verdict from `/safer:verify` into gstack `/ship` (VERSION + CHANGELOG + PR + deploy verification). Non-interactive. Eligible for zapbot-remote.
+### Invokes
 
-Per the runtime contract (`PRINCIPLES.md` → Composing with gstack), interactive skills run hold-scope autonomous and escalate to orchestrate; orchestrate is the only layer that calls `AskUserQuestion`. Teammates waiting on a user reply MUST NOT be reaped by Path (b) cleanup (see Step 5d).
+- `/codex review` — spec / architect cross-model review pass.
+- `/codex --mode supervisor` — per-round research supervision.
+- `/codex --mode consult` — second opinions on unusual routing decisions.
+- `/autoplan` — canonical fan-out target for stamina-on-plan reviews.
+- `/ship`, `/land-and-deploy`, `/landing-report` — post-verify ship hop, after `/safer:verify` emits SHIP (VERSION + CHANGELOG + PR + deploy verification).

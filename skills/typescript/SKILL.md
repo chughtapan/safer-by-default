@@ -293,4 +293,4 @@ The next agent touching this code is a junior. The type system is the document t
 
 This skill defines the TypeScript craft floor. It composes with `eslint-plugin-agent-code-guard` (ACG) at the file-edit level — ACG is the lint floor that enforces principle 1-4 patterns (no raw throws, no untyped boundary, no bare catches, exhaustiveness). ACG is installed by `/safer:setup` (the install line lives in `skills/setup/SKILL.md`).
 
-This skill does not compose with gstack workflow skills directly. Composition with the broader stack happens at the dispatching modality (the `/safer:implement-*` tier that invokes the TS skill).
+The TS skill does not invoke gstack workflow targets directly. Composition with the broader stack happens at the dispatching modality (the `/safer:implement-*` tier that invokes the TS skill).
