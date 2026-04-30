@@ -234,6 +234,38 @@ Classify the artifact per the inference rules above (or honour
 skill set in a comment on the artifact thread; that comment is the
 audit trail even if the dispatch itself fails.
 
+### Phase 1a — CI status gate (PR mode only; sbd#244)
+
+> **For PR-kind artifacts: CI must be green before any APPROVE verdict.** Diff-static review (this skill, `/codex review`, `/simplify`, `/review`) is blind to runtime regressions; CI is the runtime check. Real incident: moltzap PR #295 passed three diff-static reviewers but had 5 red CI tests because a Stream/Fiber refactor turned `client.close()` async.
+
+```bash
+PR_NUMBER=$(echo "$ARTIFACT" | grep -oE '/pull/[0-9]+' | grep -oE '[0-9]+')
+PR_REPO=$(echo "$ARTIFACT" | sed -E 's|.*github\.com/([^/]+/[^/]+)/.*|\1|')
+CI_JSON=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json statusCheckRollup 2>/dev/null)
+CI_STATUS=$(echo "$CI_JSON" | jq -r '
+  [.statusCheckRollup[] | .conclusion // .status]
+  | if length == 0 then "no-checks"
+    elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ACTION_REQUIRED") then "failing"
+    elif any(. == "IN_PROGRESS" or . == "PENDING" or . == "QUEUED") then "pending"
+    elif all(. == "SUCCESS" or . == "NEUTRAL" or . == "SKIPPED") then "green"
+    else "unknown"
+    end')
+```
+
+Decision rule (carry into Phase 3 aggregation):
+
+| `CI_STATUS` | Effect on verdict |
+|---|---|
+| `green` | proceed; surface `CI status: green` in the verdict body |
+| `failing` | aggregate verdict cannot be `APPROVE`. Either `CHANGES-REQUESTED` (if the diff caused the failure) or `HOLD` (with a route to `/safer:investigate` if the cause is unclear). Surface `CI status: failing N tests` with the failing-check names. |
+| `pending` | aggregate verdict caps at `APPROVE-PENDING-CI`. The orchestrator's auto-monitor must withhold merge until CI clears. Surface `CI status: pending`. |
+| `no-checks` | repos without CI configured: treat as `green` (no signal); surface `CI status: no-checks configured` in the verdict body. |
+| `unknown` | classifier hit an unexpected check state; treat as `pending` (fail-safe) and surface the raw `CI_JSON` for the next reviewer to triage. |
+
+Triage exception: if the failing check is verifiably pre-existing on the base branch (run the failing test on `origin/<base>` and confirm it fails identically there), the verdict body MUST quote both the base-branch and PR-head outputs and may proceed to APPROVE with `CI status: green on diff (N pre-existing flakes confirmed on base)`. "Verified" means a fresh run, not "I think it was already failing." No verbal-only triage.
+
+This step is non-skippable and counts as **part of the review-senior pass** (not a separate stamina N pass; it is the precondition gate for any APPROVE verdict).
+
 ### Phase 2 — Dispatch the composed skills
 
 Invoke each composed gstack skill in order. Each produces its own verdict

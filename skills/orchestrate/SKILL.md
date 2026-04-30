@@ -379,7 +379,7 @@ Fetch the most recent review body:
 gh pr view <N> --repo <R> --json reviews --jq '.reviews[-1].body'
 ```
 
-Scan the body for these three condition patterns. Any match blocks the merge:
+Scan the body for these four condition patterns. Any match blocks the merge:
 
 1. **Conditional approval** — phrases like *"approve but do not merge without X"*,
    *"LGTM pending Y"*, *"approve subject to Z"*. The verdict is approval against
@@ -391,6 +391,14 @@ Scan the body for these three condition patterns. Any match blocks the merge:
    not-yet-met but acceptable to defer past this review, with a stated condition
    for closing the deferral: *"accept as DRAFT pending CI green"*, *"merge after
    the linked Linear ticket lands"*.
+4. **CI-pending verdicts (sbd#244)** — phrases like *"APPROVE-PENDING-CI"*,
+   *"CI status: pending"*, *"CI status: failing"*. The reviewer ran the diff-static
+   review but CI was not green at review time. The team-lead must withhold merge
+   until CI clears (re-fetch `gh pr view --json statusCheckRollup`); on `failing`
+   route per Phase 6 (typically back to `/safer:implement-*` with the failure
+   evidence). `/safer:review-senior` Phase 1a and `/safer:stamina` Phase 0 enforce
+   the CI-green precondition; this auto-gate scan is the team-lead's
+   defense-in-depth.
 
 If any pattern matches:
 - **Manual path (Step 5c):** treat as `ESCALATED`. Do not transition the label.
