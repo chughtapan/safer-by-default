@@ -48,8 +48,9 @@ SAFER_ATTRIBUTE_TO_USER=0
 ZAPBOT_DETECTED=0
 
 # detect_zapbot — filesystem probe. Sets ZAPBOT_DETECTED. Always exits 0.
+# config.json is the only source post-#160; .env is no longer probed.
 detect_zapbot() {
-  if [ -f "$HOME/.zapbot/.env" ] || [ -f "$HOME/.zapbot/config.json" ]; then
+  if [ -f "$HOME/.zapbot/config.json" ]; then
     ZAPBOT_DETECTED=1
   else
     ZAPBOT_DETECTED=0
@@ -349,8 +350,7 @@ case "$IDENTITY_MODE" in
       14) probe_desc="schema_invalid" ;;
       *)  probe_desc="unknown" ;;
     esac
-    detected_path="$HOME/.zapbot/.env"
-    [ -f "$HOME/.zapbot/config.json" ] && [ ! -f "$HOME/.zapbot/.env" ] && detected_path="$HOME/.zapbot/config.json"
+    detected_path="$HOME/.zapbot/config.json"
     {
       echo ""
       echo "safer-publish: cannot reach zapbot token broker."
