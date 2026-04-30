@@ -363,3 +363,17 @@ See `PRINCIPLES.md` → Voice. The aggregate verdict comment names the
 composed skills that ran, the per-skill verdicts, and the aggregate rule
 that selected the final verdict. One paragraph; no prose essays. The
 consumer is the orchestrator, which routes on the verdict tag.
+
+---
+
+## Composition with gstack
+
+This skill is the routing layer for code review on PRs. It invokes:
+
+- `/review` — gstack's pre-landing review (SQL safety, LLM trust boundaries, conditional side effects). Non-interactive. Eligible for zapbot-remote.
+- `/simplify` — diff de-duplication and simplification. Non-interactive. Eligible for zapbot-remote.
+- `/codex review` — cross-model adversarial review. Non-interactive. Eligible for zapbot-remote.
+- `/safer:dogfood` — cold-start read of the diff. Non-interactive. Eligible for zapbot-remote.
+- `/security-review` — security-focused review pass. Non-interactive. Eligible for zapbot-remote.
+
+For PRs touching public surface or that the routing rule escalates to staff tier, `/safer:stamina --pr` runs instead, with N≥3 independent reviewers (per `PRINCIPLES.md` → Durability).

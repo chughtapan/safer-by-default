@@ -481,3 +481,15 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md → Voice`. Staff PRs are the largest in the pipeline and the most dangerous to read as prose. Keep the PR body structural: tables, lists, anchors. The reviewer and verify both need to find anchors fast.
 
 The next agent reading this PR is `review-senior`, then `verify`. Write so each can judge against the spec without reconstructing your reasoning. The traceability table is the handoff.
+
+---
+
+## Composition with gstack
+
+This skill invokes these gstack targets:
+
+- `/freeze`, `/careful`, `/guard` — guards while editing. Non-interactive. Eligible for zapbot-remote.
+- `/simplify` — mandatory before PR; stricter than senior-tier (apply every finding unless it conflicts with a plan-approved decision). Non-interactive. Eligible for zapbot-remote.
+- `/codex review` (diff-review mode) — mandatory before `/safer:review-senior` fires. Counts as one independent pass toward the stamina N budget. Non-interactive. Eligible for zapbot-remote.
+
+After the draft PR is open, `/safer:stamina --pr` is mandatory (staff-tier is high-blast-radius by default). Stamina runs the multi-reviewer fan-out.

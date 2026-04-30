@@ -415,3 +415,14 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md → Voice`. Your PR body is terse, concrete, and plan-anchored. The plan-anchor table is the reviewer's fastest path to confidence; do not bury it.
 
 The next agent reading this PR is `review-senior`. Write so they can judge the diff against the plan without reconstructing your reasoning. The plan-anchor table is the handoff.
+
+---
+
+## Composition with gstack
+
+This skill invokes these gstack targets:
+
+- `/freeze`, `/careful`, `/guard` — guards while editing. Non-interactive. Eligible for zapbot-remote.
+- `/simplify` — mandatory before opening the PR; reviews diff for redundancy and over-abstraction. Non-interactive. Eligible for zapbot-remote.
+
+After the draft PR is open, `/safer:review-senior` runs (mandatory). For PRs that touch public surface or escalate to staff-tier shape, `/safer:stamina --pr` replaces the single-reviewer path.

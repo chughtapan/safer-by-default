@@ -372,3 +372,22 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md` to Voice. The verdict is terse, mechanical, and evidence-backed. Not "looks good to me" but "SHIP: lint 0, typecheck 0, test 142/142; criteria 1-3 met with evidence at `src/foo.ts:18`, `src/foo.test.ts:42`."
 
 Quality judgments are the downstream modality's budget, not yours. You report facts. The next agent reading your verdict is a junior; they should be able to act on it (merge, re-implement, investigate) without asking you follow-up questions.
+
+---
+
+## Composition with gstack
+
+This skill emits SHIP/HOLD verdicts on PRs. It composes with these gstack testing-layer targets:
+
+- `/health` — composite code-quality dashboard (lint + types + test runner + dead-code + shell-lint). Non-interactive. Eligible for zapbot-remote.
+- `/qa` — full QA run with bug-fix loop on a live web app. Two-gate (orchestrator-mediated; whole-site flow). Eligible for zapbot-remote.
+- `/qa-only` — report-only QA run; bugs flagged, no fixes applied. Non-interactive. Eligible for zapbot-remote.
+- `/canary` — post-deploy monitoring with anomaly alerts. Non-interactive. Eligible for zapbot-remote.
+- `/design-review` — visual QA on the live site. Two-gate (orchestrator-mediated; whole-site flow). Eligible for zapbot-remote.
+- `/devex-review` — live developer-experience audit. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
+- `/benchmark` — page-performance regression check. Non-interactive. Eligible for zapbot-remote.
+- `/benchmark-models` — cross-model benchmark for skill prompts. Non-interactive. Eligible for zapbot-remote.
+
+Verify itself runs the project test runner directly (`bash tests/run-tests.sh` or equivalent). The gstack targets above cover the broader test layer beyond unit tests; the WS5 spec defines the precise delegation contract.
+
+After verify emits SHIP, `/safer:orchestrate` routes through gstack `/ship` for VERSION + CHANGELOG + PR description.

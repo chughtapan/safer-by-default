@@ -370,3 +370,11 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md` voice section. The verdict is terse. Numbers over adjectives. The evidence block speaks for the code. No AI filler. End with the status marker.
 
 The next agent reading the spike issue is deciding whether to act on the graduation plan. Write for that reader. They will not read the code. They will read the verdict.
+
+---
+
+## Composition with gstack
+
+`/safer:spike` is a throwaway-code skill answering one feasibility question. It does not compose with gstack workflows during the spike itself; the writeup publishes as a sub-issue comment, and the branch stays unmerged.
+
+If the spike result triggers a feature decision, the downstream modality (`/safer:spec` or `/safer:architect`) takes over and may compose with gstack via its own composition section.

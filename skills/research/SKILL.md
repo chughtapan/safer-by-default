@@ -383,3 +383,12 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 ## Voice (reminder)
 
 See `PRINCIPLES.md` voice section. The ledger is dense. Numbers over adjectives. Named sources over gestures. The Researcher voice is confident; the Supervisor voice is adversarial. Both are direct. The next agent reading the ledger wants the CLAIM / RATING structure, not prose narration. Give them the structure.
+
+---
+
+## Composition with gstack
+
+This skill invokes these gstack targets:
+
+- `/office-hours` (builder mode) — builder-style brainstorming for open-ended exploration; useful as input before round 1 if the question is under-framed. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
+- `/codex --mode supervisor` — per-round supervisor stamps `continue` / `hold` / `escalate` between research rounds. Non-interactive. Eligible for zapbot-remote.

@@ -385,3 +385,17 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 See `PRINCIPLES.md → Voice`. Your PR body is terse and concrete: one paragraph of what changed, a scope summary, a confidence level with evidence. No prose about the journey.
 
 The next agent reading this PR is `review-senior`. Write so they can judge the change against the acceptance criterion without needing to reconstruct your reasoning.
+
+---
+
+## Composition with gstack
+
+**Doctrine precedence inside this modality:** *safer wins on scope; gstack ETHOS wins on quality-within-scope*. The Junior Dev Rule (Principle 5) and the Budget Gate (Principle 6) are non-negotiable scope constraints; ETHOS construction defaults shape what to do *within* that scope (line-level craft, naming, test shapes).
+
+This skill may invoke these gstack guards while editing:
+
+- `/freeze` — restrict edits to a directory for the session. Non-interactive. Eligible for zapbot-remote.
+- `/careful` — warn before destructive commands (`rm -rf`, force-push, etc.). Non-interactive. Eligible for zapbot-remote.
+- `/guard` — `/freeze` + `/careful` combined. Non-interactive. Eligible for zapbot-remote.
+
+After the draft PR is open, `/safer:review-senior` is the mandatory next step (which itself composes with `/review`, `/simplify`, `/codex review`, `/safer:dogfood`).
