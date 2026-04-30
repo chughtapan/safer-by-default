@@ -165,6 +165,38 @@ Record exit codes. A non-zero exit from any command is a failure; aggregate all 
 
 Flakiness: if a test failed with a pattern that suggests flakiness (timeout, network, port bind), re-run the failing test once with the same command. Record both runs. A pass-on-retry is `SHIP_WITH_CONCERNS` with "flaky test" as the concern; never `SHIP`.
 
+### Phase 3.5 — Compose gstack testing layer (rings 2 + 3)
+
+Phase 3 owns ring 1 (the project's lint, typecheck, and test commands). Phase 3.5 dispatches ring 2 (whole-app QA) and ring 3 (cross-cutting quality dashboards) to gstack composition targets when the sub-issue's acceptance criteria, the diff scope, or the deploy state warrants. Defaults are conservative: skip a target when its trigger does not fire.
+
+If gstack is not installed, log each target as `skipped: gstack not installed` and continue with ring-1 only. Composed targets are advisory inputs to the verdict, not standalone gates.
+
+| Target | Trigger condition | Output captured | Failure propagation |
+|---|---|---|---|
+| `/health` | sub-issue acceptance references "health score", "code quality", "lint floor"; OR diff touches `package.json` / `tsconfig.json` / lint config | composite score + per-axis breakdown | score below explicit per-repo threshold (default: not gated) → `SHIP_WITH_CONCERNS` |
+| `/qa` | sub-issue acceptance references "QA", "user flow", "test the app"; AND a deployed URL is supplied (env var `VERIFY_QA_URL` or sub-issue body) | bug list + before/after screenshots | any critical-severity bug → `HOLD`; any high-severity → `SHIP_WITH_CONCERNS` |
+| `/qa-only` | sub-issue acceptance references "QA report" without "fix"; deployed URL supplied | bug list (no fixes applied) | any critical-severity bug → `HOLD`; high-severity → `SHIP_WITH_CONCERNS` |
+| `/canary` | post-deploy verify (after merge); deployed URL supplied; only when sub-issue is in `verifying` label state | anomaly list | any anomaly → `SHIP_WITH_CONCERNS`; routes to `/safer:investigate` for follow-up |
+| `/design-review` | sub-issue acceptance references "visual", "design", "UI", "look"; deployed URL supplied | screenshot diff + visual issue list | any blocker visual issue → `HOLD`; non-blocker → `SHIP_WITH_CONCERNS` |
+| `/devex-review` | sub-issue acceptance references "developer experience", "DX", "API design", "CLI", "docs onboarding"; deployed/runnable URL supplied | DX scorecard | scorecard threshold below explicit per-repo target → `SHIP_WITH_CONCERNS` |
+| `/benchmark` | sub-issue acceptance references "performance", "benchmark", "page speed", "web vitals"; baseline exists | metric deltas vs baseline | regression beyond explicit per-repo threshold → `HOLD`; smaller regression → `SHIP_WITH_CONCERNS` |
+| `/benchmark-models` | sub-issue acceptance references "model benchmark", "skill prompt comparison" | per-model latency/tokens/cost/quality | report-only; never blocks |
+
+All composed gstack targets run hold-scope autonomous; if any prompts for user input, escalate to `/safer:orchestrate` per the runtime contract in PRINCIPLES.md → Composing with gstack. Verify never accepts user-facing prompts inside a composed gstack skill.
+
+Invocation examples (one per target). Each command runs hold-scope autonomous; surface escalations to the orchestrator rather than blocking. Capture each target's output artifact URL for Phase 6.
+
+```bash
+gstack invoke /health --report-only
+gstack invoke /qa --url "$VERIFY_QA_URL" --tier quick
+gstack invoke /qa-only --url "$VERIFY_QA_URL"
+gstack invoke /canary --url "$VERIFY_DEPLOY_URL" --window 10m
+gstack invoke /design-review --url "$VERIFY_QA_URL"
+gstack invoke /devex-review --url "$VERIFY_DEPLOY_URL"
+gstack invoke /benchmark --url "$VERIFY_DEPLOY_URL" --baseline main
+gstack invoke /benchmark-models --skill <name>
+```
+
 ### Phase 4 — Check acceptance criteria
 
 Read the sub-issue body. Extract the acceptance-criteria checklist. For each criterion:
@@ -187,6 +219,9 @@ If the sub-issue has no acceptance criteria, `BLOCKED`; the contract is missing.
 | Any criterion not met | `HOLD` |
 | A test flaked (passed on retry) | `SHIP_WITH_CONCERNS` |
 | A test is consistently failing (failed twice) | `HOLD` |
+| Any composed-target HOLD (Phase 3.5) | `HOLD` |
+| Any composed-target SHIP_WITH_CONCERNS (Phase 3.5) | `SHIP_WITH_CONCERNS` |
+| All composed targets pass | no change to ring-1 verdict |
 
 The verdict is mechanical. No judgment call beyond flakiness detection. If the mechanics say HOLD, the verdict is HOLD regardless of how close the diff is to green.
 
@@ -217,6 +252,12 @@ Total: N  Passed: N  Failed: N  Skipped: N  Flaky: N
 
 ## Findings
 <each failure or unmet criterion, with file:line or test name>
+
+### Composed targets
+<one row per composed target dispatched in Phase 3.5; verdict + score verbatim, with link to the target's output artifact>
+- /health: <verdict> score <N/10> — <artifact URL>
+- /qa: <verdict> bugs <N> — <artifact URL>
+- ... (omit rows for targets whose trigger did not fire)
 
 ## Routing
 <if HOLD: route to implement-junior | implement-senior | investigate | architect>
@@ -388,6 +429,6 @@ This skill emits SHIP/HOLD verdicts on PRs. It composes with these gstack testin
 - `/benchmark` — page-performance regression check. Non-interactive. Eligible for zapbot-remote.
 - `/benchmark-models` — cross-model benchmark for skill prompts. Non-interactive. Eligible for zapbot-remote.
 
-Verify itself runs the project test runner directly (`bash tests/run-tests.sh` or equivalent). The gstack targets above cover the broader test layer beyond unit tests; the WS5 spec defines the precise delegation contract.
+Verify itself runs the project test runner directly (`bash tests/run-tests.sh` or equivalent). The gstack targets above cover the broader test layer beyond unit tests; the WS5 spec defines the precise delegation contract. See Phase 3.5 above for invocation triggers and propagation rules.
 
 After verify emits SHIP, `/safer:orchestrate` routes through gstack `/ship` for VERSION + CHANGELOG + PR description.
