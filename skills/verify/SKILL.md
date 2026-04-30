@@ -418,17 +418,10 @@ Quality judgments are the downstream modality's budget, not yours. You report fa
 
 ## Composition with gstack
 
-This skill emits SHIP/HOLD verdicts on PRs. It composes with these gstack testing-layer targets:
+### Invokes
 
-- `/health` — composite code-quality dashboard (lint + types + test runner + dead-code + shell-lint). Non-interactive. Eligible for zapbot-remote.
-- `/qa` — full QA run with bug-fix loop on a live web app. Two-gate (orchestrator-mediated; whole-site flow). Eligible for zapbot-remote.
-- `/qa-only` — report-only QA run; bugs flagged, no fixes applied. Non-interactive. Eligible for zapbot-remote.
-- `/canary` — post-deploy monitoring with anomaly alerts. Non-interactive. Eligible for zapbot-remote.
-- `/design-review` — visual QA on the live site. Two-gate (orchestrator-mediated; whole-site flow). Eligible for zapbot-remote.
-- `/devex-review` — live developer-experience audit. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
-- `/benchmark` — page-performance regression check. Non-interactive. Eligible for zapbot-remote.
-- `/benchmark-models` — cross-model benchmark for skill prompts. Non-interactive. Eligible for zapbot-remote.
+Phase 3.5 above is the canonical contract — eight gstack testing-layer targets with explicit triggers, output capture, and verdict-propagation rules. Verify runs the project test runner directly (ring 1); the composed targets cover the broader testing layer (rings 2–3).
 
-Verify itself runs the project test runner directly (`bash tests/run-tests.sh` or equivalent). The gstack targets above cover the broader test layer beyond unit tests; the WS5 spec defines the precise delegation contract. See Phase 3.5 above for invocation triggers and propagation rules.
+### Invoked by
 
-After verify emits SHIP, `/safer:orchestrate` routes through gstack `/ship` for VERSION + CHANGELOG + PR description.
+- `/safer:orchestrate` routes the SHIP verdict from this skill into gstack `/ship` for VERSION + CHANGELOG + PR description.

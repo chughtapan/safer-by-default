@@ -486,10 +486,12 @@ The next agent reading this PR is `review-senior`, then `verify`. Write so each 
 
 ## Composition with gstack
 
-This skill invokes these gstack targets:
+### Invokes
 
-- `/freeze`, `/careful`, `/guard` — guards while editing. Non-interactive. Eligible for zapbot-remote.
-- `/simplify` — mandatory before PR; stricter than senior-tier (apply every finding unless it conflicts with a plan-approved decision). Non-interactive. Eligible for zapbot-remote.
-- `/codex review` (diff-review mode) — mandatory before `/safer:review-senior` fires. Counts as one independent pass toward the stamina N budget. Non-interactive. Eligible for zapbot-remote.
+- `/freeze`, `/careful`, `/guard` — guards while editing.
+- `/simplify` — mandatory before PR; stricter than senior-tier (apply every finding unless it conflicts with a plan-approved decision).
+- `/codex review` (diff-review mode) — mandatory before `/safer:review-senior` fires. Counts as one independent pass toward the stamina N budget.
 
-After the draft PR is open, `/safer:stamina --pr` is mandatory (staff-tier is high-blast-radius by default). Stamina runs the multi-reviewer fan-out.
+### Invoked by
+
+- `/safer:stamina --pr` runs after the draft PR opens (mandatory; staff-tier is high-blast-radius by default).

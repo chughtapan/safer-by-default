@@ -3,7 +3,7 @@ name: safer-docs-reader
 version: 0.1.0
 model: opus
 description: |
-  Read a docs artifact and dispatch 4 ephemeral haiku personas for multi-perspective feedback. Aggregate verdicts via severity-weighted consensus; loop up to N=3 rounds (round 3 user-gated). Emit-only — does not revise the artifact.
+  Read a docs artifact and dispatch 4 ephemeral opus personas for multi-perspective feedback. Aggregate verdicts via severity-weighted consensus; loop up to N=3 rounds (round 3 user-gated). Emit-only — does not revise the artifact.
 triggers:
   - docs reader
   - personas feedback on this
@@ -43,7 +43,7 @@ These are the spec invariants this skill enforces. Every reference to `Invariant
 
 1. **One skill.** No new per-persona skill directories. A persona is a prompt file plus an ephemeral sub-agent.
 2. **Ephemeral sub-agents.** A persona sub-agent exists for exactly one feedback pass; its team is deleted at run end on every exit path.
-3. **Opus orchestrator, haiku personas.** The skill runs on opus; every persona `Agent` call carries `model: "haiku"` per the orchestrate model-routing table. Dispatch is always `TeamCreate` + `Agent(team_name, ...)`; never standalone `Agent`; never in-session `Skill`.
+3. **Opus orchestrator, opus personas.** The skill runs on opus; every persona `Agent` call carries `model: "opus"` per the orchestrate model-routing table. Dispatch is always `TeamCreate` + `Agent(team_name, ...)`; never standalone `Agent`; never in-session `Skill`.
 4. **Bounded iteration.** The round limit is fixed at N=3: round 1 auto; round 2 only on explicit user trigger after revision; round 3 only with explicit user authorization at dispatch (`--allow-round-3`). The loop cannot exceed N=3.
 5. **Aggregator is named and deterministic.** The severity-weighted consensus rule below is the complete aggregator contract. The aggregator introduces no judgments the personas did not emit; it does not reweight, rephrase, or invent items or scores.
 6. **Artifact discipline.** Every run publishes a summary comment on the target artifact when the target is a GitHub issue/PR. No state lives only in conversation.
@@ -53,7 +53,7 @@ These are the spec invariants this skill enforces. Every reference to `Invariant
 
 > **Personas read cold. Their aggregate verdict is the skill's output. The skill does not revise the artifact, and it does not invent feedback the personas did not emit.**
 
-Enforcement is architectural. Persona sub-agents are spawned via `TeamCreate` + `Agent(team_name, model: haiku)` with a self-contained prompt: the persona template, the artifact payload, the output schema. No session history. No parent epic. No sibling docs. When a persona needs context beyond the artifact, it reports that as a BLOCK in the artifact, not a gap to paper over.
+Enforcement is architectural. Persona sub-agents are spawned via `TeamCreate` + `Agent(team_name, model: opus)` with a self-contained prompt: the persona template, the artifact payload, the output schema. No session history. No parent epic. No sibling docs. When a persona needs context beyond the artifact, it reports that as a BLOCK in the artifact, not a gap to paper over.
 
 ## Role
 
@@ -61,7 +61,7 @@ You are the orchestrator. Given an artifact reference, you:
 
 1. Resolve the artifact to one self-contained payload.
 2. Create an ephemeral team via `TeamCreate`.
-3. Spawn one sub-agent per persona via `Agent(team_name, name, model: haiku)`, each with the persona prompt + payload + output schema.
+3. Spawn one sub-agent per persona via `Agent(team_name, name, model: opus)`, each with the persona prompt + payload + output schema.
 4. Collect each sub-agent's structured verdict.
 5. Aggregate via severity-weighted consensus (deterministic; see §Aggregation).
 6. Decide whether to loop: round 2 runs only on explicit user trigger (after they apply revisions); round 3 is user-gated via `--allow-round-3`.
@@ -104,7 +104,7 @@ If the invocation did not specify `--issue`, `--pr`, or `--file`, ask. No artifa
 - Resolving a GitHub issue body (optionally its comments) into a payload.
 - Resolving a GitHub PR body into a payload.
 - Reading a local markdown file into a payload.
-- Creating an ephemeral team; spawning 1 haiku sub-agent per canonical persona; collecting their verdicts.
+- Creating an ephemeral team; spawning 1 opus sub-agent per canonical persona; collecting their verdicts.
 - Running the severity-weighted aggregator over the per-persona verdicts.
 - Deciding whether round 2 or round 3 is triggered, per the rules in §Round limit.
 - Publishing the aggregate report as a comment on the issue or PR, or to stdout for a local file.
@@ -128,7 +128,7 @@ If the invocation did not specify `--issue`, `--pr`, or `--file`, ask. No artifa
 |---|---|
 | Artifacts per invocation | 1 |
 | Rounds per invocation | 3 max (round 1 auto; round 2 user-triggered after revision; round 3 user-gated) |
-| Personas per round | 4 canonical (or the subset from `--personas`), one haiku sub-agent each |
+| Personas per round | 4 canonical (or the subset from `--personas`), one opus sub-agent each |
 | Teams per invocation | 1 (ephemeral; torn down on exit) |
 | Aggregator rules | exactly the severity-weighted consensus stated below; no ad-hoc reweighting |
 | Publication destinations | 1 (the artifact's own thread, or stdout for local files) |
@@ -207,13 +207,13 @@ Templates never reference the skill's caller, the session, sibling issues, or si
 
 ### Phase 5 — Dispatch personas in parallel
 
-For each persona, call `Agent` with the team name and haiku model:
+For each persona, call `Agent` with the team name and opus model:
 
 ```
 Agent({
   team_name: "$TEAM_NAME",
   name: "persona-<persona-slug>",
-  model: "haiku",
+  model: "opus",
   description: "docs-reader persona pass",
   prompt: "<assembled prompt string>"
 })
@@ -222,13 +222,13 @@ Agent({
 Invariants:
 
 - `team_name` is always set. Standalone `Agent` is forbidden (Invariant §4.3).
-- `model: "haiku"` is always set (Invariant §4.3: opus orchestrator, haiku personas).
+- `model: "opus"` is always set (Invariant §4.3: opus orchestrator, opus personas).
 - `description` is generic — it must not leak project identifiers into the sub-agent's bootstrap.
 - `name` is `persona-<slug>`, unique within the team; collisions fail the dispatch.
 
 All N personas are dispatched in parallel (one tool-use block with N `Agent` calls). Each sub-agent emits one structured verdict as its final message; the orchestrator collects each verdict from the `Agent` call's synchronous return value.
 
-If a persona's `Agent` call fails (team ceiling, haiku unavailable, prompt too large), record the failure for that persona and continue with the rest. A persona failure contributes one `SYSTEM_FAILURE` entry to that persona's slot in the aggregate; it does not terminate the run unless *every* persona fails.
+If a persona's `Agent` call fails (team ceiling, model unavailable, prompt too large), record the failure for that persona and continue with the rest. A persona failure contributes one `SYSTEM_FAILURE` entry to that persona's slot in the aggregate; it does not terminate the run unless *every* persona fails.
 
 ### Phase 6 — Validate and aggregate
 
@@ -420,7 +420,7 @@ One status marker on the last line of the final reply.
 - [ ] Exactly one input kind resolved (`--issue`, `--pr`, or `--file`).
 - [ ] Artifact payload is non-empty.
 - [ ] Ephemeral team created via `TeamCreate`; team name is `docs-reader-<SESSION>`.
-- [ ] Every persona was dispatched via `Agent(team_name, name, model: "haiku")`. No standalone `Agent`. No in-session `Skill`.
+- [ ] Every persona was dispatched via `Agent(team_name, name, model: "opus")`. No standalone `Agent`. No in-session `Skill`.
 - [ ] Every persona's reply validated against its template schema (or re-invoked once on failure).
 - [ ] Aggregator applied the severity-weighted consensus rules exactly; no invented items or scores.
 - [ ] Round-limit rule enforced: round 2 only on explicit user trigger after revision; round 3 only with `--allow-round-3`.
@@ -455,4 +455,9 @@ The next reader of the aggregate report is the artifact's author, deciding what 
 
 ## Composition with gstack
 
-`/safer-docs-reader` is an internal doc-review skill invoked by `/safer:dogfood` and during artifact handoff review. It does not compose with gstack workflows. Per the runtime contract, feedback flows up to the calling modality, never out as a user prompt.
+### Invoked by
+
+- `/safer:dogfood` — internal doc-review during cold-start reads.
+- Artifact handoff review across modalities.
+
+safer-docs-reader does not invoke gstack targets. Feedback flows up to the calling modality, never out as a user prompt.
