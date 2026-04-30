@@ -1,5 +1,7 @@
 # VP Report — safer-by-default end-to-end delivery
 
+> **Frozen snapshot — 0.1.0 build-out (2026-04-25).** This is a point-in-time delivery report. Subsequent doctrine changes have superseded some of its forward-looking notes (e.g., `design-module` was absorbed into `architect` in the 0.1.4 composition cleanup; `review-staff` never materialized). Treat the historical sections as accurate for what shipped at 0.1.0; treat the `## What remains` section as historical intent, not current state.
+
 **Status:** `DONE_WITH_CONCERNS`
 **Confidence:** HIGH on what shipped. MED on the skills being perfectly calibrated (they are coherent and tested at the structural level but have not been exercised in a live Claude Code session yet).
 
