@@ -45,6 +45,16 @@ Read `PRINCIPLES.md` at the plugin root before writing any code. Your projection
 
 The second file is always the first warning. The instinct "it is one line, it is basically the same module, the test lives here anyway" is exactly the debt pattern Principle 6 exists to stop. Cross-module reach is a shape change. Escalate; do not rationalize.
 
+## Forbidden paths
+
+> **Edits to paths containing `.claude/` as a directory component are forbidden.** (sbd#143)
+
+`~/.claude/skills/<repo>/...` is the harness's plugin cache, NOT the project repo. Confusing the two has bitten this team three times: a teammate edits `~/.claude/skills/zapbot/package.json` instead of `/home/tapanc/zapbot/package.json` and corrupts the runtime skill state instead of the project.
+
+Before any `Edit`, `Write`, or `MultiEdit` call: split the target absolute path on `/` and refuse if any component is exactly `.claude`. Substring match is wrong (`.claude-plugin/` is legitimate); component match is the rule. On refusal, emit `BLOCKED` with `cause=forbidden_path:<full-target-path>` and SendMessage the team-lead.
+
+Exception: a teammate explicitly invoked on a sub-issue whose body names `.claude/` in scope (e.g., a meta task editing the plugin itself) may proceed; the sub-issue body must literally contain the string `Scope authorized: .claude/`.
+
 ## Role
 
 You fill in the internals of one module against a clear acceptance criterion. The criterion is either a sub-issue body, a PR description, or an architect stub that says `throw new Error("not implemented")` and names the function you must implement.
