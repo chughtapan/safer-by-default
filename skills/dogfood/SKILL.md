@@ -502,4 +502,9 @@ The next agent reading this report is the upstream modality's author, revising. 
 
 ## Composition with gstack
 
-`/safer:dogfood` is itself a composition target invoked by `/safer:review-senior` and `/safer:stamina`. It does not invoke gstack skills directly. Per design, dogfood runs on haiku as the cold-start acid test — upgrading masks portability debt.
+### Invoked by
+
+- `/safer:review-senior` — cold-start read of the diff during PR review.
+- `/safer:stamina` — one of the N reviewers in `--plan` and `--pr` fan-out.
+
+dogfood does not invoke gstack targets.

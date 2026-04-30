@@ -420,9 +420,11 @@ The next agent reading this PR is `review-senior`. Write so they can judge the d
 
 ## Composition with gstack
 
-This skill invokes these gstack targets:
+### Invokes
 
-- `/freeze`, `/careful`, `/guard` — guards while editing. Non-interactive. Eligible for zapbot-remote.
-- `/simplify` — mandatory before opening the PR; reviews diff for redundancy and over-abstraction. Non-interactive. Eligible for zapbot-remote.
+- `/freeze`, `/careful`, `/guard` — guards while editing.
+- `/simplify` — mandatory before opening the PR; reviews diff for redundancy and over-abstraction.
 
-After the draft PR is open, `/safer:review-senior` runs (mandatory). For PRs that touch public surface or escalate to staff-tier shape, `/safer:stamina --pr` replaces the single-reviewer path.
+### Invoked by
+
+- `/safer:review-senior` runs after the draft PR opens (mandatory). For PRs touching public surface or escalating to staff-tier shape, `/safer:stamina --pr` replaces the single-reviewer path.

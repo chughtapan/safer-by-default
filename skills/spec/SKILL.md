@@ -293,10 +293,12 @@ See `PRINCIPLES.md → Voice`. The spec itself is terse and concrete. Your reply
 
 ## Composition with gstack
 
-This skill invokes or accepts input from:
+### Invokes
 
-- `/codex review` — mandatory cross-model review pass before transitioning the spec to `review`. Non-interactive. Eligible for zapbot-remote.
-- `/office-hours` (input only) — startup-mode forcing questions if the user has not yet articulated the intent clearly. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
-- `/plan-ceo-review` (input only) — strategy-level rethink of the spec's scope before drafting. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
+- `/codex review` — mandatory cross-model review pass before transitioning the spec to `review`.
+- `/office-hours` — startup-mode forcing questions when the intent is under-articulated.
+- `/plan-ceo-review` — strategy-level rethink of scope before drafting.
 
-For high-blast-radius spec artifacts (public-surface invariants, cross-modality routing, doctrine), `/safer:stamina --plan` runs after publication for multi-reviewer consensus.
+### Invoked by
+
+- `/safer:stamina --plan` — for high-blast-radius spec artifacts (public-surface invariants, cross-modality routing, doctrine), stamina runs after publication for multi-reviewer consensus.

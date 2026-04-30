@@ -343,7 +343,7 @@ Poll the sub-issue until one of:
 - For code-producing sub-tasks (`implement-*`):
   - **If `safer-diff-scope --pr $PR` reports tier ≥ `senior` OR `public_surface_changed > 0` OR the sub-issue modality is `implement-staff`:** invoke `/safer:stamina --pr <PR>`. Stamina routes to the review family and gates on consensus; do not also invoke `/safer:review-senior` standalone.
   - **Else:** invoke `/safer:review-senior` on the PR (existing single-reviewer path).
-- For design-producing sub-tasks (`spec`, `architect`, `design-module`):
+- For design-producing sub-tasks (`spec`, `architect`):
   - **If the sub-issue modality is `spec` or `architect` (high-blast-radius by default):** invoke `/safer:stamina --plan <sub-issue-URL>`.
   - **Else:** read the artifact and judge against acceptance (existing path). Ask the user if any criterion is ambiguous.
 - For exploration sub-tasks (`investigate`, `spike`, `research`): read the writeup; judge against acceptance.
@@ -356,7 +356,7 @@ safer-transition-label --issue $N --from review --to plan-approved
 ```
 
 Then cascade forward per modality lifecycle:
-- `spec` / `architect` / `design-module` → `plan-approved` → (next sub-task starts, this one closes to `done`).
+- `spec` / `architect` → `plan-approved` → (next sub-task starts, this one closes to `done`).
 - `implement-*` → `plan-approved` → `implementing` (the PR is merged) → `verifying` (verify sub-task runs) → `done`.
 - `investigate` / `spike` / `research` → `plan-approved` → `done` (these produce writeups, not code).
 
@@ -770,22 +770,9 @@ Default is `*/2 * * * *` (every 2 minutes) and you should not change it without 
 
 ### Model routing
 
-The `Agent` call in Step 6d includes the `model` parameter per the table below. Every modality has a default model; override only if the user explicitly names a different model for a task.
+The `Agent` call in Step 6d includes `model: opus` for every dispatched modality. Override only if the user explicitly names a different model for a task.
 
-| Modality | Model | Rationale |
-|---|---|---|
-| `safer:implement-junior` | haiku (claude-haiku-4-5) | "fill in body of one module" is small-model territory |
-| `safer:implement-senior` | sonnet (claude-sonnet-4-6) | cross-module-within-plan; judgment without creativity |
-| `safer:implement-staff` | opus (claude-opus-4-7) | new modules / new public interfaces / new architectural patterns |
-| `safer:dogfood` | haiku | **acid test**: if haiku can't cold-read the artifact, the artifact has portability bug |
-| `safer:spike` | opus | throwaway feasibility requires exploratory reasoning |
-| `safer:research` | opus | iterative hypothesis loop over literature |
-| `safer:architect` | opus | design-module decisions; high blast radius |
-| `safer:review-senior` | opus | review is high-stakes reading |
-| `safer:verify` | opus | formal sign-off |
-| `safer:spec` | opus | translating intent to acceptance criteria |
-
-> **Dogfood-on-haiku is an acid test.** Upgrading dogfood to opus masks portability debt. Keep dogfood on haiku.
+The rationale is uniformity: dispatched teammates run high-stakes work (drafting specs, reviewing PRs, emitting verdicts), and routing decisions across the pipeline benefit from one model's calibration rather than tier-driven model swaps. Smaller-model experiments belong in narrow tools, not in the dispatch path.
 
 ### Codex dispatch pattern
 
@@ -804,12 +791,11 @@ Three modes mirror gstack `/codex`. Invoke via the gstack `/codex` skill — do 
 When routing rules conflict, this order governs. Earlier rules dominate.
 
 1. **User override wins.** User explicitly names a model, skips a gate, or routes differently → follow. Log override on sub-issue.
-2. **Scope discipline wins over capability upgrades.** If a scenario needs opus reasoning but the modality is junior, re-triage to senior. Never silently upgrade the junior's model — that hides scope drift.
-3. **Dogfood-on-haiku overrides artifact's model hint.** Dogfood IS the small-model test. If haiku cannot cold-read the artifact, fix the artifact, not the test.
-4. **Codex unavailable falls through to claude-only.** Log the skip. Blocking all spec work on a third-party CLI failure is worse than missing one cross-model pass.
-5. **Simplify finding conflicts with plan-approved architect decision.** Plan wins; skip finding; cite plan line in PR body.
-6. **Stamina N budget overlaps with codex + review-senior.** A codex diff-review pass and a `/safer:review-senior` pass count as N=2 (independent roles: mechanical/cross-model vs human-style). They do not double-count as N=1.
-7. **Gate failures are never silent.** Simplify errored, codex unreachable, review-senior did not fire: post a gate-skip comment on the sub-issue with the reason.
+2. **Scope discipline wins over capability upgrades.** If a scenario needs more reasoning than the modality budgets, re-triage to a higher-tier modality. Never silently widen a junior's scope to cover the gap — that hides scope drift.
+3. **Codex unavailable falls through to claude-only.** Log the skip. Blocking all spec work on a third-party CLI failure is worse than missing one cross-model pass.
+4. **Simplify finding conflicts with plan-approved architect decision.** Plan wins; skip finding; cite plan line in PR body.
+5. **Stamina N budget overlaps with codex + review-senior.** A codex diff-review pass and a `/safer:review-senior` pass count as N=2 (independent roles: mechanical/cross-model vs human-style). They do not double-count as N=1.
+6. **Gate failures are never silent.** Simplify errored, codex unreachable, review-senior did not fire: post a gate-skip comment on the sub-issue with the reason.
 
 ### Per-modality dispatch prompt templates
 
@@ -837,7 +823,7 @@ For `verify`, `research`, and `spec`, `{BRANCH_HINT}` is the empty string; their
 
 ```
 source: orchestrate-auto-dispatch
-Dispatch with: `model: haiku` per orchestrate Model routing table.
+Dispatch with: `model: opus` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:implement-junior`.
 
 Sub-issue: {ISSUE_URL}
@@ -861,7 +847,7 @@ team lead with the PR URL.
 
 ```
 source: orchestrate-auto-dispatch
-Dispatch with: `model: sonnet` per orchestrate Model routing table.
+Dispatch with: `model: opus` per orchestrate Model routing table.
 You are a teammate on team `{TEAM}` invoking `/safer:implement-senior`.
 
 Sub-issue: {ISSUE_URL}
@@ -1214,12 +1200,12 @@ The next agent reading your decomposition is a junior. Write the decomposition s
 
 ## Composition with gstack
 
-This skill is the routing layer for interactive gstack skills running under safer modalities. It invokes or routes to:
+orchestrate is the routing layer for safer modalities and the only layer that calls `AskUserQuestion`. Teammates waiting on a user reply MUST NOT be reaped by Path (b) cleanup (see Step 5d).
 
-- `/codex review` — spec / architect cross-model review pass. Non-interactive. Eligible for zapbot-remote.
-- `/codex --mode supervisor` — per-round research supervision. Non-interactive. Eligible for zapbot-remote.
-- `/codex --mode consult` — second opinions on unusual routing decisions. Non-interactive. Eligible for zapbot-remote.
-- `/autoplan` — canonical composition target for stamina-on-plan and zapbot-remote-friendly review fan-out. Two-gate (orchestrator-mediated). Eligible for zapbot-remote.
-- `/ship`, `/land-and-deploy`, `/landing-report` — post-verify ship hop. orchestrate routes the SHIP verdict from `/safer:verify` into gstack `/ship` (VERSION + CHANGELOG + PR + deploy verification). Non-interactive. Eligible for zapbot-remote.
+### Invokes
 
-Per the runtime contract (`PRINCIPLES.md` → Composing with gstack), interactive skills run hold-scope autonomous and escalate to orchestrate; orchestrate is the only layer that calls `AskUserQuestion`. Teammates waiting on a user reply MUST NOT be reaped by Path (b) cleanup (see Step 5d).
+- `/codex review` — spec / architect cross-model review pass.
+- `/codex --mode supervisor` — per-round research supervision.
+- `/codex --mode consult` — second opinions on unusual routing decisions.
+- `/autoplan` — canonical fan-out target for stamina-on-plan reviews.
+- `/ship`, `/land-and-deploy`, `/landing-report` — post-verify ship hop, after `/safer:verify` emits SHIP (VERSION + CHANGELOG + PR + deploy verification).

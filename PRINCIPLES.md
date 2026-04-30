@@ -403,9 +403,6 @@ Principle 5 self-polishing.
                           ▼
                       architect
                           │
-                          ▼
-               design-module*  (Tier 2)
-                          │
       ┌───────────────────┼───────────────────┐
       ▼                   ▼                   ▼
 implement-junior   implement-senior   implement-staff
@@ -431,7 +428,7 @@ orthogonal (invokable anywhere):
       (bug)      (yes/no)  (open)
 ```
 
-*\* Tier 2 = deferred to post-v1; until that lands, the architect may absorb `design-module` scope.*
+Module-design absorption happens inside `architect` — there is no separate `design-module` modality. Architect composes with gstack design skills (`/frontend-design`, `/design-consultation`, `/design-shotgun`) when the plan touches UI surfaces.
 
 Work flows forward one notch. When blocked, backward one notch via the Ratchet. `orchestrate` sees the whole graph; every other modality sees only its charter and its immediate upstream.
 
@@ -479,11 +476,13 @@ Every skill's final output carries exactly one status marker. Artifacts without 
 
 safer is the SDS modality spine. gstack is a parallel toolbox of interactive workflow skills. They coexist; composition happens at the modality dispatch seam. Each safer skill body names its own composition targets — there is no central routing table to read.
 
+**Runtime contract.** Composition targets run hold-scope autonomous: targets that would prompt the user mid-run (`/qa`, `/design-review`, `/plan-eng-review`, `/plan-design-review`, `/plan-devex-review`, `/plan-ceo-review`, `/devex-review`, `/autoplan`, `/office-hours`, `/frontend-design`, `/design-consultation`, `/design-shotgun`) escalate the decision to `/safer:orchestrate`, which surfaces the question via `AskUserQuestion`. All other targets run inline. Per-skill bodies name the targets and the trigger; they do not repeat this rule.
+
 **Doctrine precedence.** Inside an active safer modality charter: *safer wins on scope; gstack ETHOS wins on quality-within-scope*. Outside safer modalities (pure gstack workflows), ETHOS governs unmodified. The two doctrines stack at orthogonal layers — pipeline discipline (safer) and construction defaults (gstack) — and the precedence rule is the tie-break for the bounded collisions inside `implement-*`.
 
 **Investigate name collision.** safer and gstack both ship a skill named `investigate`. In safer docs, always qualify: `/safer:investigate` for reproduce-and-name-the-cause; `/gstack:investigate` for the gstack workflow. Bare `/investigate` is disallowed in safer docs.
 
-**Where the routing lives.** Per-skill, in each `skills/<name>/SKILL.md`. An agent invoking skill X reads X's body to learn X's composition. The README is for human onboarding, not agent-time reads.
+**Where the routing lives.** Per-skill, in each `skills/<name>/SKILL.md`, under `## Composition with gstack` with `### Invokes` and `### Invoked by` subsections. An agent invoking skill X reads X's body to learn X's composition. The README is for human onboarding, not agent-time reads.
 
 ---
 

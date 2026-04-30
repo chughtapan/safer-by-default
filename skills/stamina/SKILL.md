@@ -212,7 +212,7 @@ LABEL=$(gh issue view "$SUB_ISSUE" --json labels -q '.labels[].name' | grep '^sa
 |---|---|
 | `safer:implement-junior` | 1 |
 | `safer:implement-senior`, `safer:investigate`, `safer:spike`, `safer:research` | 2 |
-| `safer:spec`, `safer:architect`, `safer:design-module` | 3 |
+| `safer:spec`, `safer:architect` | 3 |
 | `safer:implement-staff` | 3 |
 
 **Dispatch set selection.** From the chosen N, select role-diverse reviewers until |set| ≥ N. Roles map to skills:
@@ -481,13 +481,13 @@ Stamina's voice is the voice of the dispatcher, not the critic. If your output r
 
 ## Composition with gstack
 
-This skill is a fan-out review adapter. It dispatches multiple review skills and gates on consensus.
+### Invokes
 
-For plan-class artifacts (`--plan` mode):
+`--plan` mode (spec, architect plan):
 - `/safer:dogfood` — cold-start read of the spec or plan.
 - `/safer:review-senior` — acceptance-vs-residuals review.
 - `/codex review` — cross-model adversarial review.
 
-For PRs (`--pr` mode): superset of the plan set, plus `/review`, `/simplify`, `/security-review`. `/autoplan` is the canonical zapbot-remote-friendly fan-out target when the artifact warrants it.
+`--pr` mode (PR review): superset of the `--plan` set, plus `/review`, `/simplify`, `/security-review`. `/autoplan` is the canonical fan-out target when the artifact warrants it.
 
-All composed targets run hold-scope autonomous; user-facing prompts route up to `/safer:orchestrate`. The N count and consensus rule live in `PRINCIPLES.md` → Durability.
+The N count and consensus rule live in `PRINCIPLES.md` → Durability.

@@ -418,4 +418,4 @@ Do not narrate the investigation in prose. The writeup is structured sections, n
 
 `/safer:investigate` and gstack's `/investigate` are different skills (name collision documented in `PRINCIPLES.md` → Composing with gstack). Always qualify with the plugin prefix in safer docs; bare `/investigate` is disallowed.
 
-This skill does not compose with gstack workflows directly. After a reproduction artifact lands and the implementation modality (`/safer:implement-*`) takes over, that modality may compose with gstack guards (`/freeze`, `/careful`, `/guard`).
+This skill does not invoke or get invoked by gstack targets. After a reproduction artifact lands, the implementation modality (`/safer:implement-*`) takes over and composes with gstack guards (`/freeze`, `/careful`, `/guard`) per its own composition section.
