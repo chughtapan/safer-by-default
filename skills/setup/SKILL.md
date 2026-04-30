@@ -176,7 +176,51 @@ Do not attempt the migration yourself. That belongs to the user's judgement abou
 
 **If both `LEGACY` and `FLAT_CONFIG` are set:** proceed on the clean-slate path, but warn the user that ESLint 9 flat config takes precedence and the `.eslintrc` file is being ignored. Deleting it later avoids confusion.
 
-**Else (clean slate):** proceed to Step 1.
+**Else (clean slate):** proceed to Step 0b.
+
+### Step 0b: Pin the package-manager toolchain (mandatory; sbd#142)
+
+Lockfile drift between local and CI is a recurring debt pattern (incident: zap#130, three CI-vs-local `bun.lock` mismatch cycles caused by local `bun` and CI `setup-bun@latest` diverging). The fix is to pin the toolchain version in `package.json` `packageManager` field from commit one. Setup writes that field if `package.json` exists.
+
+Idempotent: skip if `packageManager` is already set (any value — do not overwrite the user's choice).
+
+```bash
+if [ -f package.json ]; then
+  CURRENT_PM_PIN=$(jq -r '.packageManager // empty' package.json 2>/dev/null)
+  if [ -z "$CURRENT_PM_PIN" ]; then
+    case "$PM" in
+      pnpm) PM_VERSION=$(pnpm --version 2>/dev/null) ;;
+      npm)  PM_VERSION=$(npm --version 2>/dev/null) ;;
+      yarn) PM_VERSION=$(yarn --version 2>/dev/null) ;;
+      bun)  PM_VERSION=$(bun --version 2>/dev/null) ;;
+    esac
+    if [ -n "$PM_VERSION" ]; then
+      jq --arg pin "${PM}@${PM_VERSION}" '.packageManager = $pin' package.json > package.json.tmp \
+        && mv package.json.tmp package.json
+      echo "TOOLCHAIN_PIN: wrote packageManager=${PM}@${PM_VERSION}"
+    else
+      echo "TOOLCHAIN_PIN: could not detect ${PM} version; skipped (user can pin manually)"
+    fi
+  else
+    echo "TOOLCHAIN_PIN: packageManager already set ($CURRENT_PM_PIN); skipped"
+  fi
+fi
+```
+
+Then probe CI workflow files for unpinned setup actions and warn (advisory only — no auto-edit):
+
+```bash
+if [ -d .github/workflows ]; then
+  UNPINNED=$(grep -nE 'uses: *(actions/setup-(node|bun|python)|pnpm/action-setup|oven-sh/setup-bun)@' .github/workflows/*.{yml,yaml} 2>/dev/null \
+    | grep -E '@(latest|main|master|v[0-9]+) *$' || true)
+  if [ -n "$UNPINNED" ]; then
+    echo "TOOLCHAIN_WARN: unpinned setup action(s) in CI workflows; pin to a version sha:"
+    echo "$UNPINNED" | sed 's/^/  /'
+  fi
+fi
+```
+
+The CI-warning step is advisory only. Editing workflow files belongs to the user (they understand which versions to pin to).
 
 ### Step 1: Check peer dependencies
 
