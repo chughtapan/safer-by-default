@@ -296,6 +296,16 @@ Citations that name a line carry a commit anchor. The canonical short-form is `p
 
 **(i) Worked example.** The heading `## The debt multiplier` lives at `PRINCIPLES.md:27@e1a8578`. Resolving: `git show e1a8578:PRINCIPLES.md | sed -n '27p'` returns the exact line the citation pinned. The same line at `PRINCIPLES.md:27@<another-sha>` may differ because the file has been edited; that is the point.
 
+## Process issues are first-class artifacts
+
+Every teammate's final output carries TWO artifacts: the substantive verdict (the spec / PR / review / etc.) AND a `Process issues` log of any pipeline-level friction encountered while producing it. The orchestrator's job is to surface the latter to the user proactively — buried in a verdict body, a process issue is a debt pattern that recurs because no one upstream ever sees it.
+
+Examples of process issues: a `gh` write was sandbox-blocked and the teammate had to relay the body via SendMessage; an idle notification fired before the work actually finished; a dispatch instruction was ambiguous and required a clarifying nudge; a CI status was not surfaced when it should have been; a pre-PR `/review` flagged a class of finding that no skill body anticipates; a tool returned an unexpected output shape. Anything that made the work harder than the doctrine says it should be.
+
+Surfacing rule: every teammate appends a `Process issues` section to the SendMessage that closes their turn. Empty is a valid value (`Process issues: none`). The orchestrator scans those sections each tick and either (a) surfaces them to the user as a one-line summary in the next status update, or (b) files a follow-up sub-issue when the issue is structural enough to warrant doctrine change.
+
+The failure mode this rule prevents: a teammate completes the assigned task, gets a clean APPROVE, the user moves on — and the friction the teammate hit recurs on every subsequent dispatch because no one ever named it. The orchestrator is the only seat that sees enough dispatches to spot the pattern; if the orchestrator buries it, no one fixes it.
+
 ## Confidence is a first-class output
 
 Every recommendation carries a confidence level (LOW / MED / HIGH) and the evidence behind it. "I think so" is not an acceptable output.
