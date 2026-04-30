@@ -239,6 +239,8 @@ Apply all findings unless a finding would conflict with a plan-approved architec
 
 ### Phase 7 — Open the PR
 
+Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 ```bash
 git add <changed files>
 git commit -m "impl: <one-line summary tied to the plan>"

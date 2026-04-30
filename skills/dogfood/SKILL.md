@@ -254,6 +254,9 @@ sections.
 | Trust | N/10 | ... |
 
 ## Friction log
+
+Friction entries that cite a line use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 1. [location] - [why a consumer stumbles]
 2. ...
 

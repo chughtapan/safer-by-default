@@ -228,6 +228,8 @@ For each external library in the design, fill a row in the dependencies table: n
 
 ### Phase 7 — Publish
 
+Code references in the design doc body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 ```bash
 BRANCH="arch/${SAFER_SLUG:-arch-$SESSION}"
 git checkout -b "$BRANCH"

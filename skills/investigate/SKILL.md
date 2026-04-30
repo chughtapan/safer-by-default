@@ -211,16 +211,18 @@ Record the bisect result as a row in the isolation table.
 
 ### Phase 6 — Name the root cause
 
+Code references in the root-cause writeup use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 State the mechanism, not the symptom. The root cause is a sentence that names:
 
 - The file and line where the mistake lives.
 - The class of mistake (missing validation, wrong branch, stale invariant, schema drift, unhandled case, race, overflow, off-by-one, missing exhaustiveness check).
 - The conditions under which it fires.
 
-Examples of well-formed root causes:
+Examples of well-formed root causes (paths below use `<placeholder>/...` as schematic placeholders; they are illustrative, not real files in this repo, per the schematic-placeholder exception of the code-citation doctrine; see `PRINCIPLES.md#code-references-are-pinned`):
 
-- "In `src/auth/token.ts:83`, `decodeToken` returns `null` on malformed input instead of a tagged error; the caller at `src/api/session.ts:41` treats `null` as 'anonymous session' and grants access. Classification: logical (missing typed error channel; violates Principle 3)."
-- "In `src/pipeline/ingest.ts:112`, the schema decodes only the first event in a batch; later events are cast with `as Event`. When upstream changed event shape on 2026-03-15, the cast started producing objects whose fields are `undefined` at runtime. Classification: structural (missing boundary validation; violates Principle 2)."
+- "In `<placeholder>/auth/token.ts:83`, `decodeToken` returns `null` on malformed input instead of a tagged error; the caller at `<placeholder>/api/session.ts:41` treats `null` as 'anonymous session' and grants access. Classification: logical (missing typed error channel; violates Principle 3)."
+- "In `<placeholder>/pipeline/ingest.ts:112`, the schema decodes only the first event in a batch; later events are cast with `as Event`. When upstream changed event shape on 2026-03-15, the cast started producing objects whose fields are `undefined` at runtime. Classification: structural (missing boundary validation; violates Principle 2)."
 
 Examples of malformed root causes (do not ship these):
 

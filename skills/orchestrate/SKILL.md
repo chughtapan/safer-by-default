@@ -302,6 +302,8 @@ For each sub-issue in dependency order:
 
 **Step 5a — Invoke the modality.**
 
+Code references in the dispatch prompt and any teammate-context payload use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+
 Dispatch via a team. First `TeamCreate` a team for the epic if one does not exist, then `Agent` with `team_name` and a `name` per teammate.
 
 **Never invoke a modality in-session.** The `Skill` tool executes in your own context. That means orchestrate is doing the work, which is the Iron Rule violation this skill exists to prevent. Modalities run as teammates.
