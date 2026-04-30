@@ -379,7 +379,7 @@ Fetch the most recent review body:
 gh pr view <N> --repo <R> --json reviews --jq '.reviews[-1].body'
 ```
 
-Scan the body for these three condition patterns. Any match blocks the merge:
+Scan the body for these four condition patterns. Any match blocks the merge:
 
 1. **Conditional approval** — phrases like *"approve but do not merge without X"*,
    *"LGTM pending Y"*, *"approve subject to Z"*. The verdict is approval against
@@ -391,6 +391,14 @@ Scan the body for these three condition patterns. Any match blocks the merge:
    not-yet-met but acceptable to defer past this review, with a stated condition
    for closing the deferral: *"accept as DRAFT pending CI green"*, *"merge after
    the linked Linear ticket lands"*.
+4. **CI-pending verdicts (sbd#244)** — phrases like *"APPROVE-PENDING-CI"*,
+   *"CI status: pending"*, *"CI status: failing"*. The reviewer ran the diff-static
+   review but CI was not green at review time. The team-lead must withhold merge
+   until CI clears (re-fetch `gh pr view --json statusCheckRollup`); on `failing`
+   route per Phase 6 (typically back to `/safer:implement-*` with the failure
+   evidence). `/safer:review-senior` Phase 1a and `/safer:stamina` Phase 0 enforce
+   the CI-green precondition; this auto-gate scan is the team-lead's
+   defense-in-depth.
 
 If any pattern matches:
 - **Manual path (Step 5c):** treat as `ESCALATED`. Do not transition the label.
@@ -597,7 +605,7 @@ Record the returned job id on the parent epic (comment) so the next operator can
    - Path (a) requires only pane-missing from `$ALIVE`. A teammate whose work is incomplete but whose process died is still removed — their pane is gone either way, and the work needs to be re-dispatched.
    - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
 
-5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`). Before any auto-gate transition fires, run **Step 5c.0** against the linked PR's reviewer body; skip the sub-issue if any of the three condition patterns matches.
+5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`). Before any auto-gate transition fires, run **Step 5c.0** against the linked PR's reviewer body; skip the sub-issue if any of the four condition patterns matches.
 
    **Implement-\* gate carries a mandatory verify dispatch (sbd#241).** For sub-issues with `safer:implement-*` modality, the auto-gate does NOT close at `plan-approved`. The full lifecycle is:
 

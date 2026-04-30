@@ -175,6 +175,38 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 
 ## Workflow
 
+### Phase 0 — CI status gate (PR mode only; sbd#244)
+
+> **CI must be green on the PR head before any aggregate APPROVE verdict.** Diff-static reviewers (`/safer:review-senior`, `/codex review`, `/simplify`) are blind to runtime regressions; CI is the runtime check. Real incident: moltzap PR #295 passed N=3 stamina with green diff-static review but had 5 red CI tests from a Stream/Fiber refactor.
+
+```bash
+[ "$MODE" = "pr" ] || skip_phase_0=1   # plan-mode skips this phase
+if [ -z "$skip_phase_0" ]; then
+  PR_NUMBER=$(echo "$TARGET_URL" | grep -oE '/pull/[0-9]+' | grep -oE '[0-9]+')
+  PR_REPO=$(echo "$TARGET_URL" | sed -E 's|.*github\.com/([^/]+/[^/]+)/.*|\1|')
+  CI_STATUS=$(gh pr view "$PR_NUMBER" --repo "$PR_REPO" --json statusCheckRollup --jq '
+    [.statusCheckRollup[] | .conclusion // .status]
+    | if length == 0 then "no-checks"
+      elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "CANCELLED" or . == "ACTION_REQUIRED") then "failing"
+      elif any(. == "IN_PROGRESS" or . == "PENDING" or . == "QUEUED") then "pending"
+      elif all(. == "SUCCESS" or . == "NEUTRAL" or . == "SKIPPED") then "green"
+      else "unknown" end')
+fi
+```
+
+Decision rule (caps the Phase 4 aggregate):
+
+| `CI_STATUS` | Effect on aggregate |
+|---|---|
+| `green` or `no-checks` | proceed to Phase 1; surface `CI status: <status>` in the consolidated comment |
+| `failing` | aggregate caps at `ESCALATED`. Surface `CI status: failing — <N tests>` with the failing-check names; route per Phase 6 (typically back to `/safer:implement-*`) |
+| `pending` | aggregate caps at `APPROVE-PENDING-CI`. Auto-monitor withholds merge until CI clears |
+| `unknown` | treat as `pending` (fail-safe); surface raw `statusCheckRollup` JSON for triage |
+
+Triage exception (same shape as `skills/review-senior/SKILL.md` Phase 1a): a failing check verifiably pre-existing on the base branch — confirmed by running the test on `origin/<base>` — may proceed to APPROVE with both base-branch and PR-head outputs quoted in the verdict. No verbal-only triage.
+
+This phase is non-skippable for PR mode. It is NOT a separate stamina N pass; it is the precondition gate for any aggregate APPROVE.
+
 ### Phase 1 — Classify
 
 Compute blast radius; select N from the Durability table; select the dispatch set; record both in telemetry.
