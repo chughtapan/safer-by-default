@@ -64,7 +64,7 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Rule.** Every constraint you can encode in the type system is a test you do not have to write and a bug that cannot ship.
 
-**Why.** A test catches a bug that exists. A type makes the bug impossible to write. Type-level constraints run at compile time, on every call site, for every reader, forever — with no test execution cost. Runtime checks catch only what runs; the type system catches everything the compiler sees.
+**Why.** A test catches a bug that exists. A type makes the bug impossible to write. Type-level constraints run at compile time, on every call site, for every reader, forever — with no test execution cost. Runtime checks catch only what runs; the type system catches everything the compiler sees. ETHOS §1 "Boil the Lake" (`~/.claude/skills/gstack/ETHOS.md`) frames completeness as near-zero marginal cost; moving constraints into the type system is the compiler-tier application of that same principle (see § Composing with gstack).
 
 **Anti-patterns.**
 - `string` where `type UserId = string & { __brand: "UserId" }` would prevent confusing user ids with org ids.
@@ -96,7 +96,7 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Rule.** Data crossing a boundary is decoded by a schema. Inside the boundary, your types are truths. Outside the boundary, they are wishes.
 
-**Why.** Static types are an assertion about shape. Runtime data is a fact. Assertions that contradict facts produce the worst class of bug: runtime behavior that disagrees with the type system. The only way to make types truths is to validate at the boundary. Once validated, the rest of the code path can trust the type.
+**Why.** Static types are an assertion about shape. Runtime data is a fact. Assertions that contradict facts produce the worst class of bug: runtime behavior that disagrees with the type system. The only way to make types truths is to validate at the boundary. Once validated, the rest of the code path can trust the type. ETHOS §2 "Search Before Building" names this pattern at the knowledge layer: know what is actually coming in before deciding what to do with it; boundary validation is the runtime expression of the same discipline.
 
 **The boundaries.** Data from disk. From the network. From environment variables. From user input. From dynamic imports. From any other package. Every one of those is a boundary. Pick a schema library once — Effect Schema, Zod, Valibot — and use it at all of them.
 
@@ -116,7 +116,7 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Why.** A raw throw hides three facts: which call sites it can happen at, which callers know how to handle it, what the user actually sees. Those facts surface at runtime, usually in production, usually with bad error messages. A typed error channel makes the failure modes exhaustive at the call site; you cannot forget to handle a case the compiler knows about. `Promise<T>` erases the error channel entirely; `Effect<T, E, R>` does not.
 
-An untyped throw is the assembly-language way of doing error handling. You have better tools available.
+An untyped throw is the assembly-language way of doing error handling. You have better tools available. Tagged errors and typed results encode every failure mode at the call site; that is the "do the complete thing" expectation from ETHOS §1 applied to the error channel.
 
 **Anti-patterns.**
 - `throw new Error("something went wrong")` — no type, no handling contract, no receipt for the caller.
@@ -134,7 +134,7 @@ An untyped throw is the assembly-language way of doing error handling. You have 
 
 **Why.** An unhandled branch is a bug the compiler can catch — but only if you make the compiler look. `absurd(x: never): never` is the function that makes the compiler look. Leave it out and every future addition to the union silently skips the new case.
 
-"Probably not reached" becomes "definitely not handled" and then "broken at 2 AM."
+"Probably not reached" becomes "definitely not handled" and then "broken at 2 AM." Exhaustiveness IS completeness in the type-system register; a switch that skips a case is as incomplete as a feature that skips an edge case.
 
 **Anti-patterns.**
 - `switch (s) { case "a": ...; case "b": ...; }` with no default — implicit fallthrough.
@@ -174,7 +174,7 @@ Even a perfect compiler has scope — it translates functions, not programs. Whe
 
 **Rule.** The question is not "can I do this." The question is "is this mine to do."
 
-**Why.** You can type 500 lines of correct-looking code in two minutes. That capability is the problem, not the solution. Capability without scope discipline produces fast-compounding debt, not fast-shipping code. The SDS paper is explicit: industry copes with the junior-developer error rate by limiting scope, not by making juniors senior. You are a junior developer in this model. Accept the limit.
+**Why.** You can type 500 lines of correct-looking code in two minutes. That capability is the problem, not the solution. Capability without scope discipline produces fast-compounding debt, not fast-shipping code. The SDS paper is explicit: industry copes with the junior-developer error rate by limiting scope, not by making juniors senior. You are a junior developer in this model. Accept the limit. ETHOS §3 "User Sovereignty" names the same principle at the decision layer: when scope is unclear, the user decides; the agent presents and asks, it does not assume and act.
 
 **Anti-patterns.**
 - "I can just touch this other file real quick." *(That is the scope boundary. Stop.)*
@@ -189,7 +189,7 @@ Even a perfect compiler has scope — it translates functions, not programs. Whe
 
 **Rule.** Every modality has an explicit budget naming the shape of change in scope and out of scope. Budget violations are escalation triggers, never negotiated compromises.
 
-**Why.** The budget is about *shape of change* (what boundaries you cross), not *volume of change* (how much you type). An AI-era `implement-junior` task can legitimately produce 500 LOC. It still cannot change a module's public surface. Shape, not volume.
+**Why.** The budget is about *shape of change* (what boundaries you cross), not *volume of change* (how much you type). An AI-era `implement-junior` task can legitimately produce 500 LOC. It still cannot change a module's public surface. Shape, not volume. ETHOS §1 "Boil the Lake" draws the lake vs. ocean line: a budget names exactly what is boilable (the lake) and what is out of scope (the ocean); violating the budget means boiling an ocean, not a lake.
 
 **The shape table.**
 
@@ -220,7 +220,7 @@ Even a perfect compiler has scope — it translates functions, not programs. Whe
 
 **Why.** Stop rules exist to interrupt momentum. Momentum is the enemy of discipline. The instinct "I'll just finish this function first" is the exact failure mode the stop rule prevents — because finishing the function locks in the wrong shape, and then the escalation has to argue against shipped code instead of an unmade decision.
 
-Stop rules are not advisory. They are binary. Fired means stopped.
+Stop rules are not advisory. They are binary. Fired means stopped. ETHOS §3 frames this as the generation-verification loop: the agent generates, the user verifies and decides; stop rules are the agent-side half of that loop, the mechanism that keeps the user in the seat.
 
 **Anti-patterns.**
 - "I'll finish this function first and then escalate." *(The function is downstream of the stop.)*
@@ -242,7 +242,7 @@ user ← spec ← architect ← senior ← junior
               └────── ratchet ───────┘
 ```
 
-Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is forbidden.
+Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is forbidden. ETHOS §3 "User Sovereignty" is the parallel principle at the human layer: handing work back to the upstream modality is the safer-pipeline expression of "ask, don't decide for the user."
 
 **Anti-patterns.**
 - "I'll add a boolean flag to handle this edge case." *(Boolean flags are the canonical shape of sidestepping a design flaw.)*
@@ -470,6 +470,8 @@ Every skill's final output carries exactly one status marker. Artifacts without 
 **On craft.** *Every error you can put in the type system is one that cannot ship.* If you are about to accept `any`, a raw throw, a bare catch, or an unchecked cast, stop. The question is whether the constraint can live higher up.
 
 **On scope.** *Capability is not an instruction. Scope is.* If you are about to act because you are able to, stop. The question is whether the action is in your scope.
+
+**On composition.** Inside an active safer modality, *safer wins on scope; gstack ETHOS wins on quality-within-scope*. The two doctrines sit at orthogonal layers: safer governs the pipeline (what work is yours), ETHOS governs construction defaults (how to do that work). Outside safer modalities, ETHOS governs unmodified.
 
 ---
 
