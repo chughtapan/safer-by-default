@@ -310,6 +310,8 @@ Dispatch via a team. First `TeamCreate` a team for the epic if one does not exis
 
 **Never dispatch via `Agent` without `team_name`.** Standalone subagents are fire-and-forget; teammates are the unit of orchestration. Teams provide shared task lists, peer DM, idle notifications to the team lead, and persistent config at `~/.claude/teams/<team-name>/`.
 
+**Always dispatch with `isolation: "worktree"`.** Default-on, not opt-in. Without it, every dispatched teammate inherits the orchestrator's working directory; concurrent implementers share a worktree and their `git checkout` commands stomp each other's branches (incident: 2026-04-30, sbd#240, moltzap-arena#198). Each teammate gets its own worktree; the harness cleans it up automatically when the agent exits without changes. Override only with explicit user authorization for a specific dispatch where shared state is required.
+
 Teammate prompt template:
 
 ```
@@ -596,6 +598,15 @@ Record the returned job id on the parent epic (comment) so the next operator can
    - When uncertain whether a teammate is truly done, leave them. A held pane is cheaper than lost work.
 
 5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`). Before any auto-gate transition fires, run **Step 5c.0** against the linked PR's reviewer body; skip the sub-issue if any of the three condition patterns matches.
+
+   **Implement-\* gate carries a mandatory verify dispatch (sbd#241).** For sub-issues with `safer:implement-*` modality, the auto-gate does NOT close at `plan-approved`. The full lifecycle is:
+
+   1. `review → plan-approved` (this auto-gate step) — review verdict accepted, PR is merge-ready.
+   2. PR is merged (team-lead-driven, possibly user-authorized; not auto-merged by this loop).
+   3. `plan-approved → verifying` (next auto-monitor tick after merge): dispatch `/safer:verify` against the merged commit per the verify dispatch template. The verify dispatch is unconditional — verify is the default merge gate for every implement-\* sub-issue, not a per-team customization. Skip only when a `/safer:verify` sub-issue already exists for this commit (idempotency).
+   4. `verifying → done` (after verify emits SHIP): post the gating comment with the verify verdict URL, close the sub-issue. On HOLD: route per Phase 6 (typically back to `/safer:implement-*` with the verify findings).
+
+   The auto-gate never skips verify on implement-\* sub-issues. A sub-issue at `plan-approved` whose PR is merged and has no verify verdict on the merge commit is a candidate for auto-dispatch to verify on every tick until the verdict lands.
 6. **Auto-dispatch pending work (work-queue scan).** The prior steps react to state the loop already knows about. Step 6 is the proactive scan: enumerate pending sub-issues across every repo this team serves, filter out the ones that are already in flight, prioritize what is left, and dispatch up to the per-tick cap. Without this step the orchestrator idles between user prompts even when work is queued. Step 6 is mandatory once a team is installed.
 
 **Step 6a — enumerate pending work.** Scan every repo this team watches (`~/.claude/teams/<team-name>/config.json` carries `repos: []`; fall back to the current repo if the field is absent). For each, list open sub-issues whose labels name a dispatchable modality:
@@ -796,7 +807,7 @@ When routing rules conflict, this order governs. Earlier rules dominate.
 2. **Scope discipline wins over capability upgrades.** If a scenario needs more reasoning than the modality budgets, re-triage to a higher-tier modality. Never silently widen a junior's scope to cover the gap — that hides scope drift.
 3. **Codex unavailable falls through to claude-only.** Log the skip. Blocking all spec work on a third-party CLI failure is worse than missing one cross-model pass.
 4. **Simplify finding conflicts with plan-approved architect decision.** Plan wins; skip finding; cite plan line in PR body.
-5. **Stamina N budget overlaps with codex + review-senior.** A codex diff-review pass and a `/safer:review-senior` pass count as N=2 (independent roles: mechanical/cross-model vs human-style). They do not double-count as N=1.
+5. **Stamina N budget overlaps with codex + review-senior.** A codex diff-review pass and a `/safer:review-senior` pass count as N=2 (independent roles: mechanical/cross-model vs human-style). They do not double-count as N=1. **Pre-PR `/review` and `/simplify` runs by `/safer:implement-*` do NOT count toward N** — they are hygiene gates the implementer runs on its own diff, not independent reviewers.
 6. **Gate failures are never silent.** Simplify errored, codex unreachable, review-senior did not fire: post a gate-skip comment on the sub-issue with the reason.
 
 ### Per-modality dispatch prompt templates
@@ -838,11 +849,11 @@ Read the sub-issue and parent epic before touching code.
 Acceptance: {ACCEPTANCE}
 
 Scope is ONE module. If you need to touch a second module, stop and escalate.
-If the diff exceeds 50 LOC or introduces shared helpers, consider running /simplify
-before opening the PR. Open a draft PR titled `[impl-junior] ...`. Move the
-sub-issue to `review`. Emit a status marker (DONE / DONE_WITH_CONCERNS /
-ESCALATED / BLOCKED / NEEDS_CONTEXT) on your final output and SendMessage the
-team lead with the PR URL.
+Before opening the PR, run /simplify and /review on the diff (mandatory; apply
+findings; neither counts toward stamina N — they are pre-PR hygiene gates).
+Open a draft PR titled `[impl-junior] ...`. Move the sub-issue to `review`.
+Emit a status marker (DONE / DONE_WITH_CONCERNS / ESCALATED / BLOCKED /
+NEEDS_CONTEXT) on your final output and SendMessage the team lead with the PR URL.
 ```
 
 #### implement-senior
@@ -863,10 +874,12 @@ Acceptance: {ACCEPTANCE}
 
 Scope is cross-module WITHIN the plan. Do not introduce new modules, new public
 surface outside the plan, or new deps. `safer-diff-scope --head HEAD` must report
-`senior`. Before opening the PR, run /simplify on the diff (mandatory); apply
-findings unless a finding conflicts with a plan-approved decision (cite the plan
-line in the PR body). Open a draft PR titled `[impl-senior] ...` with a
-plan-anchor table. /safer:review-senior is mandatory before merge.
+`senior`. Before opening the PR, run /simplify and /review on the diff (both
+mandatory; apply findings unless a finding conflicts with a plan-approved
+decision — cite the plan line in the PR body for any skipped finding). Neither
+counts toward stamina N — pre-PR hygiene gates, not independent reviewers.
+Open a draft PR titled `[impl-senior] ...` with a plan-anchor table.
+/safer:review-senior is mandatory before merge.
 Status marker + SendMessage the team lead with the PR URL.
 ```
 
@@ -893,10 +906,12 @@ You may introduce new modules, new public interfaces, and new deps — all of
 which must trace to the approved plan. Before opening the PR:
 1. Run /simplify on the diff (mandatory, stricter than senior — apply every
    finding unless it conflicts with a plan-approved architect decision; cite the
-   plan line in the PR body for any skipped finding).
+   plan line in the PR body for any skipped finding). Does NOT count toward stamina N.
 2. Run /codex on the PR diff (mandatory): post the codex verdict as a PR comment
    before /safer:review-senior fires. This counts as one independent pass toward
    the stamina N budget. If /codex is unavailable, log the skip on the sub-issue.
+3. Run /review on the diff (mandatory): apply findings; cite plan-conflicting
+   skips in the PR body under "Review skips". Does NOT count toward stamina N.
 Open a draft PR titled `[impl-staff] ...`. /safer:review-senior is mandatory
 before merge. Status marker + SendMessage the team lead with the PR URL.
 ```

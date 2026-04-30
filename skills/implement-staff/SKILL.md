@@ -286,6 +286,18 @@ Post the codex verdict as a comment on the sub-issue before opening the PR (the 
 
 If `/codex` is unavailable, log "codex diff review: unavailable — skipped" on the sub-issue and proceed.
 
+### Phase 8c — Pre-PR review pass (mandatory)
+
+Before opening the PR, run `/review` on the diff:
+
+```
+/review
+```
+
+Apply all findings unless a finding conflicts with a plan-approved architect decision; cite skips in the PR body under "Review skips" with the specific plan line. An empty result is valid — note "review: no findings" in the PR body. If `/review` errors, note "review: errored — skipped" and proceed.
+
+**Does NOT count toward stamina N.** Pre-PR hygiene gate; only `/codex` (Phase 8b) counts as the staff-tier independent stamina pass.
+
 ### Phase 9 — Open the PR
 
 Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
@@ -456,6 +468,7 @@ Post on the sub-issue; leave the branch in place with the anchored work committe
 - [ ] Lint, typecheck, and tests pass across touched packages.
 - [ ] Pre-PR `/simplify` pass run; all findings applied or each skip cites the plan line in PR body.
 - [ ] `/codex` diff review run; verdict posted on sub-issue (or "unavailable — skipped" logged).
+- [ ] Pre-PR `/review` pass run; all findings applied or each skip cites the plan line in PR body.
 - [ ] Draft PR opened with title prefixed `[impl-staff]` and tables in body; sub-issue label transitioned `implementing` → `review`.
 - [ ] `/safer:review-senior` is mandatory before this PR merges (noted in PR body or enforced by orchestrate Phase 5c).
 - [ ] `safer.skill_end` event emitted.
