@@ -178,9 +178,9 @@ Do not attempt the migration yourself. That belongs to the user's judgement abou
 
 **Else (clean slate):** proceed to Step 0b.
 
-### Step 0b: Pin the package-manager toolchain (mandatory; sbd#142)
+### Step 0b: Pin the package-manager toolchain (mandatory)
 
-Lockfile drift between local and CI is a recurring debt pattern (incident: zap#130, three CI-vs-local `bun.lock` mismatch cycles caused by local `bun` and CI `setup-bun@latest` diverging). The fix is to pin the toolchain version in `package.json` `packageManager` field from commit one. Setup writes that field if `package.json` exists.
+Lockfile drift between local and CI is a recurring debt pattern: three CI-vs-local `bun.lock` mismatch cycles caused by local `bun` and CI `setup-bun@latest` diverging. The fix is to pin the toolchain version in `package.json` `packageManager` field from commit one. Setup writes that field if `package.json` exists.
 
 Idempotent: skip if `packageManager` is already set (any value — do not overwrite the user's choice).
 

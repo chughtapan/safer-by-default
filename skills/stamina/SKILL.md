@@ -175,9 +175,9 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 
 ## Workflow
 
-### Phase 0 — CI status gate (PR mode only; sbd#244)
+### Phase 0 — CI status gate (PR mode only)
 
-> **CI must be green on the PR head before any aggregate APPROVE verdict.** Diff-static reviewers (`/safer:review-senior`, `/codex review`, `/simplify`) are blind to runtime regressions; CI is the runtime check. Real incident: moltzap PR #295 passed N=3 stamina with green diff-static review but had 5 red CI tests from a Stream/Fiber refactor.
+> **CI must be green on the PR head before any aggregate APPROVE verdict.** Diff-static reviewers (`/safer:review-senior`, `/codex review`, `/simplify`) are blind to runtime regressions; CI is the runtime check. Real incident: a PR passed N=3 stamina with green diff-static review but had 5 red CI tests from a Stream/Fiber refactor.
 
 ```bash
 [ "$MODE" = "pr" ] || skip_phase_0=1   # plan-mode skips this phase

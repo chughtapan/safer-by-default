@@ -61,7 +61,7 @@ You do not edit source files. You do not commit. You do not open a PR. You read,
 When invoked inside a MoltZap-capable AO session (`AO_SESSION`,
 `MOLTZAP_LOCAL_SENDER_ID`, and `AO_CALLER_TYPE` are set), you MAY emit
 peer-channel events to other roster members via `safer-peer-message`
-(SPEC r4.1 §5(d); architect plan #148 §3.7). This is the ONLY transport
+(SPEC r4.1 §5(d)). This is the ONLY transport
 primitive this skill may use for peer coordination. Do NOT import
 `@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
 `src/moltzap/*`; the grep-purity test

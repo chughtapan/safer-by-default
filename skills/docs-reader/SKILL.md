@@ -37,9 +37,9 @@ Read `PRINCIPLES.md` at the plugin root before invoking this skill. The projecti
 - **Principle 6 (Budget Gate).** One artifact per run. One team per run. N=3 rounds maximum. Round 3 requires explicit user approval. No exceptions.
 - **Principle 7 (Brake).** Any persona reporting "I needed context outside the artifact" is the iron rule firing. That is the finding, not an error.
 
-## Invariants (from sbd#125 §4)
+## Invariants
 
-These are the spec invariants this skill enforces. Every reference to `Invariant §4.N` in the prose below resolves here.
+These are the spec invariants this skill enforces. Every reference to `Invariant §N` in the prose below resolves here.
 
 1. **One skill.** No new per-persona skill directories. A persona is a prompt file plus an ephemeral sub-agent.
 2. **Ephemeral sub-agents.** A persona sub-agent exists for exactly one feedback pass; its team is deleted at run end on every exit path.
@@ -117,7 +117,7 @@ If the invocation did not specify `--issue`, `--pr`, or `--file`, ask. No artifa
 - Opening a PR with suggested rewrites.
 - Reading the surrounding project (sibling issues, related docs, source files) to enrich the persona payload.
 - Passing session history to the sub-agents. They run cold.
-- Inferring a score or severity a persona did not emit. The aggregator never introduces novel judgments (Invariant §4.5).
+- Inferring a score or severity a persona did not emit. The aggregator never introduces novel judgments (Invariant §5).
 - Dispatching personas via in-session `Skill` calls or standalone `Agent` without `team_name`. Team lifecycle is mandatory.
 - Running more than 3 rounds, or running round 3 without explicit user approval recorded at dispatch.
 - Shipping personas as separate skill directories. A persona is a prompt file plus a sub-agent, never a `skills/<persona>/SKILL.md`.
@@ -221,8 +221,8 @@ Agent({
 
 Invariants:
 
-- `team_name` is always set. Standalone `Agent` is forbidden (Invariant §4.3).
-- `model: "opus"` is always set (Invariant §4.3: opus orchestrator, opus personas).
+- `team_name` is always set. Standalone `Agent` is forbidden (Invariant §3).
+- `model: "opus"` is always set (Invariant §3: opus orchestrator, opus personas).
 - `description` is generic — it must not leak project identifiers into the sub-agent's bootstrap.
 - `name` is `persona-<slug>`, unique within the team; collisions fail the dispatch.
 
@@ -289,7 +289,7 @@ The aggregate report contains:
 - **Round 2** runs only on explicit user trigger: the user applies revisions to the artifact and re-invokes the skill (updating the issue/PR body or supplying `--file` with the revised path). The orchestrator re-reads the artifact payload at round start. **The orchestrator does not revise the artifact itself.** Round 2 re-runs the same 4 personas against the revised artifact. If round 1 ends with a non-empty must-fix list and the user does not re-invoke, the run ends with `DONE_WITH_CONCERNS` and the must-fix list is the hand-off.
 - **Round 3** runs only if `--allow-round-3` was passed at dispatch AND round 2's must-fix list is still non-empty. Absent `--allow-round-3`, round 2 is the last round; if the must-fix list is still non-empty, the run ends with `DONE_WITH_CONCERNS` and the caller routes upstream.
 
-Round limit is Invariant §4.4: the constant is fixed at N=3 and cannot be overridden without the explicit dispatch flag.
+Round limit is Invariant §4: the constant is fixed at N=3 and cannot be overridden without the explicit dispatch flag.
 
 ### Phase 8 — Publish + tear down
 
@@ -328,7 +328,7 @@ Tear down the team on every exit path — success, stop rule fired, crash handle
 TeamDelete({ team_name: "$TEAM_NAME" })
 ```
 
-Invariant §4.2: the team is ephemeral; it does not outlive the run.
+Invariant §2: the team is ephemeral; it does not outlive the run.
 
 ### Phase 9 — Close out
 
@@ -407,13 +407,13 @@ One status marker on the last line of the final reply.
 
 - **"I'll pass the parent epic alongside the artifact so the personas have context."** Iron rule violation. Context is the bug, not the fix.
 - **"One persona said REVISE, three said SHIP — call it SHIP."** No. A single BLOCK is must-fix. Severity-weighted consensus is not majority vote.
-- **"Round 3 is right there; just run it."** `--allow-round-3` is the gate, not a suggestion. Running round 3 without the flag is an Invariant §4.4 violation.
-- **"I'll re-word the persona's FRICTION finding so it's clearer."** No. The aggregator relays persona text verbatim. Rewording is inventing judgments the persona did not emit (Invariant §4.5).
+- **"Round 3 is right there; just run it."** `--allow-round-3` is the gate, not a suggestion. Running round 3 without the flag is an Invariant §4 violation.
+- **"I'll re-word the persona's FRICTION finding so it's clearer."** No. The aggregator relays persona text verbatim. Rewording is inventing judgments the persona did not emit (Invariant §5).
 - **"Two personas disagreed — I'll pick the more experienced persona's side."** No. Direct contradictions are `ESCALATED`. The user resolves.
 - **"I'll add a 5th persona `non-engineer-pm` since the spec mentioned it."** Spec Q1 defaulted to 4 personas for v1. Adding a 5th is a new spec, not a staff call.
 - **"The team cleanup failed — I'll leave it; the next run will collide."** No. Team lifecycle is mandatory. If `TeamDelete` fails, escalate with cause `TEAM_TEARDOWN_FAILED`.
 - **"The artifact scope is obvious; skip fetch, just hand the personas the file path."** No. Personas read cold. They read the payload, not a path.
-- **"I'll invoke the persona via in-session Skill instead of Agent — easier."** Invariant §4.3 violation. Personas are out-of-session sub-agents; in-session Skill leaks the caller's context.
+- **"I'll invoke the persona via in-session Skill instead of Agent — easier."** Invariant §3 violation. Personas are out-of-session sub-agents; in-session Skill leaks the caller's context.
 
 ## Checklist before declaring status
 
