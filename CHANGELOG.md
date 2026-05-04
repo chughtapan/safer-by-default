@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### New skill: /safer:ux-audit
+
+Heuristic-based UX audit modality. Read-only on the live UI; emits a goal-linked findings ledger plus recommendations routed to the right downstream modality.
+
+- `skills/ux-audit/SKILL.md`: new skill at v0.1.0. Seven inspection protocols (H1 Nielsen, H2 cognitive walkthrough, H3 WCAG 2.1 AA, H4 responsive, H5 form/microinteraction, H6 stakeholder/artifact read, H7 information architecture). Iron rule: every recommendation has finding + evidence + goal-link.
+- Composition: per-protocol gstack pairings — `/browse` + `/design-review` for visual heuristics, `/qa-only` for cognitive-walkthrough reporting, `/setup-browser-cookies` for auth-blocked surfaces, optional `/plan-ceo-review` via `--challenge-goal` to stress-test the named goal.
+- Workflow: URL/path inference from trigger, complaint-keyword H6 front-run, `SAFER_PARENT_ISSUE` as single orchestrate-context signal (used by Phase 6 publication and SendMessage gating), Phase 1.5 time-budget checkpoint (30-min progress comment, 60-min hard stop), `--prior <issue#>` for re-audit deltas, `DONE_PARKED` status when an orchestrate contract is missing inputs.
+- Out of scope by design: applying fixes (recommendations route to `/safer:implement-*`, `/safer:architect`, or `/safer:spec`), analytics ingestion, plan-mode review of redesign-specs, auto-dispatch of recommendations.
+
 ### Contracts: explicit autonomy grants
 
 Default state for the orchestrator and dispatching skills is no longer "all-stages-authorized." Every orchestration is now governed by a contract recorded on the parent epic body.
