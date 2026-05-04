@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — Contracts: explicit autonomy grants
+## Unreleased
+
+### Contracts: explicit autonomy grants
 
 Default state for the orchestrator and dispatching skills is no longer "all-stages-authorized." Every orchestration is now governed by a contract recorded on the parent epic body.
 
@@ -14,6 +16,15 @@ Default state for the orchestrator and dispatching skills is no longer "all-stag
   - New Step 5c (wake-up digest). Posts a single consolidated digest comment when an autopilot run completes — "I went to bed; here's the night."
 - `docs/contracts/`: four worked-example contract templates (invitation, bug-fix-end-to-end, scrum-master-backlog, architect-and-stop) plus a README pointing at when to use each.
 - Per-skill changes: none. Skills publish artifacts cleanly; the contract check fires orchestrator-side. `safer-escalate --to <higher>` already declares ratchet-up; orchestrator's contract-budget check now reads it as park-mandatory.
+
+### plan-eng-review + plan-devex-review gates
+
+Architect and spec gain mandatory plan-quality gates before transitioning to review.
+
+- `skills/architect/SKILL.md` Phase 7: `/plan-eng-review` runs first (hold-scope autonomous), then `/codex`. Threshold: optional for implement-junior tier, mandatory for senior/staff. Findings within the parent epic's `## Contract` autonomy budget auto-revise; findings cross-budget ratchet up to spec via `safer-escalate`. Unavailable → Claude sub-agent fallback with a structured architecture-audit prompt.
+- `skills/spec/SKILL.md` Phase 5: same shape. Threshold: optional for junior-tier specs, mandatory for non-trivial features and any spec touching setup / deployment / infra. Same Claude sub-agent fallback.
+- `skills/orchestrate/SKILL.md` Step 5c: setup/deploy path detection on PRs (railway.toml, vercel.json, Dockerfile, .github/workflows, fly.toml, netlify.toml, package.json scripts, .env*, setup/) additively dispatches `/plan-devex-review`. Spec/architect plans that describe infra work run the gate at the spec/architect stage; orchestrate verifies via audit-trail check.
+- Order is plan-eng-review → codex (structured audit first; cross-model challenge on the audited plan).
 
 ## 0.1.4 — Composition cleanup; opus everywhere
 
