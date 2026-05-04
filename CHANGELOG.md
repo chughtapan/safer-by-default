@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Contracts: explicit autonomy grants
+
+Default state for the orchestrator and dispatching skills is no longer "all-stages-authorized." Every orchestration is now governed by a contract recorded on the parent epic body.
+
+- `PRINCIPLES.md`: new `## Contracts` section. Four-section format (Goal, Acceptance, Autonomy budget, Always-park), worked examples, lifecycle (dispatch → execution → amendment → stop → done), recommended `Always-park` defaults, ratchet-up always parks, doctrine SHA stamping.
+- `skills/orchestrate/SKILL.md`:
+  - New Phase 1a (Draft the contract). Parses user instruction into the four sections, names back, waits for `OK` before any decomposition.
+  - Phase 3 epic body template now requires `## Contract` and `## Contract history` sections.
+  - New Step 5c.-1 contract-budget check before any auto-transition. Out-of-budget next dispatch parks; ratchet-up always parks regardless of budget. Posts `## Awaiting amendment` block on the parked sub-issue.
+  - Phase 5d cron loop adds Step 1b (contract-comment scan): processes `OK`, `AMEND CONTRACT:`, `STOP CONTRACT:`, `REVISE:`, and 🛠️ reactions on the parent epic. Authorization gated on repo-collaborator status.
+  - New Step 5b (Live `## Status` rewrite). After every state change, rewrites the parent epic's `## Status` section so a cold-start reader sees current state at a glance.
+  - New Step 5c (wake-up digest). Posts a single consolidated digest comment when an autopilot run completes — "I went to bed; here's the night."
+- `docs/contracts/`: four worked-example contract templates (invitation, bug-fix-end-to-end, scrum-master-backlog, architect-and-stop) plus a README pointing at when to use each.
+- Per-skill changes: none. Skills publish artifacts cleanly; the contract check fires orchestrator-side. `safer-escalate --to <higher>` already declares ratchet-up; orchestrator's contract-budget check now reads it as park-mandatory.
+
 ## 0.1.4 — Composition cleanup; opus everywhere
 
 Tightens the per-skill `Composition with gstack` sections introduced in 0.1.3 and consolidates orchestrator dispatch on opus.
