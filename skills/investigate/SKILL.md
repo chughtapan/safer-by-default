@@ -132,11 +132,11 @@ If `safer-slug`, `safer-telemetry-log`, or `safer-update-check` is missing, cont
 The writeup has exactly these sections, in this order:
 
 1. **CLAIM** one sentence, the observable symptom.
-2. **EVIDENCE** what you collected: logs, traces, reproduction output, commit ranges. Direct quotes and `file:line` references.
+2. **EVIDENCE** what you collected: logs, traces, reproduction output, commit ranges. Direct quotes and `file:line` references. For regressions, includes the pre-bug behavior of the failing path (quoted from `git show <prior-commit>:<file>`).
 3. **REPRO** exact commands, inputs, or conditions that trigger the bug on demand. If you cannot repro, state so explicitly and move to ESCALATED.
 4. **ISOLATION** what you varied and what changed with each variation. One variable per row.
-5. **ROOT CAUSE** the mechanism, with `file:line`. Classify as structural, logical, or environmental.
-6. **RECOMMENDATION** the modality that should fix it (`implement-junior`, `implement-senior`, `architect`, or `spec`), with a one-line justification.
+5. **ROOT CAUSE** the mechanism, in two layers — **Immediate** (symptom-level: what the runtime observes, with `file:line`) and **Underlying** (the logic mistake or behavior change that produces the immediate observation, with `file:line`). For regressions, the Underlying layer names the pre-vs-post behavior delta (cite both old and new with `path:N@<sha7>`). If you can name Immediate but not Underlying, the investigation is incomplete — keep digging or escalate `BLOCKED`. Classify the Underlying as structural, logical, or environmental.
+6. **RECOMMENDATION** the modality that should fix it (`implement-junior`, `implement-senior`, `architect`, or `spec`), with a one-line justification. For regressions, the default recommendation shape is "restore pre-refactor behavior" routed to `implement-junior`; only propose a new pattern (architect-tier) when the writeup explicitly rules out restoration with evidence.
 7. **CONFIDENCE** LOW, MED, or HIGH, with the evidence supporting the level.
 
 The writeup does not have: the fix, a diff, a patch, or a PR link. Those belong to the downstream modality.
@@ -175,7 +175,20 @@ Classify the bug:
 - **Original** the code never worked for this input. The bug has been latent.
 - **Environmental** the code is fine; the environment changed (dep version, env var, data shape).
 
-The classification points at which modality owns the fix. Regressions usually route to `implement-junior`. Originals in a single module usually route to `implement-junior`. Originals spanning modules route to `implement-senior`. Environmental bugs may route to `architect` (if a boundary is missing a schema) or `spec` (if the environment assumption was never stated).
+The classification points at which modality owns the fix. Regressions usually route to `implement-junior` (restore the pre-refactor behavior). Originals in a single module usually route to `implement-junior`. Originals spanning modules route to `implement-senior`. Environmental bugs may route to `architect` (if a boundary is missing a schema) or `spec` (if the environment assumption was never stated).
+
+### Phase 3a — Compare to last-known-good (regressions only)
+
+If the bug is a regression, locate the pre-bug version of the failing logic and identify the behavior delta. The right fix for a regression is usually to restore what the prior version did, not to invent a new pattern that compensates for the symptom.
+
+```bash
+git blame <affected-file> -L <start>,<end>            # which commit changed each line
+git log --follow --oneline -- <affected-file>          # commits that touched this file
+git show <prior-commit>:<affected-file>                # pre-bug version of the file
+git diff <prior-commit>..<bug-commit> -- <affected-file>  # the delta itself
+```
+
+Record the pre-vs-post behavior delta in EVIDENCE. Quote both versions with `path:N@<sha7>`. Name the function or call site whose behavior changed. The delta is what the Underlying layer of the root cause names. If the delta is intentional (the refactor commit's PR body or commit message explains the new behavior is the desired one), the investigation may still conclude that the new behavior has an unhandled case — but the writeup must show you saw the delta, not that you skipped it.
 
 ### Phase 4 — Reproduce deterministically
 
@@ -213,22 +226,28 @@ Record the bisect result as a row in the isolation table.
 
 Code references in the root-cause writeup use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
 
-State the mechanism, not the symptom. The root cause is a sentence that names:
+The root cause is named in **two layers**:
 
-- The file and line where the mistake lives.
-- The class of mistake (missing validation, wrong branch, stale invariant, schema drift, unhandled case, race, overflow, off-by-one, missing exhaustiveness check).
-- The conditions under which it fires.
+- **Immediate** the symptom-level mechanism: what the runtime observes (timeout fired, pointer null, validation failed, response empty, hang in phase X), with the `file:line` of the observation.
+- **Underlying** the logic mistake or behavior change that produces the Immediate observation. Names the class of mistake (missing validation, wrong branch, stale invariant, schema drift, unhandled case, race, overflow, off-by-one, missing exhaustiveness check) and the conditions under which it fires. For regressions, the Underlying layer names the **pre-vs-post behavior delta** (cite both old and new with `path:N@<sha7>`).
+
+State the mechanism for both layers. **If you can name Immediate but cannot name Underlying, the investigation is incomplete.** That is the signal — keep digging, or escalate `BLOCKED` with the unresolved Underlying layer named in the escalation. A symptom held up as the root cause is a guess with a receipt: the Immediate layer alone is what the runtime gave you, not what the code did wrong.
+
+Classify the Underlying layer as structural, logical, or environmental.
 
 Examples of well-formed root causes (paths below use `<placeholder>/...` as schematic placeholders; they are illustrative, not real files in this repo, per the schematic-placeholder exception of the code-citation doctrine; see `PRINCIPLES.md#code-references-are-pinned`):
 
-- "In `<placeholder>/auth/token.ts:83`, `decodeToken` returns `null` on malformed input instead of a tagged error; the caller at `<placeholder>/api/session.ts:41` treats `null` as 'anonymous session' and grants access. Classification: logical (missing typed error channel; violates Principle 3)."
-- "In `<placeholder>/pipeline/ingest.ts:112`, the schema decodes only the first event in a batch; later events are cast with `as Event`. When upstream changed event shape on 2026-03-15, the cast started producing objects whose fields are `undefined` at runtime. Classification: structural (missing boundary validation; violates Principle 2)."
+- "Immediate: at `<placeholder>/api/session.ts:41`, the call to `decodeToken` returns `null` and the caller treats `null` as anonymous, granting access. Underlying: at `<placeholder>/auth/token.ts:83`, `decodeToken` returns `null` on malformed input instead of a tagged error, leaving the caller no way to distinguish 'no token' from 'invalid token'. Classification: logical (missing typed error channel; violates Principle 3)."
+- "Immediate: at `<placeholder>/pipeline/ingest.ts:112`, runtime objects have `undefined` fields after batch decode. Underlying: the schema decodes only the first event in the batch; later events are cast with `as Event`. The shape was tolerable until upstream changed the event shape on 2026-03-15. Classification: structural (missing boundary validation; violates Principle 2)."
+- "Immediate: at `<placeholder>/scheduling.ts:217`, `DAY_VOTE` phase never exits. Underlying: in commit `abc1234`, the phase-end condition was changed from `hasVoteParticipationQuorum` (everyone-voted, `<placeholder>/scheduling.ts:204@<old-sha7>`) to `tally(...) !== null` (decision-quorum-reached, `<placeholder>/scheduling.ts:217@<new-sha7>`). Under the live game's voting distribution, `tally` returns `null` when no candidate has the decision quorum even though every player has voted, so the phase never ends. Classification: logical (silent semantic change in a refactor; the pre-refactor function still exists, just stopped being called)."
 
 Examples of malformed root causes (do not ship these):
 
-- "The auth token handling is fragile." too vague; no `file:line`.
-- "A recent change broke login." symptom restated, no mechanism.
+- "The auth token handling is fragile." too vague; no `file:line`; no two-layer naming.
+- "A recent change broke login." symptom restated, no Underlying mechanism.
 - "It might be a race condition in `session.ts`." hypothesis, not a root cause. If you cannot prove it, label it LOW confidence and enumerate ruled-out alternatives.
+- "The day_vote phase has no hard deadline." symptom-only — names the missing safeguard, not the logic mistake. If a deeper Underlying exists ("the phase-end condition was changed"), name it; otherwise this is incomplete.
+- "The timeout exceeded after 60s." that is the runtime observation. Why? The Underlying layer is missing.
 
 ### Phase 7 — Recommend the fix modality
 
@@ -243,6 +262,8 @@ Classify the fix shape, then route:
 
 Do not name "the" fix; name the modality. The downstream agent picks the fix. Your job is to make that pick well-informed.
 
+**Regressions: prefer restoration over reinvention.** When the bug is a regression and the Underlying layer named a pre-refactor behavior delta, the **default recommendation shape is "restore the pre-refactor behavior"** routed to `implement-junior`. Restoration usually requires no new architecture, no new public surface, and no spec revision — the working version of the logic still exists in git history. Only recommend a new pattern (architect-tier) when the writeup explicitly rules out restoration with evidence (e.g., the pre-refactor behavior also has a known defect, or the new public contract committed by the refactor depends on the new behavior). State the ruling-out evidence in the recommendation; do not skip it. A regression writeup that recommends architect-tier without ruling out restoration is incomplete.
+
 ### Phase 8 — Publish
 
 Write the writeup to a temp file, then publish:
@@ -255,6 +276,7 @@ cat > "$TMP" <<EOF
 
 ## EVIDENCE
 <logs, traces, file:line pointers>
+<for regressions: pre-bug behavior of the failing path, quoted from git show <prior-commit>:<file>>
 
 ## REPRO
 <exact commands or conditions>
@@ -263,11 +285,20 @@ cat > "$TMP" <<EOF
 <table of varied variables>
 
 ## ROOT CAUSE
-<mechanism + file:line + classification>
+
+### Immediate
+<symptom-level mechanism + file:line>
+
+### Underlying
+<logic mistake or behavior change + file:line>
+<for regressions: pre-vs-post delta, both cited as path:N@<sha7>>
+Classification: <structural | logical | environmental>
 
 ## RECOMMENDATION
 Route to: <modality>
+Fix shape: <restore pre-refactor behavior | new pattern | spec revision | …>
 Justification: <one line>
+<for regressions recommending non-restoration: explicit ruling-out evidence>
 
 ## CONFIDENCE
 <LOW|MED|HIGH> <evidence>
@@ -370,6 +401,10 @@ Every code-review output is a comment on the bug issue or the sub-issue. Nothing
 - **"The fix is one line; I'll just apply it."** Iron rule violation. Publish; let `implement-junior` apply the fix.
 - **"I have a theory; let me write it up as the root cause."** A theory is not a root cause. Reproduce or label LOW confidence.
 - **"The stack trace points at `foo.ts`; that is the root cause."** A stack trace is a symptom. Read the code; name the mechanism.
+- **"The timeout exceeded / pointer was null / validation failed; that is the root cause."** Those are runtime observations — the Immediate layer. Name the Underlying layer (the logic mistake that produces the observation) or the writeup is incomplete.
+- **"The phase has no hard deadline."** Names a missing safeguard, not a logic mistake. If a deeper Underlying exists ("the phase-end condition was changed"), name it. A symptom-level recommendation that paves over a logic bug ships scar tissue.
+- **"This is a regression; I'll propose a new pattern that handles the new symptom."** For regressions, the default recommendation is to restore the pre-refactor behavior. Propose a new pattern only when the writeup explicitly rules out restoration with evidence.
+- **"I see the regression commit but I won't read the pre-bug version."** Phase 3a is mandatory for regressions. The pre-bug version is the contract the new code silently broke; reading it is how the Underlying layer becomes nameable.
 - **"I'll patch this while I'm in the file."** Scope creep. Note the second bug; do not investigate or patch it.
 - **"The repro is flaky; I'll investigate anyway."** Flaky repro plus named root cause is a guess with a receipt. Either get a deterministic repro or escalate `BLOCKED`.
 - **"I'll add a log line to see what happens."** Not if it requires editing committed code. Use a temp script or a debugger; do not modify source files as part of investigation.
@@ -379,10 +414,13 @@ Every code-review output is a comment on the bug issue or the sub-issue. Nothing
 
 - [ ] CLAIM is one sentence naming the observable symptom.
 - [ ] EVIDENCE contains concrete logs, traces, or `file:line` pointers.
+- [ ] For regressions: EVIDENCE includes the pre-bug behavior of the failing path (quoted from `git show <prior-commit>:<file>`); Phase 3a was run.
 - [ ] REPRO gives exact commands or conditions; or the writeup is explicitly `BLOCKED` on non-reproducibility.
 - [ ] ISOLATION table has at least two rows (one variable varied at minimum).
-- [ ] ROOT CAUSE names the mechanism with `file:line` and a classification.
-- [ ] RECOMMENDATION names exactly one downstream modality with justification.
+- [ ] ROOT CAUSE has both an **Immediate** layer and an **Underlying** layer, each with `file:line` evidence; the Underlying layer is classified structural / logical / environmental.
+- [ ] For regressions: the Underlying layer names the pre-vs-post behavior delta with both `path:N@<sha7>` citations.
+- [ ] RECOMMENDATION names exactly one downstream modality with justification and a fix-shape line.
+- [ ] For regressions: RECOMMENDATION either says "restore pre-refactor behavior" or explicitly rules out restoration with evidence.
 - [ ] CONFIDENCE is LOW, MED, or HIGH with evidence.
 - [ ] No source files were edited during the investigation (`git status` is clean of tracked-file edits).
 - [ ] Writeup published to GitHub (bug issue, sub-issue, or new `safer:investigate` issue).

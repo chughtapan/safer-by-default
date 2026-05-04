@@ -1077,6 +1077,27 @@ Update the decomposition table on the parent epic to reflect the re-triage. Emit
 
 **Three-strikes rule.** If a single sub-task has been re-triaged **3 times without reaching `done`**, the project is mis-scoped. Stop and escalate to the user via the Confusion Protocol (below). Do not attempt a fourth triage.
 
+#### Post-refactor regressions
+
+**Rule.** When a bug surfaced *after* a recent refactor (the user mentions the refactor PR, or the symptom started landing in a window the refactor straddles), the investigate sub-issue body MUST cite the refactor PR URL and request a pre-vs-post behavior comparison.
+
+**Brief addition for the investigate sub-issue body.** Append a `## Post-refactor context` section with:
+
+```
+## Post-refactor context
+Refactor PR: <full URL>
+Symptom started: <approximate window or commit range>
+Hypothesis: silent behavior change in the refactor.
+Investigate must:
+- run Phase 3a (Compare to last-known-good) against the affected file(s),
+- name the pre-vs-post behavior delta in the Underlying layer of ROOT CAUSE,
+- default the recommendation to "restore pre-refactor behavior" unless restoration is explicitly ruled out.
+```
+
+**Rationale.** Post-refactor bugs that look novel are usually silent behavior deltas. Investigators not primed for "compare to last-known-good" tend to design new patterns that handle the new symptom while leaving the original logic mistake in place. The brief addition surfaces the refactor PR and primes the Phase 3a pre-vs-post comparison so the Underlying layer can be named, and routes the default fix-shape toward restoration rather than reinvention.
+
+**When the dispatch is for `/safer:architect` after `/safer:investigate` on a post-refactor regression.** Include the same `## Post-refactor context` section in the architect sub-issue body, plus a pointer to the investigate writeup. The architect must read "what was this doing before?" before designing — restoration is a one-line plan; new pattern requires evidence.
+
 ### Phase 7 — Close out
 
 When every sub-issue is in state `done` or `abandoned`:
