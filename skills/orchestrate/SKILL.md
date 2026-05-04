@@ -187,6 +187,60 @@ When in doubt, ask the user:
 
 Emit `safer.skill_run` with `modality=orchestrate` only if you proceed.
 
+### Phase 1a — Draft the contract (mandatory)
+
+Once you've decided to orchestrate, draft the contract before any decomposition or sub-issue creation. The contract is the load-bearing artifact; everything downstream reads it.
+
+Read `PRINCIPLES.md → Contracts` for the four-section format, the worked examples, and the recommended `Always-park` defaults.
+
+**Parse the user's instruction into a draft.** Map intent to:
+
+- **Goal** — restate the user's intent in one paragraph. Use their words where possible.
+- **Acceptance** — convert "done" signals from the instruction into a checklist. If the instruction names a deliverable (PR merged, dogfood green, spec published), that's an item. If acceptance is implicit, ask once before drafting; do not invent criteria.
+- **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes investigate + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction.
+- **Always-park** — start from the recommended defaults in `PRINCIPLES.md → Contracts`. Add ratchet-up as a default park reason. Add any irreversible action the instruction implies the user cares about.
+
+**Confidence gate.** If parsing leaves you unsure on any of the four sections, present 2–3 candidate contract shapes to the user via `AskUserQuestion`, recommended-default first. Do NOT silently pick a shape; the asymmetric cost framing favors over-asking. A wrong autonomous draft burns trust; a wrong question costs one reply.
+
+**Name it back.** Post the draft as a comment on the parent epic (or, if the epic doesn't exist yet, in your reply to the user). Use this template:
+
+```markdown
+## Contract (draft)
+
+**Goal.** <draft>
+
+**Acceptance.**
+- [ ] <draft item>
+
+**Autonomy budget.**
+- <draft permission>
+
+**Always-park.**
+- Ratchet-up (any modality escalating upstream)
+- <recommended defaults from PRINCIPLES.md>
+- <any user-implied carve-out>
+
+Doctrine: <SHA of PRINCIPLES.md at draft time>
+Drafted: <ISO timestamp>
+By: <user@github>
+
+---
+
+Reply `OK` to proceed. Reply `AMEND CONTRACT: <change>` to revise. Reply `STOP CONTRACT: <reason>` to abort.
+
+If you do not reply, the chain does not advance.
+```
+
+**Wait for `OK` before any decomposition or sub-issue creation.** This is the gate. The orchestrator does not proceed without the contract being explicitly accepted.
+
+On `OK`, the contract becomes the parent epic's `## Contract` section (Phase 3) and the orchestrator continues to Phase 2.
+
+On `AMEND CONTRACT:`, redraft per the user's direction; post the revised draft; wait for `OK` again.
+
+On `STOP CONTRACT:`, abort orchestration. No epic is created. Tell the user the chain did not start.
+
+The contract MUST stamp the doctrine SHA at draft time (run `git rev-parse HEAD -- PRINCIPLES.md` against the safer-by-default repo, or the equivalent pointer the runtime exposes). Future agents reconstruct doctrine state from this.
+
 ### Phase 2 — Decompose
 
 Build the decomposition table. Columns:
@@ -234,6 +288,29 @@ Epic body template:
 - **Prior artifacts:** <bullet list of full URLs to every spec, issue, comment, PR, or doc this epic depends on. If none, write "none.">
 
 This section is the cold-start reader's anchor. A teammate opening this epic with zero session context must be able to start from here alone.
+
+## Contract
+
+**Goal.** <from Phase 1a draft, after user OK>
+
+**Acceptance.**
+- [ ] <from draft>
+
+**Autonomy budget.**
+- <from draft>
+
+**Always-park.**
+- Ratchet-up (any modality escalating upstream)
+- <recommended defaults>
+- <any user-implied carve-out>
+
+Doctrine: <SHA at OK time>
+Drafted: <ISO timestamp>
+OK'd: <ISO timestamp> by <user@github>
+
+## Contract history
+
+<empty until first amendment; each amendment appends an entry with timestamp + user + change>
 
 ## Decomposition
 
@@ -364,6 +441,46 @@ Then cascade forward per modality lifecycle:
 - `implement-*` → `plan-approved` → `implementing` (the PR is merged) → `verifying` (verify sub-task runs) → `done`.
 - `investigate` / `spike` / `research` → `plan-approved` → `done` (these produce writeups, not code).
 
+**Step 5c.-1 — Contract-budget check (mandatory; runs before everything else in this step).**
+
+Before any label transition or downstream dispatch, load the parent epic and read its `## Contract` section. The contract is the deal between user and orchestrator (`PRINCIPLES.md → Contracts`). The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
+
+```bash
+gh issue view "$PARENT" --json body --jq '.body' | awk '/^## Contract$/,/^## /{print}' | head -n -1 > /tmp/contract.md
+```
+
+Identify the next dispatch you would do (the next sub-issue's modality, the merge of a PR, the close of an epic). Three checks fire in order:
+
+1. **Is this a ratchet-up?** Did the upstream modality emit `safer-escalate --to <higher-modality>`? Ratchet-up always parks regardless of contract budget. Skip to the park procedure below.
+2. **Is the next dispatch in the autonomy budget?** Read the budget bullets. Match the proposed dispatch against them. If no bullet authorizes this action, park.
+3. **Is the next dispatch in `Always-park`?** Even if it's in the budget, if it's also in `Always-park`, the carve-out wins. Park.
+
+**On match → proceed.** Continue to Step 5c.0 (reviewer-body check). The contract authorizes this dispatch.
+
+**On park → halt this dispatch and append `## Awaiting amendment`.** The sub-issue stops at its current state; do not transition the label past `review`. Set sub-issue label to `awaiting-amendment` (in addition to its current label). Append this block to the sub-issue body:
+
+```markdown
+---
+
+## Awaiting amendment
+
+The next dispatch is outside the parent epic's `## Contract` autonomy budget.
+
+Recommended next: `<modality>`
+Reason for park: <out-of-budget | ratchet-up:<from>→<to> | always-park-hit:<which carve-out>>
+
+To amend the contract, comment on the parent epic:
+> AMEND CONTRACT: <change, e.g., "add architect to autonomy budget", "approve this specific merge">
+
+To revise this sub-issue's artifact instead, comment on this sub-issue:
+> REVISE: <reason>
+
+To stop the chain entirely, comment on the parent epic:
+> STOP CONTRACT: <reason>
+```
+
+Post a one-line status comment on the parent epic naming the parked sub-issue and the reason. Update the parent's `## Status` section (Step 5d.5 below). Do not re-park on subsequent ticks; the `awaiting-amendment` label is the idempotency key.
+
 **Step 5c.0 — Read reviewer body before merging.**
 
 Before transitioning a sub-issue out of `review` (`review → plan-approved` on the
@@ -371,7 +488,7 @@ manual path in Step 5c, or `review → plan-approved` on the auto-gate path in
 Phase 5d loop body item 5), team-lead MUST read the full reviewer body on
 GitHub. The teammate's `SendMessage` summary is a one-line compression; gating
 conditions live in the body, not in the summary. Acting on the summary alone is
-how the verify gate gets skipped (incident: 2026-04-19, acg#27).
+how the verify gate gets skipped.
 
 Fetch the most recent review body:
 
@@ -566,6 +683,34 @@ Record the returned job id on the parent epic (comment) so the next operator can
     - Never auto-respond. The Phase 5e protocol below defines the team-lead's response mechanisms; this step only surfaces the anomaly.
     - If `$SWARM_SOCKET` is empty (claude-swarm not running, or socket name changed upstream), log `swarm_socket_missing` and skip the step. Do not fall back to the `default` socket — that would scan the wrong panes.
 
+1b. **Contract-comment scan (mandatory).** Before any state-collection step, scan every parent epic this team owns for new contract-related comments since the last tick. Contract amendments must be applied first because they reshape the autonomy budget every other step reads.
+
+```bash
+for epic in $(jq -r '.epics[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/null); do
+  # Fetch comments since last tick (cursor stored at ~/.claude/teams/<team-name>/contract-cursor-<epic>.txt)
+  CURSOR=$(cat ~/.claude/teams/<team-name>/contract-cursor-${epic//\//_}.txt 2>/dev/null || echo "1970-01-01T00:00:00Z")
+  gh issue view "$epic" --json comments --jq \
+    ".comments[] | select(.createdAt > \"$CURSOR\") | select(.author.login | IN(\$collaborators[]))" \
+    --argjson collaborators "$(gh api repos/$REPO/collaborators --jq '[.[].login]')" \
+    > /tmp/new-contract-comments.jsonl
+  date -u +%Y-%m-%dT%H:%M:%SZ > ~/.claude/teams/<team-name>/contract-cursor-${epic//\//_}.txt
+done
+```
+
+For each comment body, scan in priority order:
+
+   - **`STOP CONTRACT: <reason>`** — highest priority. Pause every in-flight teammate on this epic via SendMessage. Set every open sub-issue label to `paused`. Post a confirmation comment on the epic naming the stop reason and the user. Do not process subsequent steps for this epic on this tick. The user must comment `AMEND CONTRACT:` or `STOP CONTRACT: abandon` to either resume or close the chain.
+
+   - **`AMEND CONTRACT: <change>`** — read the change. Update the parent epic's `## Contract` section: re-derive Goal / Acceptance / Autonomy budget / Always-park reflecting the change. Append a new entry to `## Contract history` with the timestamp, user, and original comment URL. If the amendment unblocks a sub-issue currently labeled `awaiting-amendment`, remove that label so the next contract-budget check reads green. Post a confirmation comment on the epic naming what changed.
+
+   - **`OK`** — only meaningful on a draft contract that has not yet been recorded (Phase 1a awaiting confirmation). Move the draft contract from `## Contract (draft)` to `## Contract` with `OK'd: <ts> by <user>` line; create the parent-epic decomposition (Phase 2) and first sub-issues (Phase 4). Do not respond to `OK` after the contract is already recorded.
+
+   - **`REVISE: <reason>`** posted on a sub-issue (not the epic) — route per Phase 6 (Backtrack) back to the artifact's authoring modality with the user's revision note in the brief.
+
+   - **🛠️ reaction on a park comment** — detect via `gh api repos/$REPO/issues/$N/comments/$CID/reactions`. If a 🛠️ reaction was added since last tick from an authorized user, post a numbered-options comment offering the most-likely amendments derived from the park reason. The user replies with a number; the next tick's contract-comment scan picks up the reply, converts to canonical `AMEND CONTRACT: <change>`, applies, and removes the placeholder comment. The user-facing UX is reaction → reply with `1` (or `2`, etc.) → orchestrator amends. The audit trail records the canonical `AMEND CONTRACT:` entry.
+
+   Authorization: only repo collaborators can amend, stop, or OK. Comments matching the grammar from non-collaborators are surfaced to the team-lead via SendMessage but otherwise ignored.
+
 2. **Review-ready sub-issues.** `gh issue list --label review --json number,title,url,labels` for this repo. Any hit is a candidate for Step 5c.
 3. **Open PRs.** `gh pr list --json number,url,isDraft,mergeable,statusCheckRollup` to see which draft PRs are green.
    - **Linear project sync (if configured).** Run `safer-linear-setup assign-projects --since 5m --quiet` to backfill any issues filed in the last 5 minutes to their correct Linear project. Requires `LINEAR_API_KEY` env var; silently skips if not set.
@@ -625,6 +770,67 @@ Record the returned job id on the parent epic (comment) so the next operator can
    The failure mode this rule prevents: a teammate completes the assigned task, gets a clean APPROVE, the user moves on — and the friction the teammate hit recurs on every subsequent dispatch because no one ever named it. The orchestrator is the only seat that sees enough dispatches to spot the pattern; if the orchestrator buries it, no one fixes it.
 
    "Empty" (`Process issues: none`) is a valid value and not surfaced. The rule fires only on non-empty entries.
+
+5b. **Live `## Status` section rewrite (mandatory).** After every state-change in this tick (label transition, dispatch, contract amendment, park, stop), rewrite the parent epic's `## Status` section. The section is the cold-start reader's at-a-glance view; a fresh agent landing on the epic at any moment should read this section and know current state without scrolling comments.
+
+   Format:
+
+   ```markdown
+   ## Status
+
+   **Updated:** <ISO timestamp>
+
+   **Contract:** <one-line summary derived from Goal>; <budget summary, e.g., "investigate → impl-junior → review → verify → merge"> (`OK'd <ts>`).
+
+   **In flight:**
+   - #<N> <modality> — <state, e.g., "implementing">; teammate: <name>; PR: <url or none>.
+   - #<N> <modality> — <state>; teammate: <name>.
+
+   **Awaiting amendment:** <list of sub-issues labeled `awaiting-amendment`, with reason in one line each>; or "none".
+
+   **Last 3 actions:**
+   - <ts> dispatched <modality> on #<N>
+   - <ts> auto-gated #<N> review → plan-approved
+   - <ts> opened PR #<M> for #<N>
+
+   **Next action:** <what the next cron tick will do, in one line>.
+   ```
+
+   The section is replaced wholesale on every rewrite (no diff-merge complexity). Rewrite the parent epic body in place via `gh issue edit "$EPIC" --body "$NEW_BODY"`. Idempotency: if no state changed this tick, do not rewrite; the timestamp would change for nothing.
+
+5c. **Wake-up digest on autopilot completion.** When every sub-issue is in `done` or `abandoned` state AND the parent epic is in autopilot mode (the contract authorized merge without parking), post one consolidated digest comment on the epic before closing it. The digest is the user's "I went to bed; here's the night" artifact.
+
+   Digest template:
+
+   ```markdown
+   ## Wake-up digest
+
+   **Session:** <SESSION>
+   **Started:** <epic created ts> · **Finished:** <ts>
+   **Duration:** <human-readable>
+
+   **Contract goal.** <Goal from contract, one paragraph>
+
+   **What shipped.**
+   - <PR URL>: <one-line PR title> (verify: <SHIP|HOLD>)
+   - <PR URL>: <title> (verify: <verdict>)
+
+   **Contract events.**
+   - <ts> contract OK'd
+   - <ts> AMEND CONTRACT: <one-line change> by <user>
+   - <ts> sub-issue #<N> parked (reason: <one-line>); resumed <ts>
+   - <ts> wake-up digest
+
+   **Process issues seen.** <bulleted list of non-empty Process issues entries from teammate SendMessages, deduplicated; or "none">.
+
+   **Acceptance.**
+   - [x] <criterion> — <evidence URL>
+   - [x] <criterion> — <evidence URL>
+
+   **Health note.** <one line: any flake, transient infra, or recurring friction worth flagging next session; or "clean run">.
+   ```
+
+   Post once per epic; subsequent ticks read the existing digest comment and skip. Idempotency key: presence of a comment whose body starts with `## Wake-up digest` and matches this epic's session.
 
 6. **Auto-dispatch pending work (work-queue scan).** The prior steps react to state the loop already knows about. Step 6 is the proactive scan: enumerate pending sub-issues across every repo this team serves, filter out the ones that are already in flight, prioritize what is left, and dispatch up to the per-tick cap. Without this step the orchestrator idles between user prompts even when work is queued. Step 6 is mandatory once a team is installed.
 

@@ -501,6 +501,166 @@ Every skill's final output carries exactly one status marker. Artifacts without 
 
 ---
 
+## Contracts
+
+*Autonomy is granted, not assumed.*
+
+Default state for the orchestrator and every dispatching skill is NOT autonomous. The user's instruction defines what the orchestrator may execute without further confirmation. Skills stay inside the granted scope; crossing the boundary requires explicit re-authorization.
+
+Every orchestration is governed by a **contract** recorded on the parent epic body. The contract is the deal between user and orchestrator. The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
+
+### The four sections
+
+A contract has exactly four parts. Skills load and parse these.
+
+```markdown
+## Contract
+
+**Goal.** <one paragraph: what we're building>
+
+**Acceptance.**
+- [ ] <checklist item: when this is done>
+
+**Autonomy budget.**
+- <permission: what I may do without asking>
+
+**Always-park.**
+- <carve-out: what I must ask about regardless>
+
+Doctrine: <SHA of PRINCIPLES.md at OK time>
+Drafted: <ISO timestamp>
+By: <user@github>
+```
+
+The four sections are doctrine. Drafts that omit any section are malformed; orchestrator parses and rejects with a structured error.
+
+### Worked example — bug fix end-to-end
+
+User instruction: *"fix the day_vote bug end-to-end overnight"*. Orchestrator drafts and names back; user replies `OK`:
+
+```markdown
+## Contract
+
+**Goal.** Fix the day_vote phase regression so DAY_VOTE exits on quorum reached, in the running game and in tests.
+
+**Acceptance.**
+- [ ] Reproducible failure case is fixed (regression test added).
+- [ ] Existing tests stay green.
+- [ ] PR merged to main, dogfood reachable.
+
+**Autonomy budget.**
+- Dispatch /safer:investigate, /safer:implement-junior, /safer:review-senior, /safer:verify in that order.
+- Open draft PRs.
+- Run lint, typecheck, tests; iterate until green.
+- Merge after peer review green AND CI green AND verify SHIP.
+
+**Always-park.**
+- Ratchet-up (investigate→spec, investigate→architect): the original assumption was a routine fix; ratchet means it isn't.
+- Force-push, branch deletion, infra/CI/deploy edits.
+- Adding new sub-issues for follow-up bugs.
+- LOW-confidence root cause.
+- Three-strikes mis-scoping.
+
+Doctrine: <SHA>
+Drafted: 2026-05-04T18:00Z
+By: chughtapan
+```
+
+### Worked example — invitation (dialog only)
+
+User instruction: *"look into the latency on the dashboard route"*. Orchestrator drafts:
+
+```markdown
+## Contract
+
+**Goal.** Understand the source of latency on the dashboard route.
+
+**Acceptance.**
+- [ ] /safer:investigate writeup published with two-layer root cause.
+- [ ] Recommendation routed to user for next-step decision.
+
+**Autonomy budget.**
+- Dispatch /safer:investigate.
+- Read code, run reproductions, examine logs.
+
+**Always-park.**
+- Any modality dispatch beyond investigate.
+- Any code edit.
+- Opening any PR.
+
+Doctrine: <SHA>
+Drafted: <ts>
+By: <user>
+```
+
+After investigate publishes, orchestrator asks what autonomy to grant for any fix. Without that re-authorization, the chain stops.
+
+### Recommended Always-park defaults
+
+Every contract should include these unless the contract explicitly opts out (sandbox repos may opt out of force-push restrictions, etc.):
+
+- Force-push to any branch.
+- Branch deletion.
+- Merging to `main` / `master` / `production` (unless the budget explicitly authorizes merge after peer review + CI + verify).
+- Schema migrations (DROP, destructive ALTER).
+- Mass deletion (>20 files or >500 LOC in one diff).
+- Production deploys.
+- Posting outside the repo (Slack, email, external API).
+- Token / secret operations.
+- Operations marked `careful` by the user's `/careful` skill setup.
+
+These defaults exist because **the asymmetric-cost framing applies**: a wrong autonomous action burns trust and may be irreversible; a wrong park costs one comment. When two interpretations are equally plausible, pick the one with the cheaper undo.
+
+### Lifecycle
+
+**Dispatch.** User sends instruction. Orchestrator parses into a draft contract, posts it to the parent epic, names it back. User confirms (`OK`) or amends (`AMEND CONTRACT: <change>`). Final contract is recorded as `## Contract` on the parent epic body. Execution begins.
+
+If parsing fails or confidence is LOW, the orchestrator asks before drafting; presents 2–3 candidate contract shapes with the most-conservative as recommended default.
+
+**Execution.** At every skill's DONE state, the skill loads the parent epic, reads `## Contract`, identifies the next dispatch the orchestrator would do. If the next dispatch is in the autonomy budget AND not a ratchet-up, transition normally. Otherwise, park: append `## Awaiting amendment` to the artifact body, set sub-issue label to `awaiting-amendment`, return `DONE_PARKED`.
+
+**Amendment.** User comments `AMEND CONTRACT: <change>` (or reacts 🛠️ to a park comment to open a structured dialog). Orchestrator updates the contract body, appends to `## Contract history`, transitions the parked sub-issue label, resumes the chain.
+
+**Stop.** User comments `STOP CONTRACT: <reason>` to halt immediately. Cron tick pauses every in-flight teammate via SendMessage and sets sub-issues to `paused`. No auto-revert; user manually amends or abandons.
+
+**Done.** Contract is satisfied = every Acceptance checkbox is checked = epic transitions to `completed`.
+
+### Ratchet-up always parks
+
+When a downstream modality discovers it must escalate to a higher modality (Principle 8 Ratchet — investigate → spec, architect → spec, implement-* → architect), the original autonomy scope no longer applies. The user authorized X assuming X was the right shape; the ratchet is the system reporting "X is wrong, the right shape is bigger."
+
+Even when the higher modality is technically inside the granted budget, ratchet-up parks. The escalation artifact:
+
+1. Always sets the sub-issue label to `awaiting-amendment`, not the higher modality's `planning` label.
+2. Always appends the `## Awaiting amendment` block with `Reason for park: ratchet-up:<from>→<to>`.
+3. Never auto-dispatches the higher modality.
+
+The lost incident pattern is "investigator finds a spec gap, ratchets to spec, spec revises, architect re-runs, implementation lands — and the user never saw that the spec changed underneath them." The user authorized a fix; what shipped was a spec rewrite. Ratchet-up parks.
+
+### Doctrine SHA stamping
+
+Every contract records the SHA of `PRINCIPLES.md` at OK time. In-flight contracts run against frozen doctrine; subsequent doctrine changes do not retroactively apply. This is reproducibility — any future agent reading the contract can `git checkout <sha>` to see exactly which doctrine governed it.
+
+When doctrine changes during an in-flight contract, the orchestrator may post an advisory comment naming the drift, but never auto-applies. User can opt in via amendment or stay frozen.
+
+### Stop-the-line conditions (separate from contract violations)
+
+These fire regardless of contract — *even within budget, this is wrong*:
+
+- Three-strikes mis-scoping (a sub-task re-triaged 3 times).
+- Confusion protocol (orchestrator can't proceed, doesn't know intent).
+- Peer-review disagreement (review-senior + codex split verdicts on PR).
+- Stamina returns BLOCK on a high-blast-radius artifact.
+- LOW-confidence on a non-junior recommendation.
+
+Each posts a stop-the-line comment to the parent epic and parks. Recovery is user comment with direction.
+
+### Cold-start readability
+
+A future agent picking up a parked epic with no session history reads `## Contract` and `## Awaiting amendment` and knows: what we're building (Goal), when it's done (Acceptance), what's allowed (Autonomy budget), what's never allowed (Always-park), why we're parked (Awaiting amendment, Reason), what user-action would unblock it (recommended action in the park). No git log archeology. No conversation reconstruction. The thread is self-contained.
+
+---
+
 ## Composing with gstack
 
 safer is the SDS modality spine. gstack is a parallel toolbox of interactive workflow skills. They coexist; composition happens at the modality dispatch seam. Each safer skill body names its own composition targets — there is no central routing table to read.
