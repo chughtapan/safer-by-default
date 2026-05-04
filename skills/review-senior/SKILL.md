@@ -234,9 +234,9 @@ Classify the artifact per the inference rules above (or honour
 skill set in a comment on the artifact thread; that comment is the
 audit trail even if the dispatch itself fails.
 
-### Phase 1a — CI status gate (PR mode only; sbd#244)
+### Phase 1a — CI status gate (PR mode only)
 
-> **For PR-kind artifacts: CI must be green before any APPROVE verdict.** Diff-static review (this skill, `/codex review`, `/simplify`, `/review`) is blind to runtime regressions; CI is the runtime check. Real incident: moltzap PR #295 passed three diff-static reviewers but had 5 red CI tests because a Stream/Fiber refactor turned `client.close()` async.
+> **For PR-kind artifacts: CI must be green before any APPROVE verdict.** Diff-static review (this skill, `/codex review`, `/simplify`, `/review`) is blind to runtime regressions; CI is the runtime check. Real incident: a PR passed three diff-static reviewers but had 5 red CI tests because a Stream/Fiber refactor turned `client.close()` async.
 
 ```bash
 PR_NUMBER=$(echo "$ARTIFACT" | grep -oE '/pull/[0-9]+' | grep -oE '[0-9]+')

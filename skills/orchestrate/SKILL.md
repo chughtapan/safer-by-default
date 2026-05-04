@@ -63,7 +63,7 @@ You are a scrum master who reads `gh issue list` instead of a Jira board, and wh
 When invoked inside a MoltZap-capable AO session (`AO_SESSION`,
 `MOLTZAP_LOCAL_SENDER_ID`, and `AO_CALLER_TYPE` are set), you MAY emit
 peer-channel events to other roster members via `safer-peer-message`
-(SPEC r4.1 §5(d); architect plan #148 §3.7). This is the ONLY transport
+(SPEC r4.1 §5(d)). This is the ONLY transport
 primitive this skill may use for peer coordination. Do NOT import
 `@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
 `src/moltzap/*`; the grep-purity test
@@ -310,7 +310,7 @@ Dispatch via a team. First `TeamCreate` a team for the epic if one does not exis
 
 **Never dispatch via `Agent` without `team_name`.** Standalone subagents are fire-and-forget; teammates are the unit of orchestration. Teams provide shared task lists, peer DM, idle notifications to the team lead, and persistent config at `~/.claude/teams/<team-name>/`.
 
-**Always dispatch with `isolation: "worktree"`.** Default-on, not opt-in. Without it, every dispatched teammate inherits the orchestrator's working directory; concurrent implementers share a worktree and their `git checkout` commands stomp each other's branches (incident: 2026-04-30, sbd#240, moltzap-arena#198). Each teammate gets its own worktree; the harness cleans it up automatically when the agent exits without changes. Override only with explicit user authorization for a specific dispatch where shared state is required.
+**Always dispatch with `isolation: "worktree"`.** Default-on, not opt-in. Without it, every dispatched teammate inherits the orchestrator's working directory; concurrent implementers share a worktree and their `git checkout` commands stomp each other's branches. Each teammate gets its own worktree; the harness cleans it up automatically when the agent exits without changes. Override only with explicit user authorization for a specific dispatch where shared state is required.
 
 Teammate prompt template:
 
@@ -391,7 +391,7 @@ Scan the body for these four condition patterns. Any match blocks the merge:
    not-yet-met but acceptable to defer past this review, with a stated condition
    for closing the deferral: *"accept as DRAFT pending CI green"*, *"merge after
    the linked Linear ticket lands"*.
-4. **CI-pending verdicts (sbd#244)** — phrases like *"APPROVE-PENDING-CI"*,
+4. **CI-pending verdicts** — phrases like *"APPROVE-PENDING-CI"*,
    *"CI status: pending"*, *"CI status: failing"*. The reviewer ran the diff-static
    review but CI was not green at review time. The team-lead must withhold merge
    until CI clears (re-fetch `gh pr view --json statusCheckRollup`); on `failing`
@@ -607,7 +607,7 @@ Record the returned job id on the parent epic (comment) so the next operator can
 
 5. **Auto-gate + update epic progress.** For each sub-issue whose acceptance is mechanically verifiable (clean draft PR green on CI, review-ready comment matching the acceptance criterion, etc.), run **Step 5c.1 and Step 5c.2**: transition `review → plan-approved`, post the gating comment, close the sub-issue, then rewrite the parent epic's `## Progress` section. Skip the sub-issue when tests are red, CI is pending, or the acceptance artifact requires human judgment (any criterion the modality delegates to `/safer:review-senior`). Before any auto-gate transition fires, run **Step 5c.0** against the linked PR's reviewer body; skip the sub-issue if any of the four condition patterns matches.
 
-   **Implement-\* gate carries a mandatory verify dispatch (sbd#241).** For sub-issues with `safer:implement-*` modality, the auto-gate does NOT close at `plan-approved`. The full lifecycle is:
+   **Implement-\* gate carries a mandatory verify dispatch.** For sub-issues with `safer:implement-*` modality, the auto-gate does NOT close at `plan-approved`. The full lifecycle is:
 
    1. `review → plan-approved` (this auto-gate step) — review verdict accepted, PR is merge-ready.
    2. PR is merged (team-lead-driven, possibly user-authorized; not auto-merged by this loop).
