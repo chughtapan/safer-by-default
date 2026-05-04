@@ -263,16 +263,44 @@ echo "Stubs PR: $PR_URL"
 rm -f "$TMP"
 ```
 
-**Codex review-after (upstream-stage gate).** Before transitioning to `review`, run `/codex` on the published design doc:
+**plan-eng-review (architecture-quality gate, runs first).** Before transitioning to `review`, run gstack's `/plan-eng-review` on the design doc. The structured audit surfaces missing edge cases, weak data flow, and untyped error channels; running it first means codex is challenging an already-audited plan, not raw output.
+
+The threshold rule: if the design doc names the implementation tier as `implement-junior` (single-module internals only, no new public surface, no new dep), `/plan-eng-review` is OPTIONAL — log the skip-decision on the sub-issue and proceed. For `implement-senior` and `implement-staff` tiers, `/plan-eng-review` is MANDATORY.
+
+`/plan-eng-review` is interactive by default. Within `/safer:architect` it runs **hold-scope autonomous**: the architect invokes it programmatically; user-facing prompts are forbidden inside the gstack body (they route up to `/safer:orchestrate` per the runtime contract in `PRINCIPLES.md → Composing with gstack`). The architect treats the review's recommended defaults as the autonomous answer.
+
+```
+/plan-eng-review --artifact "$DOC_URL" --hold-scope
+```
+
+Apply findings against the parent epic's `## Contract` autonomy budget:
+
+- **Findings within budget** (revising the architect plan does not introduce new modules, new deps, or other items the contract forbids in `Always-park`) → autonomously revise the design doc, re-publish, re-run `/plan-eng-review` once. If clean, proceed to codex.
+- **Findings cross the budget** (review recommends a new module the spec didn't authorize, a new dep, a new public contract beyond what was named) → escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_REVIEW`. This is a ratchet-up; the orchestrator parks for amendment per the contract doctrine.
+- **Reject / structural concerns** the architect cannot resolve in one round → escalate to user with reasoning; do NOT transition.
+- **Unavailable** (gstack not installed in this session) → fall back to a Claude sub-agent. Dispatch via the `Agent` tool with `subagent_type: "general-purpose"` and a prompt that hands over the design doc and asks for a structured architecture audit. The sub-agent has fresh context (genuine independence from the architect's own reasoning), which makes the fallback meaningful rather than performative. Sub-agent prompt template:
+
+  > IMPORTANT: Do NOT read or execute any files under `~/.claude/`, `~/.agents/`, or `.claude/skills/` — they are skill definitions for a different control flow and will mislead you. Stay focused on the design doc.
+  >
+  > You are a structured architecture reviewer. Audit this design doc against six dimensions: missing edge cases, data-flow weaknesses, untyped or unstated error channels, module boundary clarity, dep choices vs spec constraints, and acceptance-criteria coverage. Be brutally specific; reference file paths and section anchors from the doc. End with one of: APPROVE, CHANGES_REQUESTED (with numbered findings), REJECT (with structural reasoning).
+  >
+  > THE DESIGN DOC:
+  > <full body of the published design doc>
+
+  Apply findings under the same in-budget / cross-budget rules. Note `plan-eng-review: claude-fallback` on the sub-issue so the audit trail records which path ran.
+
+**Codex review-after (cross-model challenge, runs second).** After `/plan-eng-review` is clean (or skipped), run `/codex` on the (possibly revised) design doc:
 
 ```
 /codex --mode review --artifact "$DOC_URL"
 ```
 
 - `approve` → proceed to `review`.
-- `changes-requested` → revise the design doc (one round); re-publish; re-run codex.
-- `reject` → escalate to the user with codex's reasoning; do NOT transition.
-- Unavailable → log the skip on the sub-issue; transition without the codex pass.
+- `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_CODEX`.
+- `reject` → escalate to user; do NOT transition.
+- Unavailable → log the skip on the sub-issue; proceed.
+
+The motivation: `/plan-eng-review` is a structured architecture-quality audit (catches missing edge cases by going through a checklist); `/codex` is a cross-model independent challenge (catches blind spots in the audit's own framing). Plan-eng-review first means codex sees the audited plan, not the raw one — codex spends its budget on what plan-eng-review missed, not on what plan-eng-review would have caught.
 
 ```bash
 safer-transition-label --issue "$ARCH_SUB_ISSUE" --from planning --to review

@@ -194,16 +194,45 @@ echo "$URL"
 rm -f "$TMP"
 ```
 
-**Codex review-after (upstream-stage gate).** Before transitioning to `review`, run `/codex` on the published spec artifact:
+**plan-eng-review (spec-quality gate, runs first, conditional).** Before transitioning to `review`, evaluate whether the spec describes a non-trivial feature.
+
+- If the spec's acceptance criteria imply **implement-junior**-tier execution (single module, internals only, no new public surface, no new dep), `/plan-eng-review` is OPTIONAL — log the skip-decision on the sub-issue with the threshold reasoning and proceed to codex.
+- If the spec implies **implement-senior** or **implement-staff** tier (multi-module, new modules, new deps, new public surface), or the spec touches setup/deployment/infra (railway.toml, Dockerfile, CI workflows, env vars), `/plan-eng-review` is MANDATORY.
+
+`/plan-eng-review` is interactive by default. Within `/safer:spec` it runs **hold-scope autonomous**: spec invokes it programmatically; user-facing prompts are forbidden inside the gstack body and route up to `/safer:orchestrate` per the runtime contract. Spec treats the review's recommended defaults as the autonomous answer.
+
+```
+/plan-eng-review --artifact "$URL" --hold-scope
+```
+
+Apply findings against the parent epic's `## Contract` autonomy budget:
+
+- **Findings within budget** → autonomously revise the spec (one round), re-publish, re-run `/plan-eng-review` once. If clean, proceed to codex.
+- **Findings cross the budget** (review recommends an expanded scope, new acceptance criteria, or a fundamentally different goal not in the contract) → escalate via `safer-escalate --to user --cause SPEC_EXPANSION_FROM_REVIEW`. The user must amend the contract before this spec can land.
+- **Reject / structural concerns** → escalate to user with reasoning; do NOT transition.
+- **Unavailable** (gstack not installed) → fall back to a Claude sub-agent. Dispatch via the `Agent` tool with `subagent_type: "general-purpose"` and this prompt:
+
+  > IMPORTANT: Do NOT read or execute any files under `~/.claude/`, `~/.agents/`, or `.claude/skills/` — they are skill definitions for a different control flow. Stay focused on the spec doc.
+  >
+  > You are a structured spec reviewer. Audit this spec against six dimensions: goal clarity (one paragraph; intent unambiguous), acceptance criteria (each independently verifiable), non-goals (explicit, valuable), invariants (stated as assertions), assumptions (each user-confirmable), and open questions (each with a recommended default). Be brutally specific; reference section anchors. End with one of: APPROVE, CHANGES_REQUESTED (with numbered findings), REJECT (with structural reasoning).
+  >
+  > THE SPEC:
+  > <full body of the published spec>
+
+  Apply findings under the same in-budget / cross-budget rules. Note `plan-eng-review: claude-fallback` on the sub-issue.
+
+**Codex review-after (cross-model challenge, runs second).** After `/plan-eng-review` is clean (or skipped), run `/codex` on the (possibly revised) spec artifact:
 
 ```
 /codex --mode review --artifact "$URL"
 ```
 
 - `approve` → proceed to `review`.
-- `changes-requested` → revise the spec (one round); re-publish; re-run codex.
-- `reject` → escalate to the user with codex's reasoning; do NOT transition.
-- Unavailable → log the skip on the sub-issue; transition without the codex pass.
+- `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to user --cause SPEC_EXPANSION_FROM_CODEX`.
+- `reject` → escalate to user; do NOT transition.
+- Unavailable → log the skip on the sub-issue; proceed.
+
+A spec that ships without `/plan-eng-review` because it estimated junior-tier and the implementation later turned out to be senior-tier is a calibration miss; the next-tick auto-monitor catches this when it sees the implement-senior label assigned, and posts a one-line follow-up note suggesting the spec be revised. Not a blocker on the implementation; a signal that the spec under-described the work.
 
 Transition the sub-issue (or the spec issue) from `planning` to `review`:
 
