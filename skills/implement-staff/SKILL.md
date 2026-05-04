@@ -47,11 +47,11 @@ Staff-tier capability is the most dangerous place in the pipeline for scope drif
 
 ## Forbidden paths
 
-> **Edits to paths containing `.claude/` as a directory component are forbidden.** (sbd#143)
+> **Edits to paths under the harness plugin cache (`.claude/skills/` or `.claude/plugins/`) are forbidden.** (sbd#143, sbd#261)
 
-`~/.claude/skills/<repo>/...` is the harness's plugin cache, NOT the project repo. Confusing the two corrupts the runtime skill state instead of the project. Before any `Edit`, `Write`, or `MultiEdit` call: split the target absolute path on `/` and refuse if any component is exactly `.claude`. Substring match is wrong (`.claude-plugin/` is legitimate); component match is the rule. On refusal, emit `BLOCKED` with `cause=forbidden_path:<full-target-path>` and SendMessage the team-lead.
+`~/.claude/skills/<repo>/...` and `~/.claude/plugins/...` are the harness's plugin cache, NOT the project repo. Confusing the two corrupts the runtime skill state instead of the project. Before any `Edit`, `Write`, or `MultiEdit` call: split the target absolute path on `/` and refuse if it contains the adjacent pair `.claude/skills/` or `.claude/plugins/`. The adjacent-pair check catches the harness cache (typically `$HOME/.claude/skills/...` and `$HOME/.claude/plugins/...`) without over-firing on project worktrees that legitimately live under `.claude/worktrees/<slug>/...` (sbd#261). Single-component match (any `.claude` component) is too broad; substring match is wrong in the other direction (`.claude-plugin/` is legitimate). On refusal, emit `BLOCKED` with `cause=forbidden_path:<full-target-path>` and SendMessage the team-lead.
 
-Exception: a teammate explicitly invoked on a sub-issue whose body literally contains `Scope authorized: .claude/` may proceed (rare; meta-tasks editing the plugin itself).
+Exception: a teammate explicitly invoked on a sub-issue whose body literally contains `Scope authorized: .claude/skills/` or `Scope authorized: .claude/plugins/` may proceed (rare; meta-tasks editing the plugin itself).
 
 ## Role
 
