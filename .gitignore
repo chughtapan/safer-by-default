@@ -11,3 +11,7 @@
 # Local state (never committed; user-specific)
 ~/.safer/
 /.codex
+
+# Skill-creator workspaces (run artifacts; reproducible from evals.json)
+skills/*-workspace/
+skills/*/evals/iteration-*/
