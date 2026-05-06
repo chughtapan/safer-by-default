@@ -1,6 +1,6 @@
 # safer-by-default
 
-A Claude skill plugin that recalibrates your coding agent for type-safe, scope-disciplined work. Eight principles in two categories.
+A Claude skill plugin that recalibrates your coding agent for type-safe, scope-disciplined work. Four parts: craft, discipline, stamina, communication.
 
 ## The Problem
 
@@ -8,21 +8,25 @@ Your coding agent is miscalibrated. It was trained on human-written code — dec
 
 It is not. This plugin recalibrates.
 
-## Eight Principles: Two Axes
+## Four parts
 
-**Part 1 — Use your powers (craft).** Four principles for eliminating classes of error at the type level:
-- **Types beat tests:** Use branded types or discriminated unions to make invalid states unrepresentable. Every constraint that can live in the type system should.
+**Part 1 — Craft.** Four principles for compiler-grade output:
+- **Types beat tests:** Move constraints into the type system. Branded types, discriminated unions, exhaustive matches — the compiler catches every site, every reader, forever.
 - **Validate at every boundary:** Inside a module, trust your types. At boundaries (disk, env, network, another package), decode with a schema.
-- **Typed errors not raw throws:** Every error is a tagged union or discriminated result. No `throw new Error("bad")`, no bare `catch {}`.
-- **Exhaustiveness over optionality:** Every switch ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches explicitly.
+- **Errors are typed, not thrown:** Tagged unions or discriminated results. No `throw new Error("bad")`, no bare `catch {}`, no `Promise<T>` that erases the error channel.
+- **Exhaustiveness over optionality:** Every switch ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches.
 
-**Part 2 — Stay in your lane (scope).** Four principles for scope discipline:
-- **Discipline over capability:** You fill one module. Cross-module reach is a boundary; reach is escalation.
-- **Budget gate:** Shape is the rule, not volume. A 500-line module is fine; one line across two modules is not.
-- **Literal stop rules:** When a 2nd module is touched, the rule has fired. Do not rationalize. Escalate.
-- **The ratchet:** Escalate up (to senior, architect, staff), never sideways. No quick fixes in sibling modules.
+**Part 2 — Discipline.** Four principles for scope:
+- **Discipline over capability:** The question is not "can I do this." The question is "is this mine to do."
+- **The Budget Gate:** Shape, not volume. A 500-line module is fine; one line across two modules is not.
+- **The Brake:** Stop rules are literal. When fired, stop writing code. Produce the escalation artifact.
+- **The Ratchet:** Escalate up, never sideways. No quick fixes in sibling modules.
 
-Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `SKILL.md` to see one projection of the principles onto one kind of work.
+**Part 3 — Stamina.** How leverage-class artifacts earn `done`. N heterogeneous review passes, set by blast radius × reversibility, capped at 4. Internal one-module changes ship on N=1; public-surface or destructive changes go up to N=4.
+
+**Part 4 — Communication.** How work hands off. Contracts (autonomy is granted, not assumed). Durable records (the forge is the record; edit in place, never amend; doctrine SHA-stamped at OK time; code references pinned). Output receipts (status, confidence, effort, process issues — every artifact declares all four). Writing for the cold-start reader (present-tense; portable; the next agent has none of your context).
+
+Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `SKILL.md` for one projection of the principles onto one kind of work.
 
 ## Install
 
@@ -53,7 +57,9 @@ cd ~/.claude/skills/safer-by-default
 
 `./bin/safer-setup-labels` creates the GitHub issue labels used by safer-by-default skills (`safer:spec`, `safer:planning`, `safer:implementing`, etc.). Requires `gh` authenticated with `repo` scope and write access to the repository. It is idempotent; running it twice on the same repo is safe.
 
-**Requirements:** `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (for the template generator).
+**Requirements:**
+- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (for the template generator).
+- [gstack](https://github.com/chughtapan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
 
 **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
 
@@ -88,7 +94,7 @@ Notes:
 
 ## Skill catalog
 
-Thirteen skills, grouped by **modality** (the type of work: design, execution, gating, or bootstrap).
+Seventeen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
 
 Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:spec` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
 
@@ -97,10 +103,11 @@ Each skill is invoked as a **Claude slash-command** within a Claude Code session
 | Skill | When to invoke | Output |
 |---|---|---|
 | `/safer:spec` | ambiguous intent; no acceptance criteria | spec doc → GitHub issue |
-| `/safer:architect` | need module/interface/data-flow structure | design doc + interface stubs |
+| `/safer:architect` | need module/interface/data-flow structure | design doc + interface stubs + every artifact that defines the system (docs, configs, scripts, CI, deploy files) |
 | `/safer:investigate` | reproducible bug | root-cause writeup + fix recommendation (no fix) |
 | `/safer:spike` | "is X feasible?" | throwaway code + go/no-go |
 | `/safer:research` | open question, no known answer | hypothesis ledger + validated insights |
+| `/safer:ux-audit` | UI surface needs heuristic audit (Nielsen, WCAG, etc.) | findings ledger routed to downstream modality |
 
 ### Execution
 
@@ -110,20 +117,23 @@ Each skill is invoked as a **Claude slash-command** within a Claude Code session
 | `/safer:implement-senior` | cross-module within approved plan; no new modules |
 | `/safer:implement-staff` | new modules per approved spec |
 
-### Gate / handoff
+### Review / gate / handoff
 
 | Skill | Role |
 |---|---|
 | `/safer:review-senior` | pre-merge diff review; native PR review |
 | `/safer:verify` | tests + acceptance + ship/hold |
 | `/safer:orchestrate` | decomposition + routing + tracking (scrum master) |
+| `/safer:stamina` | fan-out reviewer for high-blast-radius artifacts (N heterogeneous passes) |
+| `/safer:dogfood` | cold-start read of any artifact; portability check before handoff |
+| `/safer:safer-docs-reader` | multi-persona docs review (4 ephemeral opus personas) |
 
 ### Floor + bootstrap
 
 | Skill | Role |
 |---|---|
 | `/safer:typescript` | TS craft floor; invoked by `implement-*` on TS repos |
-| `/safer:setup` | one-time: install `eslint-plugin-agent-code-guard`, flip strict flags, probe |
+| `/safer:setup` | one-time: install `eslint-plugin-agent-code-guard`, flip strict flags, probe; gstack hard-dep precondition check |
 
 ## How work flows
 
