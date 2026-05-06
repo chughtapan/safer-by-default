@@ -1,0 +1,51 @@
+{
+  "skill_name": "architect",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "You are testing the /safer:architect skill in dry-run mode. Read /home/tapanc/safer-by-default/skills/architect/SKILL.md first to understand the charter, then produce the architect's outputs as files in your output directory: a design-doc.md, every stub file the design requires, and any doc/config updates the design changes (README, package.json, .env.example, Dockerfile, CI workflows, etc.). Do NOT publish to GitHub or open a PR; produce the artifact contents only.\n\nSPEC (approved):\n\n**Goal.** Add a `sha256OfFile(path)` function to the `crypto` utility module. Returns the hex digest of the file's contents.\n\n**Acceptance.**\n- [ ] The function returns a hex string equal to `openssl dgst -sha256 <path>` output.\n- [ ] Errors typed: `FileNotFound`, `IoError`.\n- [ ] Public surface: one named export from `src/crypto/sha256.ts`.\n\n**Non-goals.**\n- Streaming for very large files.\n- Hashing directories.\n\n**Invariants.**\n- No partial reads — function either returns the full digest or returns an error.\n\nTarget repository uses TypeScript with Node.js. Built-in `crypto` and `fs/promises` are available; no new external deps should be needed.",
+      "expected_output": "design-doc.md with all 8 sections; src/crypto/sha256.ts stub with typed-error signature and `throw new Error('not implemented')` body; minimal doc updates only where the README references the affected module; no new dependencies; no CI changes (no new test target this design requires).",
+      "expectations": [
+        "Design doc contains the 8 fixed sections: Summary, Modules, Interfaces, Data flow, Errors, Dependencies, Traceability, Open questions",
+        "src/crypto/sha256.ts exists as a stub file",
+        "Every function body in the stub is exactly `throw new Error(\"not implemented\")` — no other logic, no comments like `// TODO`, no partial sketches",
+        "The function signature uses a typed error channel (tagged errors, discriminated result, or Effect with E parameter) — not bare `Promise<string>`",
+        "No new dependencies are added to package.json",
+        "Test infrastructure is unchanged or only adds `it.todo(...)` entries with no test bodies",
+        "The Errors section of the design doc names FileNotFound and IoError as the discriminated cases",
+        "The Traceability section maps every acceptance criterion to a module or interface"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "You are testing the /safer:architect skill in dry-run mode. Read /home/tapanc/safer-by-default/skills/architect/SKILL.md first to understand the charter, then produce the architect's outputs as files in your output directory: design-doc.md, every stub file the design requires, AND every doc/config/script/CI/deploy/env file the design changes. Do NOT publish to GitHub or open a PR; produce the artifact contents only.\n\nSPEC (approved):\n\n**Goal.** Add a Postgres-backed user store with CRUD operations on a `users` table.\n\n**Acceptance.**\n- [ ] Module `src/users/store.ts` exposes typed CRUD: `createUser`, `getUser`, `updateUser`, `deleteUser`.\n- [ ] Errors typed: `UserNotFound`, `UniqueViolation`, `DbError`.\n- [ ] Tests run against a real Postgres via `testcontainers`.\n- [ ] CI runs the integration tests.\n- [ ] `.env.example` declares `DATABASE_URL`.\n\n**Non-goals.**\n- Migrations beyond initial schema.\n- Connection pooling tuning.\n\n**Invariants.**\n- All SQL is parameterized (no string interpolation).\n- Schema initialization is idempotent.\n\nTarget repository uses TypeScript with Node.js. Postgres is a NEW dependency; testcontainers is a NEW dev dependency. The repo currently has a basic GitHub Actions CI workflow at `.github/workflows/ci.yml` that runs lint and unit tests but no integration tests.",
+      "expected_output": "Design doc with 8 sections including Postgres dep entry; src/users/store.ts stub with typed CRUD signatures and typed errors; package.json updated with `pg` (or equivalent) and `@testcontainers/postgresql`; .env.example with DATABASE_URL example; docker-compose.yml or Dockerfile note for local Postgres; .github/workflows/ci.yml updated to run integration tests with testcontainers; test file with `it.todo(...)` entries.",
+      "expectations": [
+        "Design doc contains the 8 fixed sections including a populated Dependencies section",
+        "Dependencies section names a Postgres client library (pg, postgres, etc.) AND testcontainers, both with pinned version + license + one-sentence justification",
+        "package.json is updated to include the new dependencies",
+        ".env.example declares DATABASE_URL with an example value (not a real secret)",
+        ".github/workflows/ci.yml is updated to add an integration test job (or step) using testcontainers",
+        "src/users/store.ts exists as a stub file with all four CRUD function signatures",
+        "Every function body in src/users/store.ts is exactly `throw new Error(\"not implemented\")` — no SQL strings, no parameter binding logic, no transaction code, no logic of any kind",
+        "The error channel is typed (UserNotFound | UniqueViolation | DbError discriminated union, or tagged errors) — not bare `Promise<T>`",
+        "A test file exists with `it.todo(...)` entries for each acceptance criterion; no test bodies are written",
+        "The Data flow section explicitly mentions parameterized queries (the spec invariant)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "You are testing the /safer:architect skill in dry-run mode. Read /home/tapanc/safer-by-default/skills/architect/SKILL.md first to understand the charter, then produce the architect's outputs as files in your output directory: design-doc.md, the stub file, any doc updates. Do NOT publish to GitHub or open a PR; produce the artifact contents only.\n\nSPEC (approved):\n\n**Goal.** Add a memoized version of the existing `computeChecksum(path: string): Promise<string>` function. Cache results keyed by absolute path, evict entries older than 5 minutes.\n\n**Acceptance.**\n- [ ] Repeated calls within 5 minutes return the cached value without recomputing.\n- [ ] Calls after 5 minutes recompute.\n- [ ] Public surface: one named export `memoizedComputeChecksum`.\n\n**Non-goals.**\n- Distributed caching.\n- Persistent cache across restarts.\n\n**Invariants.**\n- Cache hit/miss is observable (no silent staleness).\n\nTarget repository uses TypeScript. The existing `computeChecksum` is in `src/crypto/checksum.ts` and currently returns `Promise<string>` with no typed error channel.",
+      "expected_output": "Design doc with 8 sections; the cache algorithm is named in one sentence in the Modules or Data flow section but NOT implemented; src/crypto/memoized-checksum.ts stub with `throw new Error('not implemented')` body; the body contains zero cache code; the new function's error channel is typed even though the original function uses bare Promise<string>.",
+      "expectations": [
+        "Design doc contains the 8 fixed sections",
+        "The Modules or Data flow section names the cache algorithm in one sentence (e.g., 'uses a Map keyed by absolute path with timestamped entries and a 5-minute TTL') — no more than one sentence of algorithmic detail",
+        "src/crypto/memoized-checksum.ts (or similarly named) exists as a stub file",
+        "The stub body is exactly `throw new Error(\"not implemented\")` — zero cache-related code (no Map literal, no Date.now(), no setInterval, no eviction logic)",
+        "The new function's signature uses a typed error channel — does NOT inherit the original `Promise<string>` shape",
+        "The Open questions section either names the cache-observability mechanism (logging? metrics?) or routes that decision to a downstream modality with a recommended default",
+        "The Data flow section explicitly notes the cache hit / cache miss paths as separate flows"
+      ]
+    }
+  ]
+}
