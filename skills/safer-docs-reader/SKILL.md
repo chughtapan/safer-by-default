@@ -31,9 +31,9 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root before invoking this skill. The projection onto this modality:
 
-- **Artifact discipline → Cold Start Test.** Every persona runs cold against the artifact. Session history does not leak; context leakage is the bug the personas are looking for.
+- **Part 4 → Write for the cold-start reader.** Every persona runs cold against the artifact. Session history does not leak; context leakage is the bug the personas are looking for.
 - **The debt multiplier.** A confusing docs artifact caught by 4 personas in the same session is 1x; the same confusion caught a quarter later by a new adopter is 30-50x. This skill keeps artifacts in row 1.
-- **Principle 5 (Junior Dev Rule).** The skill reads and proposes. It does not write revisions. The upstream author applies or rejects.
+- **Principle 5 (Discipline over capability).** The skill reads and proposes. It does not write revisions. The upstream author applies or rejects.
 - **Principle 6 (Budget Gate).** One artifact per run. One team per run. N=3 rounds maximum. Round 3 requires explicit user approval. No exceptions.
 - **Principle 7 (Brake).** Any persona reporting "I needed context outside the artifact" is the iron rule firing. That is the finding, not an error.
 
@@ -46,7 +46,7 @@ These are the spec invariants this skill enforces. Every reference to `Invariant
 3. **Opus orchestrator, opus personas.** The skill runs on opus; every persona `Agent` call carries `model: "opus"` per the orchestrate model-routing table. Dispatch is always `TeamCreate` + `Agent(team_name, ...)`; never standalone `Agent`; never in-session `Skill`.
 4. **Bounded iteration.** The round limit is fixed at N=3: round 1 auto; round 2 only on explicit user trigger after revision; round 3 only with explicit user authorization at dispatch (`--allow-round-3`). The loop cannot exceed N=3.
 5. **Aggregator is named and deterministic.** The severity-weighted consensus rule below is the complete aggregator contract. The aggregator introduces no judgments the personas did not emit; it does not reweight, rephrase, or invent items or scores.
-6. **Artifact discipline.** Every run publishes a summary comment on the target artifact when the target is a GitHub issue/PR. No state lives only in conversation.
+6. **Part 4 (Communication).** Every run publishes a summary comment on the target artifact when the target is a GitHub issue/PR. No state lives only in conversation.
 7. **Cold-start readable.** The aggregate report is actionable by a fresh session with no prior context.
 
 ## Iron rule
@@ -56,6 +56,8 @@ These are the spec invariants this skill enforces. Every reference to `Invariant
 Enforcement is architectural. Persona sub-agents are spawned via `TeamCreate` + `Agent(team_name, model: opus)` with a self-contained prompt: the persona template, the artifact payload, the output schema. No session history. No parent epic. No sibling docs. When a persona needs context beyond the artifact, it reports that as a BLOCK in the artifact, not a gap to paper over.
 
 ## Role
+
+This skill does not invoke gstack targets. Feedback flows up to the calling modality, never out as a user prompt.
 
 You are the orchestrator. Given an artifact reference, you:
 
@@ -447,17 +449,6 @@ When invoked standalone (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md → Voice`. The aggregate report is terse, structural, evidence-first. Every must-fix entry is a quoted phrase plus a specific "why." No "this might be clearer," no "consider adding." Personas write directly; the aggregator relays directly.
+The aggregate report is terse, structural, evidence-first. Every must-fix entry is a quoted phrase plus a specific "why." No "this might be clearer," no "consider adding." Personas write directly; the aggregator relays directly.
 
 The next reader of the aggregate report is the artifact's author, deciding what to revise. They need to know where to cut, what to add, what to leave. A junior writes for them.
-
----
-
-## Composition with gstack
-
-### Invoked by
-
-- `/safer:dogfood` — internal doc-review during cold-start reads.
-- Artifact handoff review across modalities.
-
-safer-docs-reader does not invoke gstack targets. Feedback flows up to the calling modality, never out as a user prompt.

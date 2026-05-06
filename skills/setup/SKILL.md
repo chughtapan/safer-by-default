@@ -36,7 +36,7 @@ Read `PRINCIPLES.md` at the plugin root. This skill is the projection of the pri
 - **Principle 2 (Validate at every boundary).** The lint rules this skill installs catch the patterns that bypass boundary validation: bare casts, raw SQL, hardcoded secrets.
 - **Principle 3 (Errors are typed).** The `bare-catch`, `async-keyword`, and `promise-type` rules are the lint floor for the typed-errors principle.
 - **Principle 4 (Exhaustiveness).** Strict flags plus `bare-catch` together make the compiler look at every branch.
-- **Artifact discipline: Cold Start Test.** This skill's output is `eslint.config.js` and `tsconfig.json` edits on disk. They are the durable artifact; future agents read them without reading this session.
+- **Part 4 → Durable records.** This skill's output is `eslint.config.js` and `tsconfig.json` edits on disk. They are the durable artifact; future agents read them without reading this session.
 
 ## Role
 
@@ -77,12 +77,26 @@ if [ ! -f tsconfig.json ] && [ ! -f package.json ]; then
   exit 1
 fi
 
+# gstack is a hard dependency. safer skills call gstack tools (/simplify, /review,
+# /codex, /plan-eng-review, /plan-devex-review, /security-review, /ship,
+# /land-and-deploy) inline. If gstack is absent, those calls fail with no fallback.
+if [ ! -d "$HOME/.claude/skills/gstack" ]; then
+  cat <<'EOF'
+ERROR: gstack is required but not installed at ~/.claude/skills/gstack/.
+safer-by-default treats gstack as a hard dependency.
+
+Install via Claude Code's plugin system, then re-run this skill:
+  /gstack-upgrade
+EOF
+  exit 1
+fi
+
 REPO_ROOT=$(pwd)
 echo "REPO_ROOT: $REPO_ROOT"
 echo "SESSION:   $SESSION"
 ```
 
-If `safer-update-check` or `safer-telemetry-log` is missing, continue. Telemetry is optional.
+If `safer-update-check` or `safer-telemetry-log` is missing, continue. Telemetry is optional. gstack itself is not optional — the preconditions check above fails fast if it is absent.
 
 ## Scope
 
@@ -649,32 +663,24 @@ The next agent touching this repo reads `eslint.config.js` and `tsconfig.json`, 
 
 ---
 
-## Composition with gstack
+## Per-stage recommendations
 
 This skill is the bootstrap-stage audit. It auto-detects whether the target repo is green-field (no source past scaffolding) or brown-field (existing source) via the probe in Step 0 and adapts:
 
 - **Green-field path:** writes config + doctrine + scaffolds tooling.
-- **Brown-field path:** produces a phased migration plan and ratchets to `/safer:spec → /safer:architect → /safer:implement-*` for any code edits. The ratchet is a control-flow note — those modalities are downstream destinations, not composition targets. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
+- **Brown-field path:** produces a phased migration plan and ratchets to `/safer:spec → /safer:architect → /safer:implement-*` for any code edits. Those modalities are downstream destinations. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
 
-There is no `--mode` flag; the probe decides. If the probe is ambiguous, the skill stops and asks via `AskUserQuestion`.
+There is no `--mode` flag; the probe decides. If the probe is ambiguous, the skill stops and asks via `AskUserQuestion`. Setup may invoke `/setup-deploy` for deploy-target detection, `/setup-gbrain` for memory / MCP setup, `/setup-browser-cookies` for authenticated QA flows, `/codex --mode consult` for per-recommendation second opinions, and `/autoplan` when the audit produces a multi-step plan.
 
-### Invokes
-
-- `/setup-deploy` — deploy-target detection and configuration.
-- `/setup-gbrain` — memory / MCP setup.
-- `/setup-browser-cookies` — cookie import for authenticated QA flows.
-- `/codex --mode consult` — per-recommendation second opinions during the audit.
-- `/autoplan` — recommendation-set confirmation when the audit produces a multi-step plan.
-
-### Per-stage recommendation table
+### Stage-by-stage table
 
 Stage classification (probe-driven, not voluntary): **greenfield** = no source past scaffolding; **early** = has source, no tests, no CI; **mid** = has tests + CI, no doctrine doc, partial type/lint floor; **mature** = doctrine + tests + CI + type/lint floor present.
 
 | Stage | Doctrine | Modality skills | Test infra | Deploy | Memory | Lint/type floor |
 |---|---|---|---|---|---|---|
-| Greenfield | install `PRINCIPLES.md`; install `ETHOS.md` if user opts in | install all safer modalities; gstack install optional per user | scaffold via `/safer:setup` (TS path) or language-equivalent; ensure CI runs the suite (Principle 1.4) | `/setup-deploy` if a deploy target is named | `/setup-gbrain` if user opts in | `/safer:setup` flips strict `tsconfig` + installs ACG (TS); language-equivalent for non-TS |
-| Early | install `PRINCIPLES.md` | install safer modalities; defer gstack non-essentials | add test runner; ensure CI executes it (Principle 1.4) | defer until production target named | defer until cross-session need | enable strict mode + ACG; baseline-freeze pre-existing violations |
+| Greenfield | install `PRINCIPLES.md`; install `ETHOS.md` if user opts in | install all safer modalities (gstack is already required) | scaffold via `/safer:setup` (TS path) or language-equivalent; ensure CI runs the suite (Principle 1.4) | `/setup-deploy` if a deploy target is named | `/setup-gbrain` if user opts in | `/safer:setup` flips strict `tsconfig` + installs ACG (TS); language-equivalent for non-TS |
+| Early | install `PRINCIPLES.md` | install safer modalities | add test runner; ensure CI executes it (Principle 1.4) | defer until production target named | defer until cross-session need | enable strict mode + ACG; baseline-freeze pre-existing violations |
 | Mid | confirm `PRINCIPLES.md` present and current | gap-fill missing modalities; ensure orchestrate registered | add property-based tests for pure functions (Principle 1.1); mutation gate on critical glob (Principle 1.3) | wire if not wired | `/setup-gbrain` if multi-session work is recurring | tighten ACG ruleset; remove baseline overrides one rule at a time per Principle 8 (Ratchet) |
-| Mature | review for drift; rotate to current `PRINCIPLES.md` | review composition-map cross-refs in skill bodies | add `testcontainers` **if a real DB / cache / queue / external-service dependency exists** (Principle 1.5); a pure-library repo at mature stage does not require `testcontainers` | review deploy hooks | review trust policy | continue removing baseline overrides one rule at a time per Principle 8 (Ratchet); `/health` reports a CI quality score; **gate CI on the score only if an explicit per-repo decision authorizes it per Principle 6 (Budget Gate)**. `/health` is gstack-conditioned; substitute the repo's quality dashboard if gstack is not installed. |
+| Mature | review for drift; rotate to current `PRINCIPLES.md` | review modality wiring across skill bodies | add `testcontainers` **if a real DB / cache / queue / external-service dependency exists** (Principle 1.5); a pure-library repo at mature stage does not require `testcontainers` | review deploy hooks | review trust policy | continue removing baseline overrides one rule at a time per Principle 8 (Ratchet); `/health` reports a CI quality score; **gate CI on the score only if an explicit per-repo decision authorizes it per Principle 6 (Budget Gate)**. |
 
 This table is the v0 deliverable. New stages or new dimensions are spec-revision triggers, not PR drift.

@@ -33,11 +33,11 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root before invoking this skill. Your projection of the principles onto this modality:
 
-- **Artifact discipline to Cold Start Test** is the doctrine this skill enforces. Every other modality is supposed to write for the cold-start reader. Dogfood is the check. If the artifact fails here, the upstream modality shipped debt.
+- **Part 4 → Write for the cold-start reader** is the doctrine this skill enforces. Every other modality is supposed to write for the cold-start reader. Dogfood is the check. If the artifact fails here, the upstream modality shipped debt.
 - **The debt multiplier** is why this exists. A confusing artifact caught in the same session is 1x; the same confusion caught by the next agent is 3 to 5x; the same confusion caught a quarter later is 30 to 50x. Dogfood lives in row 1 of that table.
-- **Principle 5 (Junior Dev Rule)** the skill reads; it does not revise. The upstream author revises. Routing a fix is forward, not sideways.
+- **Principle 5 (Discipline over capability)** the skill reads; it does not revise. The upstream author revises. Routing a fix is forward, not sideways.
 - **Principle 7 (Brake)** the subagent stops the moment it notices prior context is leaking. That leak is the bug the skill is looking for.
-- **Artifact discipline to GitHub is the record** the report is published on the artifact's own thread (issue or PR). A dogfood report kept in local scratch is not a dogfood report.
+- **Part 4 → Durable records** the report is published on the artifact's own thread (issue or PR). A dogfood report kept in local scratch is not a dogfood report.
 
 ## Iron rule
 
@@ -255,7 +255,7 @@ sections.
 
 ## Friction log
 
-Friction entries that cite a line use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Friction entries that cite a line use the canonical pinned form `path:N[-M]@<sha7>`.
 
 1. [location] - [why a consumer stumbles]
 2. ...
@@ -455,7 +455,7 @@ Nothing dogfood produces lives outside GitHub unless the input is a local file a
 - **"Let me pass the parent epic body alongside the artifact so the subagent has context."** Iron rule violation. The subagent runs cold; context is the bug, not the fix.
 - **"I'll skim the linked design doc and summarize it in the prompt."** Same violation. If the artifact needs the design doc, the artifact should inline or properly cross-reference it; that is the finding.
 - **"The subagent's score feels wrong; I'll bump Clarity from 6 to 8."** No. The subagent is the reader. The skill publishes what the subagent emits.
-- **"I'll rewrite the artifact's confusing sentence while I'm here."** Junior Dev Rule violation. Dogfood reads; the upstream author revises.
+- **"I'll rewrite the artifact's confusing sentence while I'm here."** Discipline over capability violation. Dogfood reads; the upstream author revises.
 - **"The artifact is a PR; I'll include the full diff in the payload."** The payload is what a cold-start consumer sees first: title, body, labels. Diffs are a separate modality's input (`review-senior`). Do not over-include.
 - **"The subagent did not return a valid schema; I'll write the report myself."** Escalate. The subagent's failure is a signal about the artifact's fit for this rubric; do not paper over it.
 - **"I'll run dogfood on three related artifacts at once."** One artifact per invocation. Run the skill three times.
@@ -490,7 +490,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -499,17 +499,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md`, Voice section. The subagent's report is terse, concrete, and evidence-first. Every score is a number with a quoted phrase or a location. Every friction entry is a specific location and a specific reason. No "this might be improved by," no "I think the clarity could be higher."
+The subagent's report is terse, concrete, and evidence-first. Every score is a number with a quoted phrase or a location. Every friction entry is a specific location and a specific reason. No "this might be improved by," no "I think the clarity could be higher."
 
 The next agent reading this report is the upstream modality's author, revising. They need to know where to cut and what to add, not to be flattered about what worked. The author is a junior; write for them.
-
----
-
-## Composition with gstack
-
-### Invoked by
-
-- `/safer:review-senior` — cold-start read of the diff during PR review.
-- `/safer:stamina` — one of the N reviewers in `--plan` and `--pr` fan-out.
-
-dogfood does not invoke gstack targets.

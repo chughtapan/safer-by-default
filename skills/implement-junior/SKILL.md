@@ -36,7 +36,7 @@ Read `PRINCIPLES.md` at the plugin root before writing any code. Your projection
 - **Principle 2 (Validate at every boundary)** — inside the module, trust your types. At the boundary (disk, env, network, another package), decode with a schema.
 - **Principle 3 (Errors are typed, not thrown)** — tagged errors or discriminated results. No raw `throw new Error("bad")`. No `catch {}`. `Promise<T>` on a failing path is a bug by you.
 - **Principle 4 (Exhaustiveness over optionality)** — every switch ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches.
-- **Principle 5 (Junior Dev Rule)** — you do one module. The instinct "while I'm here" is the stop rule.
+- **Principle 5 (Discipline over capability)** — you do one module. The instinct "while I'm here" is the stop rule.
 - **Principle 6 (Budget Gate)** — shape of change is the budget, not volume. 500 LOC in one module is fine. 2 LOC across two modules is not.
 
 ## Iron rule
@@ -180,7 +180,7 @@ safer-transition-label --issue "$SUB_ISSUE" --from planning --to implementing
 
 ### Phase 2 — Confirm scope
 
-Before writing any code, write out a one-line statement of what you are about to change. Example: "Fill in `fetchUser` in `packages/auth/src/user-repo.ts`, add `UserNotFound` tagged error, update test file." Check it against the acceptance criterion in the sub-issue. If the statement includes a file outside the module, or adds a new export, stop and escalate. The statement is a Junior Dev Rule checkpoint.
+Before writing any code, write out a one-line statement of what you are about to change. Example: "Fill in `fetchUser` in `packages/auth/src/user-repo.ts`, add `UserNotFound` tagged error, update test file." Check it against the acceptance criterion in the sub-issue. If the statement includes a file outside the module, or adds a new export, stop and escalate. The statement is a Discipline-over-capability checkpoint.
 
 ### Phase 3 — Create a branch
 
@@ -254,7 +254,7 @@ Apply all findings; cite skips in the PR body under "Review skips" with rational
 
 ### Phase 7 — Open the PR
 
-Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`.
 
 ```bash
 git add <module files>
@@ -375,7 +375,7 @@ Post on the sub-issue; leave the branch in place with no cross-module edits comm
 - **"I'll add `as unknown as T` to get past the typecheck; the reviewer can fix it."** (Principle 1 violation. A cast is a lie. Fix the type or escalate.)
 - **"I'll throw a plain `Error` and tag it later."** (Principle 3 violation. "Later" is the debt multiplier. Tag it now.)
 - **"The switch covers the cases I know about; I can skip `absurd`."** (Principle 4 violation. Skipping `absurd` is how new variants become silent bugs.)
-- **"The architect did not name this helper; I'll export it so siblings can use it."** (Junior Dev Rule violation. Helpers stay internal. If a sibling needs it, that is a `senior` task.)
+- **"The architect did not name this helper; I'll export it so siblings can use it."** (Discipline over capability violation. Helpers stay internal. If a sibling needs it, that is a `senior` task.)
 - **"The lockfile changed because my IDE ran install; I'll commit it anyway."** (No. No `package.json` or lockfile changes. Revert.)
 - **"The test would pass if I relaxed this assertion."** (Debt pattern. If the assertion is wrong, say why and escalate. If the code is wrong, fix the code.)
 - **"`safer-diff-scope` says senior but the change is really one module, I just touched a shared type."** (The shared type is the cross-module reach. Escalate.)
@@ -411,7 +411,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -420,22 +420,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md → Voice`. Your PR body is terse and concrete: one paragraph of what changed, a scope summary, a confidence level with evidence. No prose about the journey.
+Your PR body is terse and concrete: one paragraph of what changed, a scope summary, a confidence level with evidence. No prose about the journey.
 
 The next agent reading this PR is `review-senior`. Write so they can judge the change against the acceptance criterion without needing to reconstruct your reasoning.
-
----
-
-## Composition with gstack
-
-**Doctrine precedence inside this modality:** *safer wins on scope; gstack ETHOS wins on quality-within-scope*. The Junior Dev Rule (Principle 5) and the Budget Gate (Principle 6) are non-negotiable scope constraints; ETHOS construction defaults shape what to do *within* that scope (line-level craft, naming, test shapes).
-
-### Invokes
-
-- `/freeze` — restrict edits to a directory for the session.
-- `/careful` — warn before destructive commands (`rm -rf`, force-push, etc.).
-- `/guard` — `/freeze` + `/careful` combined.
-
-### Invoked by
-
-- `/safer:review-senior` runs after the draft PR opens (which itself composes with `/review`, `/simplify`, `/codex review`, `/safer:dogfood`).

@@ -17,7 +17,7 @@ It is not. This plugin recalibrates.
 - **Exhaustiveness over optionality:** Every switch ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches explicitly.
 
 **Part 2 — Stay in your lane (scope).** Four principles for scope discipline:
-- **Junior-dev rule:** You fill one module. Cross-module reach is a boundary; reach is escalation.
+- **Discipline over capability:** You fill one module. Cross-module reach is a boundary; reach is escalation.
 - **Budget gate:** Shape is the rule, not volume. A 500-line module is fine; one line across two modules is not.
 - **Literal stop rules:** When a 2nd module is touched, the rule has fired. Do not rationalize. Escalate.
 - **The ratchet:** Escalate up (to senior, architect, staff), never sideways. No quick fixes in sibling modules.
@@ -148,13 +148,9 @@ Every skill publishes its artifact to GitHub before considering itself done. Sta
 
 ## Composing with gstack
 
-safer is the SDS modality spine. [gstack](https://github.com/chughtapan/gstack) is a parallel toolbox of interactive workflow skills (`/codex`, `/qa`, `/ship`, `/plan-*`, `/health`, etc.). They coexist; composition happens at the modality dispatch seam, not at file/config layering.
+safer is the SDS modality spine. [gstack](https://github.com/chughtapan/gstack) is a parallel toolbox of interactive workflow skills (`/codex`, `/qa`, `/ship`, `/plan-*`, `/health`, etc.). gstack is a hard dependency: every safer skill assumes the gstack tools it names are present. Install gstack alongside this plugin.
 
-**Each safer skill body owns its own composition section.** When an agent invokes `/safer:review-senior`, it reads `skills/review-senior/SKILL.md` to learn which gstack targets that skill calls (`/review`, `/simplify`, `/codex review`, `/safer:dogfood`, `/security-review`). When an agent invokes `/safer:verify`, it reads `skills/verify/SKILL.md` to learn the testing-skill delegation (`/health`, `/qa`, `/canary`, etc.). There is no central routing table — each skill's composition is local to its own body.
-
-**Why per-skill rather than centralized.** A reader (human or agent) invoking skill X needs only X's composition info, not the whole catalog. Reading a 200-line README to find one routing fact is a tax that adds up across thousands of invocations.
-
-**Doctrine precedence.** Inside an active safer modality: *safer wins on scope; gstack ETHOS wins on quality-within-scope*. Both doctrines stack at orthogonal layers — pipeline discipline (safer) and construction defaults (gstack). See `PRINCIPLES.md` → Composing with gstack.
+Individual skills name their own gstack tool usage inline in the workflow prose where the tool is called. There is no central routing table; the skill body is the dispatcher.
 
 **Investigate name collision.** safer and gstack both ship a skill named `investigate`. Always qualify in safer docs: `/safer:investigate` (reproduce-and-name-the-cause); `/gstack:investigate` (gstack workflow). Bare `/investigate` is disallowed in safer docs.
 

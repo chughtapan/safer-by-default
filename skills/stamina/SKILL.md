@@ -8,7 +8,7 @@ description: |
   /safer:dogfood, /codex, /security-review for PRs; /safer:dogfood +
   /safer:review-senior + /codex for plans) and aggregates
   their verdicts. N is set by the blast-radius x reversibility table in
-  PRINCIPLES.md > Durability. Two invocation modes: --plan <sub-issue-URL>
+  PRINCIPLES.md Part 3 (Stamina). Two invocation modes: --plan <sub-issue-URL>
   and --pr <pr-URL>. Use when the caller (typically /safer:orchestrate Phase
   5c) has decided the artifact warrants stamina. Do NOT self-invoke from the
   working modality; that is Principle 5 self-polishing.
@@ -31,10 +31,10 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root before invoking. Projection onto this modality:
 
-- **Artifact discipline > Durability** — this skill is the enforcement mechanism for the Durability clause. The budget table lives there; this skill reads it. Every `N` you pick traces to a row.
-- **Principle 5 (Junior Dev Rule)** — stamina routes; it does not review. Every verdict comes from a dispatched reviewer.
+- **Part 3 → Stamina** — this skill is the enforcement mechanism for the Stamina clause. The budget table lives there; this skill reads it. Every `N` you pick traces to a row.
+- **Principle 5 (Discipline over capability)** — stamina routes; it does not review. Every verdict comes from a dispatched reviewer.
 - **Principle 8 (Ratchet)** — any BLOCK verdict routes upstream (to the modality that authored the artifact), never sideways via a stamina-authored patch.
-- **Artifact discipline > GitHub is the record** — the consolidated verdict is published to the target issue/PR; per-reviewer reports link to the reviewer's native artifact (`gh pr review`, issue comment).
+- **Part 4 → Durable records** — the consolidated verdict is published to the target issue/PR; per-reviewer reports link to the reviewer's native artifact (`gh pr review`, issue comment).
 
 Shape sibling: `skills/review-senior/SKILL.md` and `skills/dogfood/SKILL.md`. Stamina is a dispatcher over them, not a superset.
 
@@ -168,8 +168,7 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 2. N is bounded: floor N=1, ceiling N=4 table-default, N>4 requires explicit user approval (captured in `--budget` or `safer-escalate`).
 3. Review family (PR mode): `/safer:review-senior`, `/safer:dogfood`, `/codex`, `/security-review`. Fixed list; no additions in v1. `/simplify` and `/review` are NOT in the stamina dispatch set — they run as mandatory pre-PR hygiene gates inside `/safer:implement-*` (see `skills/implement-junior/SKILL.md` Phases 6a-6b, `skills/implement-senior/SKILL.md` Phases 6a-6b, `skills/implement-staff/SKILL.md` Phases 8a + 8c) and do not count toward stamina N. Only independent reviewers count.
 4. Review family (plan mode): `/safer:dogfood`, `/safer:review-senior` (re-targeted at the plan body), `/codex` (cross-model). Fixed list; no additions in v1.
-5. Graceful degradation: if gstack is absent, the PR dispatch set reduces to `{/safer:review-senior, /safer:dogfood}` plus `/codex` if configured; the ceiling caps at N=3. Never hard-fail on a missing optional dep; always name what is missing in the consolidated comment.
-6. Persona diversity: every pass differs by *role* (acceptance-vs-diff, structural-diff, adversarial, security, simplification, cold-start-read) or by *model* (`/codex` is the cross-model channel). Two passes with the same role on the same model do not count as two passes; reject at dispatch time.
+5. Persona diversity: every pass differs by *role* (acceptance-vs-diff, structural-diff, adversarial, security, simplification, cold-start-read) or by *model* (`/codex` is the cross-model channel). Two passes with the same role on the same model do not count as two passes; reject at dispatch time.
 
 `safer-diff-scope` is the mechanical classifier for PR mode. Expected output fields: `{tier, files, modules, exports, new_deps, rationale}`. Any other output is a `NEEDS_CONTEXT` stop.
 
@@ -258,7 +257,7 @@ LABEL=$(gh issue view "$SUB_ISSUE" --json labels -q '.labels[].name' | grep '^sa
 | adversarial, cross-model | `/codex` (optional) | `/codex` (optional) |
 | security | `/security-review` (auto-skipped if no auth/crypto/secret touches per `safer-diff-scope`) | — |
 
-Apply graceful degrade (Scope budget rule 5) if gstack or codex is absent. If the final set has fewer roles than N, cap N down to the set size and record `n-capped=true` in telemetry. If the capped N < 1 the classifier is broken → `NEEDS_CONTEXT`.
+If the final set has fewer roles than N, cap N down to the set size and record `n-capped=true` in telemetry. If the capped N < 1 the classifier is broken → `NEEDS_CONTEXT`.
 
 ```bash
 safer-telemetry-log --event-type safer.stamina_gate \
@@ -360,10 +359,6 @@ One consolidated comment on the target PR or sub-issue. Shape:
 - On `ESCALATED`: `safer-escalate --from stamina --to <authoring-modality> --cause REVIEWER_BLOCK`.
 - On `BLOCKED`: reviewer dispatch failed — <reviewer-name>, last-known state <state>.
 - On `NEEDS_CONTEXT`: <the open question>.
-
-### Graceful-degrade notes (if any)
-
-- `/codex` not configured; ceiling capped to N=3.
 ```
 
 Publish via `safer-publish` (one call; idempotent on retries). On plan mode `DONE`, transition the label:
@@ -444,7 +439,6 @@ Nothing stamina produces lives outside GitHub.
 - **"I'll run `/safer:review-senior` three times with different prompts to hit N=3."** — Independence rule violation. Three passes of the same skill on the same model is N=1.
 - **"Two reviewers approved, one hasn't replied; I'll ship."** — Incomplete dispatch is not consensus. `BLOCKED` until the last reviewer publishes or times out.
 - **"One reviewer blocked on a nit; I'll downgrade their verdict to a concern."** — Stamina does not grade reviewers. Any BLOCK routes upstream.
-- **"gstack isn't present, so stamina is a no-op."** — Graceful degradation: cap at N=3 using pure-safer + `/codex` if configured. Do not skip silently.
 - **"I'll invoke stamina on my own output before handing back."** — Principle 5 violation. Stamina is orchestrator-driven, not self-invoked.
 - **"The consolidated comment should summarize what each reviewer found."** — No. The consolidated comment is a routing table over verdict URLs. The findings live with the reviewers.
 - **"`safer-diff-scope` returned a field I do not recognize; I'll ignore it."** — Classifier drift is a real bug in the chain. `NEEDS_CONTEXT`; do not guess.
@@ -505,21 +499,6 @@ Post on the target; leave the consolidated comment in place; do not delete the p
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md > Voice`. Stamina's output is terse and structural. The consolidated comment is a routing table, not an essay. Per-reviewer findings live with the reviewer; stamina reports who ran, what they said, and the consensus outcome.
+Stamina's output is terse and structural. The consolidated comment is a routing table, not an essay. Per-reviewer findings live with the reviewer; stamina reports who ran, what they said, and the consensus outcome.
 
 Stamina's voice is the voice of the dispatcher, not the critic. If your output reads like a review, you are in the wrong modality. The next agent reading the consolidated comment is the orchestrator (`/safer:orchestrate` Phase 5c) or the user. Write so each can route on the verdict without reconstructing your reasoning.
-
----
-
-## Composition with gstack
-
-### Invokes
-
-`--plan` mode (spec, architect plan):
-- `/safer:dogfood` — cold-start read of the spec or plan.
-- `/safer:review-senior` — acceptance-vs-residuals review.
-- `/codex review` — cross-model adversarial review.
-
-`--pr` mode (PR review): superset of the `--plan` set, plus `/review`, `/simplify`, `/security-review`. `/autoplan` is the canonical fan-out target when the artifact warrants it.
-
-The N count and consensus rule live in `PRINCIPLES.md` → Durability.
