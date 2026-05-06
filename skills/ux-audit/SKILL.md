@@ -33,13 +33,14 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root. The load-bearing fragments this skill projects, inlined so a cold-start reader does not need to leave the artifact:
 
-- **Principle 5 (Junior Dev Rule):** *"The question is not 'can I do this.' The question is 'is this mine to do.'"* The audit reads; redesign is a separate modality. Findings without recommendations are incomplete; recommendations without modality routing are out of scope.
+- **Principle 5 (Discipline over capability):** *"The question is not 'can I do this.' The question is 'is this mine to do.'"* The audit reads; redesign is a separate modality. Findings without recommendations are incomplete; recommendations without modality routing are out of scope.
 - **Principle 7 (The Brake):** *"When a stop rule fires, stop writing code. Produce the escalation artifact. Do not 'note it and keep going.'"* Every finding carries (finding, evidence, goal-link). The moment one is missing, drop the finding or stop the audit.
 - **Principle 8 (The Ratchet):** *"When blocked, hand the work back to the upstream modality. Never invent a local workaround that patches a structural problem downstream."* When the audit reveals the named goal is itself mis-named, route to `/safer:spec` or `/plan-ceo-review`. Do not silently re-frame mid-audit.
-- **Artifact discipline.** GitHub is the record (writeup published as a sub-issue or epic comment). Cold Start Test (the next agent reads with no session context).
-- **Confidence calibration** (per `PRINCIPLES.md` → Confidence is a first-class output): **HIGH** = reproducible evidence, no ambiguity. **MED** = evidence supports the conclusion but alternatives remain. **LOW** = plausible but under-evidenced.
-- **Effort estimates** (per `PRINCIPLES.md` → Estimates): write `(human: ~X / CC: ~Y)`. ux-audit work patterns to the Research/exploration row, ~3× compression.
-- **"Hold-scope autonomous"** (per `PRINCIPLES.md` → Composing with gstack): a composed gstack target runs without prompting the user mid-run. If the target *would* prompt (e.g., interactive mode), it escalates the prompt to `/safer:orchestrate`, which surfaces it via `AskUserQuestion`.
+- **Part 4 → Durable records.** GitHub is the record (writeup published as a sub-issue or epic comment).
+- **Part 4 → Write for the cold-start reader.** The next agent reads with no session context.
+- **Confidence calibration:** **HIGH** = reproducible evidence, no ambiguity. **MED** = evidence supports the conclusion but alternatives remain. **LOW** = plausible but under-evidenced.
+- **Effort estimates:** write `(human: ~X / CC: ~Y)`. ux-audit work patterns to the Research/exploration row, ~3× compression.
+- **"Hold-scope autonomous":** a composed gstack target runs without prompting the user mid-run. If the target *would* prompt (e.g., interactive mode), it escalates the prompt to `/safer:orchestrate`, which surfaces it via `AskUserQuestion`.
 
 ## Iron rule
 
@@ -624,7 +625,7 @@ Nothing ux-audit produces lives outside GitHub.
 - **"The goal is conversion, but the cognitive walkthrough revealed a navigation issue — that's adjacent enough."** Goal-link is direct or it is not. Adjacent goes to the out-of-scope follow-up.
 - **"This finding tags Nielsen #1, #4, and #8."** Pick one. The strongest match is the heuristic; multi-tagging dilutes the recommendation.
 - **"I'll run /qa to fix the bugs I find."** No. /qa fixes; the audit reports. Use `/qa-only` if you need the structured-reporting shape.
-- **"The surface is broken; I'll write the spec for the redesign while I'm here."** Iron rule + Junior Dev Rule. Route to `/safer:spec`.
+- **"The surface is broken; I'll write the spec for the redesign while I'm here."** Iron rule + Discipline over capability. Route to `/safer:spec`.
 - **"Diving straight into screenshots before reading any stakeholder thread."** H6 informs Relevance; running it last means the writeup's first section is unbacked.
 - **"The audit fixed one CSS error, then published."** Stop rule 5: discard the run. An audit-with-fix is not an audit.
 - **"Auto-dispatching all 12 recommendations to /safer:implement-junior."** v0.1 is user-dispatched. `--auto-dispatch` is v0.2.
@@ -673,7 +674,7 @@ If `SAFER_PARENT_ISSUE` is unset (standalone invocation), skip this step entirel
 
 The `to: "team-lead"` address is resolved by the harness's team registry; the orchestrator injects it when it dispatches sub-tasks. Treat `team-lead` as a literal address inside an orchestrate context and a no-op outside.
 
-The `Process issues` field is mandatory (per `PRINCIPLES.md` → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 ## Voice (reminder)
 
@@ -682,37 +683,3 @@ The audit is structural, not narrative. Each finding is a row in a table. Each r
 Be specific; avoid usability jargon; express friction tactfully; emphasize what works alongside what does not. The next agent applying the fix is a junior — write the recommendation as the input to their charter, not as your post-hoc reasoning.
 
 No "I noticed that..." No "It seems like..." No "There may be a slight issue with..." Direct: "F4: Nielsen #4 violation, /checkout/step-3, blocks completion." That is the voice.
-
----
-
-## Composition with gstack
-
-### Invokes (precise per protocol)
-
-| Protocol | Skill | Why |
-|---|---|---|
-| H1 (Nielsen) | `/browse` (capture) → `/design-review` (visual findings) | /design-review reads aesthetic; ux-audit re-tags against named heuristics before merging |
-| H2 (CW) | `/browse` (perform flow) → `/qa-only` (structured report) | /qa-only does not fix; iron rule forbids `/qa` |
-| H3 (WCAG) | `/browse` only (DOM extraction + computed style) | accessibility is binary against WCAG; not aesthetic, no /design-review |
-| H4 (responsive) | `/browse` (multi-viewport) → `/design-review` (layout breaks) | viewport tagging happens after /design-review emits |
-| H5 (forms) | `/browse` (live form interaction); `/qa-only` optional | /qa would fix; not allowed |
-| H6 (stakeholder) | `gh issue list`, `gh pr list`, `Read` on docs/; optional `/plan-ceo-review` if `--challenge-goal` | challenge-goal is opt-in, off by default |
-| H7 (IA) | `/browse` (nav walk) | structural inspection; no aesthetic reframing |
-| Auth-blocked surface | `/setup-browser-cookies` (gstack) | imports user's browser cookies for `/browse` to reach gated pages; user-invoked, not auto |
-
-All composition targets run hold-scope autonomous (defined in Read-first). Targets that would prompt the user mid-run (`/plan-ceo-review`, `/design-review` in interactive mode) escalate to `/safer:orchestrate`, which surfaces the question via `AskUserQuestion`.
-
-### Invoked by
-
-- `/safer:orchestrate` — when an epic's contract names "redesign", "audit", or "improve UX" before any spec exists. ux-audit produces the recommendations that become a spec; it does not write the spec itself. Orchestrate fills goal/scope/persona on the contract during drafting; ux-audit defends with park-for-amendment if any is missing.
-- `/safer:stamina` — only for live-UI redesigns. Plan-mode review of a redesign-spec is out of scope for this skill.
-
-### Does not invoke
-
-- `/safer:implement-*` — recommendations are user-dispatched in v0.1. `--auto-dispatch` is v0.2.
-- `/qa` — fixes; iron-rule violation.
-- `/devex-review`, `/plan-devex-review` — developer audience, not user.
-- `/canary`, `/benchmark` — runtime monitoring, not heuristic.
-- `/cso` — security; orthogonal axis.
-- `/safer:investigate`, `/safer:spike`, `/safer:research` — different modality charters.
-- Analytics tools (Google Analytics, Crazy Egg, Kissmetrics) — out of scope; this skill is heuristic-only.

@@ -32,7 +32,7 @@ Read `PRINCIPLES.md` at the plugin root. Your projection of the principles onto 
 - **Principle 6 (Budget Gate)** verify has the narrowest budget of any modality. You run, you check, you report. Nothing else.
 - **Principle 7 (Brake)** the first failing test or unmet acceptance criterion fires the stop. You do not triage, diagnose, or retry. You hold.
 - **Principle 8 (Ratchet)** a failure routes forward: to `investigate` if the cause is unclear, or back to `implement-*` if the cause is clear. It does not route to you.
-- **Artifact discipline** the verdict is the artifact. A verdict held in conversation memory is not a verdict.
+- **Part 4 (Communication)** the verdict is the artifact. A verdict held in conversation memory is not a verdict.
 
 ## Iron rule
 
@@ -167,9 +167,7 @@ Flakiness: if a test failed with a pattern that suggests flakiness (timeout, net
 
 ### Phase 3.5 — Compose gstack testing layer (rings 2 + 3)
 
-Phase 3 owns ring 1 (the project's lint, typecheck, and test commands). Phase 3.5 dispatches ring 2 (whole-app QA) and ring 3 (cross-cutting quality dashboards) to gstack composition targets when the sub-issue's acceptance criteria, the diff scope, or the deploy state warrants. Defaults are conservative: skip a target when its trigger does not fire.
-
-If gstack is not installed, log each target as `skipped: gstack not installed` and continue with ring-1 only. Composed targets are advisory inputs to the verdict, not standalone gates.
+Phase 3 owns ring 1 (the project's lint, typecheck, and test commands). Phase 3.5 dispatches ring 2 (whole-app QA) and ring 3 (cross-cutting quality dashboards) to gstack composition targets when the sub-issue's acceptance criteria, the diff scope, or the deploy state warrants. Defaults are conservative: skip a target when its trigger does not fire. Composed targets are advisory inputs to the verdict, not standalone gates.
 
 | Target | Trigger condition | Output captured | Failure propagation |
 |---|---|---|---|
@@ -182,7 +180,7 @@ If gstack is not installed, log each target as `skipped: gstack not installed` a
 | `/benchmark` | sub-issue acceptance references "performance", "benchmark", "page speed", "web vitals"; baseline exists | metric deltas vs baseline | regression beyond explicit per-repo threshold → `HOLD`; smaller regression → `SHIP_WITH_CONCERNS` |
 | `/benchmark-models` | sub-issue acceptance references "model benchmark", "skill prompt comparison" | per-model latency/tokens/cost/quality | report-only; never blocks |
 
-All composed gstack targets run hold-scope autonomous; if any prompts for user input, escalate to `/safer:orchestrate` per the runtime contract in PRINCIPLES.md → Composing with gstack. Verify never accepts user-facing prompts inside a composed gstack skill.
+All composed gstack targets run hold-scope autonomous; if any prompts for user input, escalate to `/safer:orchestrate`. Verify never accepts user-facing prompts inside a composed gstack skill.
 
 Invocation examples (one per target). Each command runs hold-scope autonomous; surface escalations to the orchestrator rather than blocking. Capture each target's output artifact URL for Phase 6.
 
@@ -227,7 +225,7 @@ The verdict is mechanical. No judgment call beyond flakiness detection. If the m
 
 ### Phase 6 — Publish the verdict
 
-Code references in the verdict body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the verdict body use the canonical pinned form `path:N[-M]@<sha7>`.
 
 Write the verdict body:
 
@@ -405,7 +403,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -414,18 +412,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` to Voice. The verdict is terse, mechanical, and evidence-backed. Not "looks good to me" but "SHIP: lint 0, typecheck 0, test 142/142; criteria 1-3 met with evidence at `<placeholder>/foo.ts:18`, `<placeholder>/foo.test.ts:42`." *Schematic example; `<placeholder>/...` paths are illustrative placeholders, not real files in this repo (schematic-placeholder exception of the code-citation doctrine; see `PRINCIPLES.md#code-references-are-pinned`).*
+The verdict is terse, mechanical, and evidence-backed. Not "looks good to me" but "SHIP: lint 0, typecheck 0, test 142/142; criteria 1-3 met with evidence at `<placeholder>/foo.ts:18`, `<placeholder>/foo.test.ts:42`." *Schematic example; `<placeholder>/...` paths are illustrative placeholders, not real files in this repo (schematic-placeholder exception of the code-citation doctrine).*
 
 Quality judgments are the downstream modality's budget, not yours. You report facts. The next agent reading your verdict is a junior; they should be able to act on it (merge, re-implement, investigate) without asking you follow-up questions.
-
----
-
-## Composition with gstack
-
-### Invokes
-
-Phase 3.5 above is the canonical contract — eight gstack testing-layer targets with explicit triggers, output capture, and verdict-propagation rules. Verify runs the project test runner directly (ring 1); the composed targets cover the broader testing layer (rings 2–3).
-
-### Invoked by
-
-- `/safer:orchestrate` routes the SHIP verdict from this skill into gstack `/ship` for VERSION + CHANGELOG + PR description.

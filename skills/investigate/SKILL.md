@@ -27,14 +27,16 @@ allowed-tools:
 
 # /safer:investigate
 
+> **Name collision.** `/safer:investigate` and gstack's `/investigate` are different skills. Always qualify with the plugin prefix in safer docs; bare `/investigate` is disallowed.
+
 ## Read first
 
 Read `PRINCIPLES.md` at the plugin root. Your projection of the principles onto this modality:
 
-- **Principle 5 (Junior Dev Rule)** investigation is its own scope. Finding the bug and fixing the bug are two tasks, not one. Your charter ends at the root cause.
+- **Principle 5 (Discipline over capability)** investigation is its own scope. Finding the bug and fixing the bug are two tasks, not one. Your charter ends at the root cause.
 - **Principle 7 (Brake)** the moment the root cause is named with evidence, you stop. Writing "and here is the fix" is out of scope, even when the fix is one line.
 - **Principle 8 (Ratchet)** the fix routes forward to `implement-junior`, `implement-senior`, `architect`, or back to `spec`. It does not route back to you.
-- **Artifact discipline** the writeup is the artifact. A root cause held in conversation memory is not an artifact.
+- **Part 4 (Communication)** the writeup is the artifact. A root cause held in conversation memory is not an artifact.
 
 ## Iron rule
 
@@ -224,7 +226,7 @@ Record the bisect result as a row in the isolation table.
 
 ### Phase 6 — Name the root cause
 
-Code references in the root-cause writeup use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the root-cause writeup use the canonical pinned form `path:N[-M]@<sha7>`.
 
 The root cause is named in **two layers**:
 
@@ -235,7 +237,7 @@ State the mechanism for both layers. **If you can name Immediate but cannot name
 
 Classify the Underlying layer as structural, logical, or environmental.
 
-Examples of well-formed root causes (paths below use `<placeholder>/...` as schematic placeholders; they are illustrative, not real files in this repo, per the schematic-placeholder exception of the code-citation doctrine; see `PRINCIPLES.md#code-references-are-pinned`):
+Examples of well-formed root causes (paths below use `<placeholder>/...` as schematic placeholders; they are illustrative, not real files in this repo, per the schematic-placeholder exception of the code-citation doctrine):
 
 - "Immediate: at `<placeholder>/api/session.ts:41`, the call to `decodeToken` returns `null` and the caller treats `null` as anonymous, granting access. Underlying: at `<placeholder>/auth/token.ts:83`, `decodeToken` returns `null` on malformed input instead of a tagged error, leaving the caller no way to distinguish 'no token' from 'invalid token'. Classification: logical (missing typed error channel; violates Principle 3)."
 - "Immediate: at `<placeholder>/pipeline/ingest.ts:112`, runtime objects have `undefined` fields after batch decode. Underlying: the schema decodes only the first event in the batch; later events are cast with `as Event`. The shape was tolerable until upstream changed the event shape on 2026-03-15. Classification: structural (missing boundary validation; violates Principle 2)."
@@ -441,7 +443,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -450,14 +452,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` to Voice. Write for the cold-start reader. The next agent applying the fix has none of your context. Every `file:line` pointer, every isolation row, every bit of evidence is what lets them pick up the work without asking you.
+Write for the cold-start reader. The next agent applying the fix has none of your context. Every `file:line` pointer, every isolation row, every bit of evidence is what lets them pick up the work without asking you.
 
 Do not narrate the investigation in prose. The writeup is structured sections, not a story. The next agent is a junior.
-
----
-
-## Composition with gstack
-
-`/safer:investigate` and gstack's `/investigate` are different skills (name collision documented in `PRINCIPLES.md` → Composing with gstack). Always qualify with the plugin prefix in safer docs; bare `/investigate` is disallowed.
-
-This skill does not invoke or get invoked by gstack targets. After a reproduction artifact lands, the implementation modality (`/safer:implement-*`) takes over and composes with gstack guards (`/freeze`, `/careful`, `/guard`) per its own composition section.

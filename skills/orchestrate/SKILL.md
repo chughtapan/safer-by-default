@@ -31,10 +31,12 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root before continuing. This skill is the projection of the principles onto **project-level coordination**. Specifically:
 
-- **Principle 5 (Junior Dev Rule)** — you classify the work before anyone does it. You never do it.
+- **Principle 5 (Discipline over capability)** — you classify the work before anyone does it. You never do it.
 - **Principle 6 (Budget Gate)** — you assign the modality. The modality enforces its own scope.
 - **Principle 8 (Ratchet)** — when a downstream modality escalates, you route upstream. You do not rescue.
-- **Artifact discipline → GitHub is the record** — every piece of state you create lives on GitHub, not in local files.
+- **Part 4 → Durable records** — every piece of state you create lives on the forge, not in local files.
+
+The operational tables that drive routing — debt multiplier (cost model), shape table (modality scope), pipeline diagram, and backtracking routing — live in this skill, not in PRINCIPLES.md. Doctrine names the principle; this file carries the operational detail.
 
 ## Iron rule
 
@@ -161,6 +163,78 @@ If a sub-task cannot be represented in this shape, you have the wrong decomposit
 
 ---
 
+## Cost model
+
+Every routing decision pays the debt multiplier. Cost of fixing the same mistake, as a function of when it is caught:
+
+| Caught | Multiplier | Why |
+|---|---|---|
+| Same session, before publish | **1x** | Author types the fix now. |
+| Next session, same agent | **3-5x** | Cold start. Re-derive context. |
+| Next sprint, different agent | **10x** | No session memory. Full re-read. |
+| Quarter later, code built on top | **30-50x** | Tangled with unrelated code. |
+| Year later, public surface accreted | **100x+** | Breaks downstream. Rewrite. |
+
+*Multipliers are heuristic estimates from team experience, not measured.*
+
+Decomposition implication: every sub-task you skip ("we'll figure it out later," "ship now and clean up next week") is a row-3-to-5 bet against the multiplier. Default to row 1: catch it in the same session, before publish. The orchestrator's job is to keep the pipeline in row 1, not to ship faster by deferring.
+
+---
+
+## Pipeline diagram
+
+```
+                  orchestrate
+              (VP / scrum master)
+                       │
+                       ▼
+                     spec
+                       │
+                       ▼
+                   architect
+                       │
+   ┌───────────────────┼───────────────────┐
+   ▼                   ▼                   ▼
+implement-junior  implement-senior  implement-staff
+                       │
+                       ▼
+                  review-senior
+                       │
+                       ▼
+                     verify
+                       │
+                       ▼
+                   SHIP / HOLD
+
+orthogonal (invokable anywhere):
+   investigate    spike    research
+      (bug)      (yes/no)  (open)
+```
+
+Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is forbidden. The orchestrator routes; it does not skip.
+
+---
+
+## Shape table
+
+The routing target for every sub-task. If the sub-task does not fit one row, re-decompose.
+
+| Modality | Shape in scope | Shape out of scope | Escalation trigger |
+|---|---|---|---|
+| `spec` | goals, non-goals, acceptance, invariants | architecture, libs, code | any structural commitment |
+| `architect` | modules, interfaces, data flow, deps, all docs describing the changed surface | function bodies, docs unrelated to the design | implementation detail; doc out of scope |
+| `implement-junior` | internals of one module | exported signatures, new deps, cross-module reach | touching a 2nd module |
+| `implement-senior` | cross-module within an approved plan | new modules, new architectural patterns | plan revision needed |
+| `implement-staff` | new modules per approved spec | revising the spec | work not traceable to plan |
+| `investigate` | repro + isolation + root cause | applying the fix | anything that ships code |
+| `spike` | throwaway yes/no code | shipping the spike code | the spike graduates |
+| `research` | hypotheses + validated insights | shipping code | insight maturing to spec |
+| `review-senior` | reading diff, writing verdict | applying fixes | any code write |
+| `verify` | running tests, ship/hold verdict | fixing failures | failure needing new code |
+| `orchestrate` | decomposition, routing, tracking | other modalities' work | implementation instinct |
+
+---
+
 ## Workflow
 
 ### Phase 1 — Triage
@@ -191,14 +265,28 @@ Emit `safer.skill_run` with `modality=orchestrate` only if you proceed.
 
 Once you've decided to orchestrate, draft the contract before any decomposition or sub-issue creation. The contract is the load-bearing artifact; everything downstream reads it.
 
-Read `PRINCIPLES.md → Contracts` for the four-section format, the worked examples, and the recommended `Always-park` defaults.
+A contract has exactly four sections: **Goal**, **Acceptance**, **Autonomy budget**, **Always-park**. Autonomy is granted, not assumed; ratchet-up always parks; stop-the-line conditions fire regardless of contract.
 
 **Parse the user's instruction into a draft.** Map intent to:
 
 - **Goal** — restate the user's intent in one paragraph. Use their words where possible.
 - **Acceptance** — convert "done" signals from the instruction into a checklist. If the instruction names a deliverable (PR merged, dogfood green, spec published), that's an item. If acceptance is implicit, ask once before drafting; do not invent criteria.
 - **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes investigate + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction.
-- **Always-park** — start from the recommended defaults in `PRINCIPLES.md → Contracts`. Add ratchet-up as a default park reason. Add any irreversible action the instruction implies the user cares about.
+- **Always-park** — start from the Recommended defaults below. Add ratchet-up as a default park reason. Add any irreversible action the instruction implies the user cares about.
+
+**Recommended Always-park defaults.** Every contract should include these unless the contract explicitly opts out (sandbox repos may opt out of force-push restrictions, etc.):
+
+- Force-push to any branch.
+- Branch deletion.
+- Merging to `main` / `master` / `production` (unless the budget explicitly authorizes merge after peer review + CI + verify).
+- Schema migrations (DROP, destructive ALTER).
+- Mass deletion (>20 files or >500 LOC in one diff).
+- Production deploys.
+- Posting outside the repo (Slack, email, external API).
+- Token / secret operations.
+- Operations marked `careful` by the user's `/careful` skill setup.
+
+These exist because the asymmetric-cost framing applies: a wrong autonomous action burns trust and may be irreversible; a wrong park costs one comment. When two interpretations are equally plausible, pick the cheaper undo.
 
 **Confidence gate.** If parsing leaves you unsure on any of the four sections, present 2–3 candidate contract shapes to the user via `AskUserQuestion`, recommended-default first. Do NOT silently pick a shape; the asymmetric cost framing favors over-asking. A wrong autonomous draft burns trust; a wrong question costs one reply.
 
@@ -217,7 +305,7 @@ Read `PRINCIPLES.md → Contracts` for the four-section format, the worked examp
 
 **Always-park.**
 - Ratchet-up (any modality escalating upstream)
-- <recommended defaults from PRINCIPLES.md>
+- <recommended defaults from list above>
 - <any user-implied carve-out>
 
 Doctrine: <SHA of PRINCIPLES.md at draft time>
@@ -424,7 +512,7 @@ Poll the sub-issue until one of:
 - For code-producing sub-tasks (`implement-*`):
   - **If `safer-diff-scope --pr $PR` reports tier ≥ `senior` OR `public_surface_changed > 0` OR the sub-issue modality is `implement-staff`:** invoke `/safer:stamina --pr <PR>`. Stamina routes to the review family and gates on consensus; do not also invoke `/safer:review-senior` standalone.
   - **Else:** invoke `/safer:review-senior` on the PR (existing single-reviewer path).
-  - **Setup/deploy path detection (additive).** If the PR diff touches any of: `railway.toml`, `vercel.json`, `Dockerfile*`, `docker-compose*.yml`, `.github/workflows/*`, `fly.toml`, `netlify.toml`, `package.json` `scripts` section, `.env*` files, `bin/setup*`, `setup/*`, `setup-codex/*`, then ALSO run `/plan-devex-review --hold-scope --artifact <PR-URL>`. Hold-scope autonomous; recommended defaults applied within the parent epic's `## Contract` autonomy budget. Findings outside the budget escalate per the same in-budget vs cross-budget rule documented in `skills/architect/SKILL.md` Phase 7 (plan-eng-review section). Unavailable → fall back to a Claude sub-agent with a structured DX-audit prompt; note `plan-devex-review: claude-fallback` on the sub-issue.
+  - **Setup/deploy path detection (additive).** If the PR diff touches any of: `railway.toml`, `vercel.json`, `Dockerfile*`, `docker-compose*.yml`, `.github/workflows/*`, `fly.toml`, `netlify.toml`, `package.json` `scripts` section, `.env*` files, `bin/setup*`, `setup/*`, `setup-codex/*`, then ALSO run `/plan-devex-review --hold-scope --artifact <PR-URL>`. Hold-scope autonomous; recommended defaults applied within the parent epic's `## Contract` autonomy budget. Findings outside the budget escalate per the same in-budget vs cross-budget rule documented in `skills/architect/SKILL.md` Phase 7 (plan-eng-review section).
 - For design-producing sub-tasks (`spec`, `architect`):
   - **If the sub-issue modality is `spec` or `architect` (high-blast-radius by default):** invoke `/safer:stamina --plan <sub-issue-URL>`.
   - **Else:** read the artifact and judge against acceptance (existing path). Ask the user if any criterion is ambiguous.
@@ -445,7 +533,7 @@ Then cascade forward per modality lifecycle:
 
 **Step 5c.-1 — Contract-budget check (mandatory; runs before everything else in this step).**
 
-Before any label transition or downstream dispatch, load the parent epic and read its `## Contract` section. The contract is the deal between user and orchestrator (`PRINCIPLES.md → Contracts`). The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
+Before any label transition or downstream dispatch, load the parent epic and read its `## Contract` section. The contract is the deal between user and orchestrator. The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
 
 ```bash
 gh issue view "$PARENT" --json body --jq '.body' | awk '/^## Contract$/,/^## /{print}' | head -n -1 > /tmp/contract.md
@@ -1136,7 +1224,7 @@ which must trace to the approved plan. Before opening the PR:
    plan line in the PR body for any skipped finding). Does NOT count toward stamina N.
 2. Run /codex on the PR diff (mandatory): post the codex verdict as a PR comment
    before /safer:review-senior fires. This counts as one independent pass toward
-   the stamina N budget. If /codex is unavailable, log the skip on the sub-issue.
+   the stamina N budget.
 3. Run /review on the diff (mandatory): apply findings; cite plan-conflicting
    skips in the PR body under "Review skips". Does NOT count toward stamina N.
 Open a draft PR titled `[impl-staff] ...`. /safer:review-senior is mandatory
@@ -1202,10 +1290,9 @@ Acceptance: {ACCEPTANCE}
 Run an iterative hypothesis loop; post one comment per iteration on the
 sub-issue as your research ledger. Produce no code. The Supervisor role
 for each round is codex (run /codex --mode supervisor on the Researcher
-output before advancing to the next round). If /codex is unavailable,
-log the skip and continue with the internal Supervisor turn. Status marker
-+ SendMessage the team lead with the ledger URL when the loop converges
-or the budget runs out.
+output before advancing to the next round). Status marker + SendMessage
+the team lead with the ledger URL when the loop converges or the budget
+runs out.
 ```
 
 #### spec
@@ -1228,8 +1315,7 @@ the parent epic (or sub-issue body per the skill's publication rule).
 After publishing, run /codex --mode review on the published artifact. The
 codex verdict must be `approve` before transitioning to `review`. If
 `changes-requested`, revise and re-run (one revision round). If `reject`,
-escalate to the user with codex's reasoning. If /codex is unavailable, log
-the skip and transition to `review` without the codex pass.
+escalate to the user with codex's reasoning.
 Transition the sub-issue to `review`. Status marker + SendMessage the
 team lead with the spec URL.
 ```
@@ -1328,13 +1414,23 @@ safer-telemetry-log --event-type safer.skill_end \
 
 ## Stop rules
 
-Orchestrate has five stop rules. Each fires on a specific condition; each requires an escalation artifact via `safer-escalate --from orchestrate --to <target> --cause <CAUSE>`.
+Orchestrate has five internal stop rules. Each fires on a specific condition; each requires an escalation artifact via `safer-escalate --from orchestrate --to <target> --cause <CAUSE>`.
 
 1. **Under-specified intent.** The intent is so vague that decomposition would be guessing. → Create a `spec` sub-task first; do not attempt further decomposition until the spec is `done`. Status: `NEEDS_CONTEXT`.
 2. **Circular dependency.** Two sub-tasks mutually depend on each other. → The decomposition is wrong. Re-decompose. Status: internal; do not publish.
 3. **Three-strikes triage.** A sub-task has been re-triaged 3 times. → Project is mis-scoped. Status: `BLOCKED` to user with what was learned.
 4. **Missing modality.** You classified a sub-task into a modality that does not exist in the catalog. → Either the catalog is incomplete or your classification is wrong. Status: `NEEDS_CONTEXT` to user.
 5. **Implementation instinct.** You notice yourself about to write code. → This is the Iron Law firing. Stop; re-classify the current sub-task. Status: internal; abort the current action.
+
+### Contract-level stop conditions
+
+Five runtime conditions park even when the action is technically inside the contract budget. These fire during execution, not decomposition. Each posts a stop-the-line comment to the parent epic, sets the active sub-issue to `awaiting-amendment`, and returns `DONE_PARKED`.
+
+1. **Three-strikes mis-scoping** (same as stop rule 3, but at the contract level: project mis-scoped, escalate to user with what was learned).
+2. **Confusion protocol fires.** Orchestrator cannot proceed without user direction.
+3. **Peer-review disagreement.** `/safer:review-senior` and `/codex` split verdicts on the same PR. Park; user resolves.
+4. **Stamina returns BLOCK** on a high-blast-radius artifact. Park; user resolves the BLOCK.
+5. **LOW-confidence on a non-junior recommendation.** Anything above implement-junior with LOW-confidence is asking the user to authorize a risky bet. Park.
 
 ---
 
@@ -1421,7 +1517,7 @@ Post the artifact as a comment on the blocked sub-issue and cross-link on the pa
 | Escalation artifacts | Comments on blocked sub-issues | — |
 | Final VP dashboard | Comment on parent epic | — |
 
-Nothing orchestrate produces lives outside GitHub (see Artifact discipline → GitHub is the record).
+Nothing orchestrate produces lives outside GitHub. The forge is the record.
 
 ---
 
@@ -1455,22 +1551,8 @@ If any box is unchecked, the status is not `DONE`.
 
 ---
 
-## Voice (reminder)
+## Voice
 
-See PRINCIPLES.md → Voice. Short paragraphs. Concrete specifics. No AI filler. No em-dashes. Direct quality judgments. End with what to do.
+Short paragraphs. Concrete specifics. No AI filler. No em-dashes. Direct quality judgments. End with what to do.
 
-The next agent reading your decomposition is a junior. Write the decomposition so they can execute their sub-task without asking you clarifying questions. That is the Cold Start Test applied to orchestration.
-
----
-
-## Composition with gstack
-
-orchestrate is the routing layer for safer modalities and the only layer that calls `AskUserQuestion`. Teammates waiting on a user reply MUST NOT be reaped by Path (b) cleanup (see Step 5d).
-
-### Invokes
-
-- `/codex review` — spec / architect cross-model review pass.
-- `/codex --mode supervisor` — per-round research supervision.
-- `/codex --mode consult` — second opinions on unusual routing decisions.
-- `/autoplan` — canonical fan-out target for stamina-on-plan reviews.
-- `/ship`, `/land-and-deploy`, `/landing-report` — post-verify ship hop, after `/safer:verify` emits SHIP (VERSION + CHANGELOG + PR + deploy verification).
+The next agent reading your decomposition has none of your context. Write so they can execute their sub-task without asking you clarifying questions. Comments in present tense.

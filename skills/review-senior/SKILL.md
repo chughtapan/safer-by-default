@@ -290,7 +290,7 @@ here breaks them.
 
 ### Phase 3 — Aggregate the verdict
 
-Code references in the verdict body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the verdict body use the canonical pinned form `path:N[-M]@<sha7>`.
 
 Combine per-skill verdicts into one artifact verdict. Rules:
 
@@ -362,8 +362,7 @@ Every invocation ends with exactly one status marker on the last line:
   if a new case is needed (Principle 8, Ratchet).
 - **"This PR is small; I'll skip `/codex`."** No. Every row in the
   routing table is mandatory for its kind. `/codex` is an independent
-  cross-model pass toward the stamina budget (PRINCIPLES.md →
-  Durability).
+  cross-model pass toward the stamina budget.
 
 ## Checklist before declaring `DONE`
 
@@ -389,27 +388,15 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 If invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` → Voice. The aggregate verdict comment names the
+The aggregate verdict comment names the
 composed skills that ran, the per-skill verdicts, and the aggregate rule
 that selected the final verdict. One paragraph; no prose essays. The
 consumer is the orchestrator, which routes on the verdict tag.
 
----
-
-## Composition with gstack
-
-### Invokes
-
-- `/review` — gstack's pre-landing review (SQL safety, LLM trust boundaries, conditional side effects).
-- `/simplify` — diff de-duplication and simplification.
-- `/codex review` — cross-model adversarial review.
-- `/safer:dogfood` — cold-start read of the diff.
-- `/security-review` — security-focused review pass.
-
-For PRs touching public surface or escalating to staff tier, `/safer:stamina --pr` replaces this single-reviewer path with N≥3 independent reviewers (per `PRINCIPLES.md` → Durability).
+For PRs touching public surface or escalating to staff tier, `/safer:stamina --pr` replaces this single-reviewer path with N≥3 independent reviewers.

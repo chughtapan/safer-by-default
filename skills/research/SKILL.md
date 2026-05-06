@@ -33,11 +33,11 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root. This skill is the projection of the principles onto **open-ended inquiry**. Specifically:
 
-- **Principle 5 (Junior Dev Rule)** applies double here. Research that drifts into implementation work ceases to be research. Discipline is staying inside the hypothesis loop.
-- **Principle 7 (Epistemic Receipt, from Artifact discipline)** is the central output. Every insight carries a confidence level and the evidence behind it. "I think so" is not a research artifact.
+- **Principle 5 (Discipline over capability)** applies double here. Research that drifts into implementation work ceases to be research. Discipline is staying inside the hypothesis loop.
+- **Part 4 → Every output carries receipts** is the central output. Every insight carries a confidence level and the evidence behind it. "I think so" is not a research artifact.
 - **Principle 8 (Ratchet)** applies at exit. An insight matures into a spec; it does not mature into code that the research skill ships. If the next step is to write code, escalate to `/safer:spec`.
-- **Artifact discipline: GitHub is the record.** The iteration ledger is published as one comment per round, so a future agent can read how the conclusion was reached.
-- **Artifact discipline: Cold Start Test.** The final report is readable by an agent with no session context. "As we discussed" and "see the conversation" are anti-patterns.
+- **Part 4 → Durable records.** The iteration ledger is published as one comment per round, so a future agent can read how the conclusion was reached.
+- **Part 4 → Write for the cold-start reader.** The final report is readable by an agent with no session context. "As we discussed" and "see the conversation" are anti-patterns.
 
 ## Iron rule
 
@@ -179,7 +179,7 @@ Transition the label: `safer-transition-label --issue "$ISSUE" --from planning -
 
 ### Phase 2: The loop
 
-The Supervisor role is **codex** (cross-model independent evaluation). Run `/codex --mode supervisor` on the Researcher turn output before writing the Supervisor turn. If `/codex` is unavailable, fall back to the internal Supervisor turn and log the skip on the sub-issue.
+The Supervisor role is **codex** (cross-model independent evaluation). Run `/codex --mode supervisor` on the Researcher turn output before writing the Supervisor turn.
 
 For each round, do the following five steps:
 
@@ -208,7 +208,7 @@ Comment template for a round:
 
 ### Codex supervisor
 **STAMP.** <continue | hold | escalate>
-**NOTE.** <one sentence from codex, or "unavailable — skipped" if /codex not installed>
+**NOTE.** <one sentence from codex>
 
 ### Supervisor
 **QUESTIONS.**
@@ -375,7 +375,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -384,13 +384,4 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` voice section. The ledger is dense. Numbers over adjectives. Named sources over gestures. The Researcher voice is confident; the Supervisor voice is adversarial. Both are direct. The next agent reading the ledger wants the CLAIM / RATING structure, not prose narration. Give them the structure.
-
----
-
-## Composition with gstack
-
-### Invokes
-
-- `/office-hours` (builder mode) — input before round 1 when the question is under-framed.
-- `/codex --mode supervisor` — per-round supervisor stamps `continue` / `hold` / `escalate` between research rounds.
+The ledger is dense. Numbers over adjectives. Named sources over gestures. The Researcher voice is confident; the Supervisor voice is adversarial. Both are direct. The next agent reading the ledger wants the CLAIM / RATING structure, not prose narration. Give them the structure.

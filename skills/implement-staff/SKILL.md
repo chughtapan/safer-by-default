@@ -35,7 +35,7 @@ Read `PRINCIPLES.md` at the plugin root before writing any code. Your projection
 - **Principle 2 (Validate at every boundary)** — new deps are new boundaries. Every external call, every JSON decode, every env var read is a schema site. No `as` casts across those seams.
 - **Principle 3 (Errors are typed, not thrown)** — a new public API declares its error channel. `Promise<T>` on a failing path is a failure by you. Callers inherit what you declare.
 - **Principle 4 (Exhaustiveness over optionality)** — unions you introduce on the public surface become switches at every caller. Every switch ends in `absurd`. Design for it.
-- **Principle 5 (Junior Dev Rule)** — staff is still junior to the spec. You do not revise the spec. Capability is not the instruction.
+- **Principle 5 (Discipline over capability)** — staff is still junior to the spec. You do not revise the spec. Capability is not the instruction.
 - **Principle 6 (Budget Gate)** — shape is "new modules and new surface traceable to spec lines." No LOC ceiling. Every line traces.
 - **Principle 8 (The Ratchet)** — if the spec needs revision, ratchet up to spec. Never invent scope the spec did not authorize.
 
@@ -290,9 +290,7 @@ After committing, run `/codex` on the PR diff as an independent cross-model revi
 /codex --mode review --diff HEAD
 ```
 
-Post the codex verdict as a comment on the sub-issue before opening the PR (the reviewer and `/safer:review-senior` pass will see it). This counts as one independent pass toward the stamina N budget (PRINCIPLES.md → Durability — independent roles: mechanical/cross-model vs human-style).
-
-If `/codex` is unavailable, log "codex diff review: unavailable — skipped" on the sub-issue and proceed.
+Post the codex verdict as a comment on the sub-issue before opening the PR (the reviewer and `/safer:review-senior` pass will see it). This counts as one independent pass toward the stamina N budget.
 
 ### Phase 8c — Pre-PR review pass (mandatory)
 
@@ -308,7 +306,7 @@ Apply all findings unless a finding conflicts with a plan-approved architect dec
 
 ### Phase 9 — Open the PR
 
-Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`.
 
 ```bash
 git add <new files + package.json + lockfile>
@@ -346,7 +344,7 @@ Architect plan: <URL or 'none'>
 - <plan line> — <reason finding was skipped> (or "none")
 
 ## Codex diff review
-- <codex verdict summary> (or "unavailable — skipped")
+- <codex verdict summary>
 
 ## Confidence
 <LOW|MED|HIGH> — <evidence>
@@ -475,7 +473,7 @@ Post on the sub-issue; leave the branch in place with the anchored work committe
 - [ ] Tests cover success, each error tag, and each named invariant.
 - [ ] Lint, typecheck, and tests pass across touched packages.
 - [ ] Pre-PR `/simplify` pass run; all findings applied or each skip cites the plan line in PR body.
-- [ ] `/codex` diff review run; verdict posted on sub-issue (or "unavailable — skipped" logged).
+- [ ] `/codex` diff review run; verdict posted on sub-issue.
 - [ ] Pre-PR `/review` pass run; all findings applied or each skip cites the plan line in PR body.
 - [ ] Draft PR opened with title prefixed `[impl-staff]` and tables in body; sub-issue label transitioned `implementing` → `review`.
 - [ ] `/safer:review-senior` is mandatory before this PR merges (noted in PR body or enforced by orchestrate Phase 5c).
@@ -494,7 +492,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -503,20 +501,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md → Voice`. Staff PRs are the largest in the pipeline and the most dangerous to read as prose. Keep the PR body structural: tables, lists, anchors. The reviewer and verify both need to find anchors fast.
+Staff PRs are the largest in the pipeline and the most dangerous to read as prose. Keep the PR body structural: tables, lists, anchors. The reviewer and verify both need to find anchors fast.
 
 The next agent reading this PR is `review-senior`, then `verify`. Write so each can judge against the spec without reconstructing your reasoning. The traceability table is the handoff.
-
----
-
-## Composition with gstack
-
-### Invokes
-
-- `/freeze`, `/careful`, `/guard` — guards while editing.
-- `/simplify` — mandatory before PR; stricter than senior-tier (apply every finding unless it conflicts with a plan-approved decision).
-- `/codex review` (diff-review mode) — mandatory before `/safer:review-senior` fires. Counts as one independent pass toward the stamina N budget.
-
-### Invoked by
-
-- `/safer:stamina --pr` runs after the draft PR opens (mandatory; staff-tier is high-blast-radius by default).
