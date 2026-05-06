@@ -30,7 +30,7 @@ allowed-tools:
 Read `PRINCIPLES.md` at the plugin root. This skill is the projection of the principles onto **feasibility code**. Specifically:
 
 - **Principles 1 to 4 (craft) are SUSPENDED for spike code itself.** The code is throwaway. Writing `async`/`await`, `throw new Error`, `as Record<string, unknown>`, and bare `try`/`catch` is explicitly allowed inside a spike branch. The suspension is the whole point of the modality: you buy speed by promising never to ship the code.
-- **Principle 5 (Junior Dev Rule) still applies.** You answer the question you were given. You do not answer a neighboring question because the code is right there.
+- **Principle 5 (Discipline over capability) still applies.** You answer the question you were given. You do not answer a neighboring question because the code is right there.
 - **Principle 6 (Budget Gate) still applies.** Time box is a budget. If the box runs out before the verdict, the absence of a verdict is itself the verdict.
 - **Principle 7 (Brake) still applies.** When the iron rule below fires, stop. Do not "clean up" the spike into something shippable.
 - **Principle 8 (Ratchet) still applies.** If the spike is green, escalate to `architect` or `spec`. Never graduate the spike code itself into `implement-*`.
@@ -176,7 +176,7 @@ Choose one:
 - **NO-GO.** The question fails under the stated conditions. Confidence: LOW / MED / HIGH. Evidence attached.
 - **MIXED.** Passes under some conditions, fails under others. Spell out each.
 
-Confidence calibration (from PRINCIPLES.md):
+Confidence calibration:
 - HIGH: the probe ran cleanly, the result is reproducible, there is no ambiguity in the measurement.
 - MED: the probe ran but some parameter (hardware, version, config) makes the result only indicative.
 - LOW: the probe ran, but the measurement leaves the question partly open.
@@ -329,7 +329,7 @@ The branch is not a PR. Do not open a PR. PRs signal intent to merge; spike bran
 - **"The spike works, so I will clean it up into the real implementation."** Iron rule violation. The spike branch never ships. A fresh implementation picks up the graduation plan.
 - **"I will add one test to make the spike robust."** No. Suspension of craft is the modality's payment. A test signals you think this code will live. It will not.
 - **"The question is a little fuzzy, I will figure it out as I code."** Phase 1 violation. A fuzzy question produces a fuzzy verdict. Framing is upstream of code.
-- **"I hit an adjacent question, so I answered it too."** Junior Dev Rule violation. One question per spike. File the second question separately.
+- **"I hit an adjacent question, so I answered it too."** Discipline over capability violation. One question per spike. File the second question separately.
 - **"The time box ran out but I am almost there; one more hour."** Stop rule 2. The box is literal. "Almost there" after the box is `NO-GO`.
 - **"The verdict is probably GO, confidence HIGH."** "Probably" and "HIGH" cannot coexist. Re-rate.
 - **"I will delete the branch before publishing the verdict."** No. The branch is evidence. Delete after the verdict is published and accepted.
@@ -360,7 +360,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -369,14 +369,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md` voice section. The verdict is terse. Numbers over adjectives. The evidence block speaks for the code. No AI filler. End with the status marker.
+The verdict is terse. Numbers over adjectives. The evidence block speaks for the code. No AI filler. End with the status marker.
 
 The next agent reading the spike issue is deciding whether to act on the graduation plan. Write for that reader. They will not read the code. They will read the verdict.
-
----
-
-## Composition with gstack
-
-spike does not invoke or get invoked by gstack targets. The writeup publishes as a sub-issue comment; the branch stays unmerged.
-
-If the spike result triggers a feature decision, the downstream modality (`/safer:spec` or `/safer:architect`) takes over and composes with gstack via its own composition section.

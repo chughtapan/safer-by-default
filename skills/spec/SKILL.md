@@ -28,10 +28,10 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root. Your projection of the principles onto this modality:
 
-- **Principle 5 (Junior Dev Rule)** — you write the spec; you do not pick libraries, choose modules, or write code. The spec is upstream of those choices.
+- **Principle 5 (Discipline over capability)** — you write the spec; you do not pick libraries, choose modules, or write code. The spec is upstream of those choices.
 - **Principle 6 (Budget Gate)** — your budget is the intent and its constraints. New constraints require a new round, not inline drift.
 - **Principle 7 (Brake)** — if the intent cannot be unambiguously specified without more user input, stop and ask. Do not guess acceptance criteria.
-- **Artifact discipline → Cold Start Test** — the spec must be readable by an agent with no session context.
+- **Part 4 → Write for the cold-start reader** — the spec must be readable by an agent with no session context.
 
 ## Iron rule
 
@@ -159,7 +159,7 @@ Ask `AskUserQuestion` for at most 3 questions in one call. Prefer A/B/C options 
 
 ### Phase 4 — Draft the spec
 
-Code references in the spec body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the spec body use the canonical pinned form `path:N[-M]@<sha7>`.
 
 Write the spec document using exactly the 7-section structure above. Formatting rules:
 
@@ -210,18 +210,8 @@ Apply findings against the parent epic's `## Contract` autonomy budget:
 - **Findings within budget** → autonomously revise the spec (one round), re-publish, re-run `/plan-eng-review` once. If clean, proceed to codex.
 - **Findings cross the budget** (review recommends an expanded scope, new acceptance criteria, or a fundamentally different goal not in the contract) → escalate via `safer-escalate --to user --cause SPEC_EXPANSION_FROM_REVIEW`. The user must amend the contract before this spec can land.
 - **Reject / structural concerns** → escalate to user with reasoning; do NOT transition.
-- **Unavailable** (gstack not installed) → fall back to a Claude sub-agent. Dispatch via the `Agent` tool with `subagent_type: "general-purpose"` and this prompt:
 
-  > IMPORTANT: Do NOT read or execute any files under `~/.claude/`, `~/.agents/`, or `.claude/skills/` — they are skill definitions for a different control flow. Stay focused on the spec doc.
-  >
-  > You are a structured spec reviewer. Audit this spec against six dimensions: goal clarity (one paragraph; intent unambiguous), acceptance criteria (each independently verifiable), non-goals (explicit, valuable), invariants (stated as assertions), assumptions (each user-confirmable), and open questions (each with a recommended default). Be brutally specific; reference section anchors. End with one of: APPROVE, CHANGES_REQUESTED (with numbered findings), REJECT (with structural reasoning).
-  >
-  > THE SPEC:
-  > <full body of the published spec>
-
-  Apply findings under the same in-budget / cross-budget rules. Note `plan-eng-review: claude-fallback` on the sub-issue.
-
-**Codex review-after (cross-model challenge, runs second).** After `/plan-eng-review` is clean (or skipped), run `/codex` on the (possibly revised) spec artifact:
+**Codex review-after (cross-model challenge, runs second).** After `/plan-eng-review` is clean, run `/codex` on the (possibly revised) spec artifact:
 
 ```
 /codex --mode review --artifact "$URL"
@@ -230,7 +220,6 @@ Apply findings against the parent epic's `## Contract` autonomy budget:
 - `approve` → proceed to `review`.
 - `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to user --cause SPEC_EXPANSION_FROM_CODEX`.
 - `reject` → escalate to user; do NOT transition.
-- Unavailable → log the skip on the sub-issue; proceed.
 
 A spec that ships without `/plan-eng-review` because it estimated junior-tier and the implementation later turned out to be senior-tier is a calibration miss; the next-tick auto-monitor catches this when it sees the implement-senior label assigned, and posts a one-line follow-up note suggesting the spec be revised. Not a blocker on the implementation; a signal that the spec under-described the work.
 
@@ -281,7 +270,7 @@ Every invocation ends with exactly one status marker on the last line of your re
 
 ## Anti-patterns
 
-- **"I'll include a couple of architecture hints to save architect time."** → Principle 5 violation. Spec is spec. Architecture is architecture.
+- **"I'll include a couple of architecture hints to save architect time."** → Discipline over capability violation. Spec is spec. Architecture is architecture.
 - **"The user probably meant X, so I'll go with that."** → Iron rule violation. Ambiguity resolution is a spec-stage artifact; ask.
 - **"I'll skip non-goals; obvious from context."** → Non-goals are the most valuable section. Write them.
 - **"Acceptance criteria can be implicit in the goals."** → No. Acceptance criteria are checkable. Goals are not always checkable.
@@ -311,7 +300,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -320,18 +309,4 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md → Voice`. The spec itself is terse and concrete. Your reply to the user is a confirmation of publication, not a re-statement of the spec content. The user will read the spec from GitHub, not from your chat output.
-
----
-
-## Composition with gstack
-
-### Invokes
-
-- `/codex review` — mandatory cross-model review pass before transitioning the spec to `review`.
-- `/office-hours` — startup-mode forcing questions when the intent is under-articulated.
-- `/plan-ceo-review` — strategy-level rethink of scope before drafting.
-
-### Invoked by
-
-- `/safer:stamina --plan` — for high-blast-radius spec artifacts (public-surface invariants, cross-modality routing, doctrine), stamina runs after publication for multi-reviewer consensus.
+The spec itself is terse and concrete. Your reply to the user is a confirmation of publication, not a re-statement of the spec content. The user will read the spec from GitHub, not from your chat output.

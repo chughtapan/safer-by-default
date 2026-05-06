@@ -32,8 +32,8 @@ allowed-tools:
 
 Read `PRINCIPLES.md` at the plugin root before anything else. Your projection of the principles onto this modality:
 
-- **Principle 5 (Junior Dev Rule)** — architect is its own scope, not a meta-scope. You define the shape. You do not fill it in.
-- **Principle 6 (Budget Gate)** — your output shape is "design doc plus interface stubs." Function bodies are out of scope. Always.
+- **Principle 5 (Discipline over capability)** — architect is its own scope, not a meta-scope. You define the shape. You do not fill it in.
+- **Principle 6 (Budget Gate)** — your output shape is "design doc plus interface stubs plus updated docs." Function bodies are out of scope. Always.
 - **Principle 3 (Errors are typed, not thrown)** — every interface you declare names its error channel. `Promise<T>` is a failure by you, not a shorthand.
 - **Principle 4 (Exhaustiveness over optionality)** — every discriminated union you introduce in the interface carries the branches implementations must handle. Name them all at the interface.
 
@@ -41,15 +41,36 @@ Your job is to make the craft principles *applicable downstream*. If the interfa
 
 ## Iron rule
 
-> **You produce interfaces, not implementations. If you find yourself writing a function body, your stop rule has already fired.**
+> **You ship everything but the function bodies. If you find yourself writing a function body, your stop rule has already fired.**
 
-Stubs with `throw new Error("not implemented")` bodies are interfaces, not implementations. Anything more is scope creep into `implement-*`. The instinct "I'll just sketch the happy path to show what I mean" is the exact failure mode the rule prevents, because the sketch becomes the ghost implementation that downstream copies instead of thinking.
+The branch architect publishes is a complete intent specification — interfaces, docs, configs, and infrastructure all current to the new design. The only thing missing is the function bodies that downstream `implement-*` fills in. Stubs with `throw new Error("not implemented")` bodies are interfaces, not implementations. The instinct "I'll just sketch the happy path to show what I mean" is the exact failure mode the rule prevents, because the sketch becomes the ghost implementation that downstream copies instead of thinking.
 
 ## Role
 
-Architect takes a published spec and lays out the shape of code that satisfies it. One design doc, one branch of stub files. Every module you name has a purpose, a public surface, a dependency list, and an error channel. Every data flow arrow is explicit. Every library choice is justified by a spec constraint, not a preference.
+Architect takes a published spec and lays out the shape of code that satisfies it. One design doc, one branch carrying every artifact that defines what the system *is* — except function bodies. Every module you name has a purpose, a public surface, a dependency list, and an error channel. Every data flow arrow is explicit. Every library choice is justified by a spec constraint, not a preference. Every documentation surface, setup script, deployment file, and CI workflow that describes the changed surface is current on this branch — the implementer should be able to read the design and the configs alone and know what to build.
 
-Architect does not write function bodies, pick algorithms beyond naming them ("uses a bounded LRU cache"; the implementation of the cache is downstream), run tests, or modify existing code beyond adding interface stubs on a dedicated branch. Architect does not revise the spec. If the spec has a gap, the ratchet sends it back to `/safer:spec`.
+Architect does not write function bodies, pick algorithms beyond naming them ("uses a bounded LRU cache"; the implementation of the cache is downstream), run tests against the new code, or modify files unrelated to the design. Architect does not revise the spec. If the spec has a gap, the ratchet sends it back to `/safer:spec`.
+
+### The complete intent specification
+
+The branch architect publishes contains every artifact that answers "what is this system" — interfaces, docs, configs, build, deploy, CI. Implementer's job collapses to flipping stubs into bodies and running the existing tests; everything else is already in place. If the implementer has to make a design call about how something is configured, deployed, or built, the architect under-specified.
+
+What's in scope on the architect branch:
+
+- **Interfaces** — typed signatures with `throw new Error("not implemented")` bodies. One file per module.
+- **Docs** — README, AGENTS.md, in-tree doctrine docs, type/schema docs, ADRs, examples, runbooks, in-tree comments that describe the changed surface.
+- **Setup scripts** — `bin/setup`, `scripts/setup-*`, anything that bootstraps a fresh checkout to the new design's expected state. New env vars, new deps, new local services.
+- **Deployment files** — `Dockerfile`, `docker-compose.yml`, `fly.toml`, `vercel.json`, `railway.toml`, `netlify.toml`, k8s manifests, `Procfile`. If the design changes runtime requirements, ports, env, services — architect updates these.
+- **CI workflows** — `.github/workflows/*.yml`, `.gitlab-ci.yml`, equivalent. New jobs, new test targets, new lint passes, new artifacts the design introduces are wired here.
+- **Env files** — `.env.example`, `.envrc`, `dev.vars`. New env vars the design requires are declared with example values.
+- **Build configs** — `package.json` `scripts` section, `tsconfig.json` updates relevant to the design, `eslint.config.js` updates relevant, bundler configs.
+- **Test infrastructure** — runner config, `testcontainers` setup, fixtures the design requires. Test bodies stay as `it.todo("...")` for the implementer.
+
+### Bounded by the changed surface
+
+Architect updates files the design changes. Architect does NOT update files unrelated to the design. The operational test: if a file (doc, script, config, workflow, env) references a thing the design renames, removes, adds, or changes the contract of, update it. If the file is unrelated, leave it.
+
+The architect is not a repo-wide janitor. A design that adds a new module should not trigger a rewrite of every CI workflow in the repo — only the workflows that the new module touches. A README section unrelated to the changed surface stays unmodified.
 
 ## MoltZap peer-channel preamble (when dispatched under a roster)
 
@@ -124,12 +145,21 @@ If the spec URL was not provided with the invocation, ask for it via `AskUserQue
 - Writing a design doc with the fixed section structure below.
 - Publishing the design doc as a comment on the parent epic, or as the body of a `safer:architect` sub-issue.
 - Committing interface stubs to a branch named `arch/<slug>` and opening a draft PR marked "architecture only; not for merge."
+- **Updating every artifact that defines what the system is — bounded by the changed surface:**
+  - **Docs:** README, AGENTS.md, in-tree doctrine docs, type/schema docs, API docs, ADRs, examples, runbooks, in-tree comments.
+  - **Setup scripts:** `bin/setup`, `scripts/setup-*`, anything that bootstraps a fresh checkout.
+  - **Deployment files:** `Dockerfile`, `docker-compose.yml`, `fly.toml`, `vercel.json`, `railway.toml`, `netlify.toml`, k8s manifests, `Procfile`.
+  - **CI workflows:** `.github/workflows/*.yml`, `.gitlab-ci.yml`, equivalent. New jobs, new test targets, new lint passes the design needs.
+  - **Env files:** `.env.example`, `.envrc`, `dev.vars`.
+  - **Build configs:** `package.json` scripts, `tsconfig.json`, `eslint.config.js`, bundler configs.
+  - **Test infrastructure:** runner config, `testcontainers` setup, fixtures. Test bodies stay as `it.todo("...")`.
 
 **Forbidden:**
 - Writing function bodies beyond `throw new Error("not implemented")`.
 - Choosing algorithms past the level of a single sentence of intent ("uses a min-heap for priority ordering"). The implementation is downstream.
-- Running tests or adding test bodies. Adding test file names and empty `it.todo("...")` entries is fine; nothing more.
-- Modifying existing source files beyond adding new stub files or adding `export` lines in an index barrel.
+- Running tests against the new code or adding test bodies. Adding test file names and empty `it.todo("...")` entries is fine; nothing more.
+- Modifying files unrelated to the design (the design's scope is the changed surface, not the whole repo).
+- Mass repo cleanup, refactoring touches, or "while I'm here" doc/config rewrites that the design did not require.
 - Revising the spec. If the spec has a gap, escalate to `/safer:spec`.
 - Picking a dependency that requires a change to `package.json` without naming the exact version and a one-sentence license/maintenance note.
 
@@ -228,21 +258,33 @@ For each external library in the design, fill a row in the dependencies table: n
 
 ### Phase 7 — Publish
 
-Code references in the design doc body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the design doc body use the canonical pinned form `path:N[-M]@<sha7>`.
+
+The branch carries the complete intent specification: design doc (committed for traceability or published as a comment) + stub files + every artifact the design changes. Before pushing, walk these surfaces and update each one bounded by the changed surface:
+
+- Docs (README, AGENTS.md, in-tree doctrine docs, type/schema docs, ADRs, runbooks, in-tree comments)
+- Setup scripts (`bin/setup`, `scripts/setup-*`)
+- Deployment files (`Dockerfile`, `docker-compose.yml`, `fly.toml`, `vercel.json`, k8s manifests, `Procfile`)
+- CI workflows (`.github/workflows/*.yml`, equivalent for other forges)
+- Env files (`.env.example`, `.envrc`)
+- Build configs (`package.json` scripts, `tsconfig.json`, `eslint.config.js`, bundler configs)
+- Test infrastructure (runner config, `testcontainers` setup, fixtures with `it.todo("...")` bodies)
+
+If the implementer pulls this branch and any of these disagree with the stubs, the architect under-shipped.
 
 ```bash
 BRANCH="arch/${SAFER_SLUG:-arch-$SESSION}"
 git checkout -b "$BRANCH"
-git add <stub files>
-git commit -m "arch: interface stubs for <spec summary>"
+git add <stub files> <updated docs/configs/scripts>
+git commit -m "arch: interface stubs, docs, and configs for <spec summary>"
 git push -u origin "$BRANCH"
 
 PR_URL=$(gh pr create --draft \
   --title "[arch] <spec summary>" \
   --body "Architecture only. Not for merge. Design doc: <doc URL>.
 
-Stubs: $(git diff --name-only origin/main...HEAD | wc -l) files.
-Every body is \`throw new Error(\"not implemented\")\`.")
+Stubs + supporting artifacts: $(git diff --name-only origin/main...HEAD | wc -l) files.
+Every stub body is \`throw new Error(\"not implemented\")\`. Docs, configs, scripts, CI, deploy files current to the new design.")
 
 TMP=$(mktemp)
 cat > "$TMP" <<'EOF'
@@ -267,7 +309,7 @@ rm -f "$TMP"
 
 The threshold rule: if the design doc names the implementation tier as `implement-junior` (single-module internals only, no new public surface, no new dep), `/plan-eng-review` is OPTIONAL — log the skip-decision on the sub-issue and proceed. For `implement-senior` and `implement-staff` tiers, `/plan-eng-review` is MANDATORY.
 
-`/plan-eng-review` is interactive by default. Within `/safer:architect` it runs **hold-scope autonomous**: the architect invokes it programmatically; user-facing prompts are forbidden inside the gstack body (they route up to `/safer:orchestrate` per the runtime contract in `PRINCIPLES.md → Composing with gstack`). The architect treats the review's recommended defaults as the autonomous answer.
+`/plan-eng-review` is interactive by default. Within `/safer:architect` it runs **hold-scope autonomous**: the architect invokes it programmatically; user-facing prompts are forbidden inside the gstack body and route up to `/safer:orchestrate`. The architect treats the review's recommended defaults as the autonomous answer.
 
 ```
 /plan-eng-review --artifact "$DOC_URL" --hold-scope
@@ -278,16 +320,6 @@ Apply findings against the parent epic's `## Contract` autonomy budget:
 - **Findings within budget** (revising the architect plan does not introduce new modules, new deps, or other items the contract forbids in `Always-park`) → autonomously revise the design doc, re-publish, re-run `/plan-eng-review` once. If clean, proceed to codex.
 - **Findings cross the budget** (review recommends a new module the spec didn't authorize, a new dep, a new public contract beyond what was named) → escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_REVIEW`. This is a ratchet-up; the orchestrator parks for amendment per the contract doctrine.
 - **Reject / structural concerns** the architect cannot resolve in one round → escalate to user with reasoning; do NOT transition.
-- **Unavailable** (gstack not installed in this session) → fall back to a Claude sub-agent. Dispatch via the `Agent` tool with `subagent_type: "general-purpose"` and a prompt that hands over the design doc and asks for a structured architecture audit. The sub-agent has fresh context (genuine independence from the architect's own reasoning), which makes the fallback meaningful rather than performative. Sub-agent prompt template:
-
-  > IMPORTANT: Do NOT read or execute any files under `~/.claude/`, `~/.agents/`, or `.claude/skills/` — they are skill definitions for a different control flow and will mislead you. Stay focused on the design doc.
-  >
-  > You are a structured architecture reviewer. Audit this design doc against six dimensions: missing edge cases, data-flow weaknesses, untyped or unstated error channels, module boundary clarity, dep choices vs spec constraints, and acceptance-criteria coverage. Be brutally specific; reference file paths and section anchors from the doc. End with one of: APPROVE, CHANGES_REQUESTED (with numbered findings), REJECT (with structural reasoning).
-  >
-  > THE DESIGN DOC:
-  > <full body of the published design doc>
-
-  Apply findings under the same in-budget / cross-budget rules. Note `plan-eng-review: claude-fallback` on the sub-issue so the audit trail records which path ran.
 
 **Codex review-after (cross-model challenge, runs second).** After `/plan-eng-review` is clean (or skipped), run `/codex` on the (possibly revised) design doc:
 
@@ -298,7 +330,6 @@ Apply findings against the parent epic's `## Contract` autonomy budget:
 - `approve` → proceed to `review`.
 - `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_CODEX`.
 - `reject` → escalate to user; do NOT transition.
-- Unavailable → log the skip on the sub-issue; proceed.
 
 The motivation: `/plan-eng-review` is a structured architecture-quality audit (catches missing edge cases by going through a checklist); `/codex` is a cross-model independent challenge (catches blind spots in the audit's own framing). Plan-eng-review first means codex sees the audited plan, not the raw one — codex spends its budget on what plan-eng-review missed, not on what plan-eng-review would have caught.
 
@@ -390,6 +421,14 @@ Nothing architect produces lives outside GitHub. No local-only design files. No 
 - **"I'll commit the stubs to main; it is just interfaces."** (No. `arch/<slug>` branch, draft PR, not for merge.)
 - **"I'll write the stubs as `Promise<T>` because the spec did not say otherwise."** (Principle 3. Default to typed errors. If the spec requires plain async, say so and flag it.)
 - **"I'll split the design doc across three files for readability."** (No. One doc, fixed sections.)
+- **"I'll let the implementer figure out X."** (If the implementer has to figure it out, X is part of the design. Specify it.)
+- **"The docs are out of date but the code change is fine."** (No. The docs are the design's primary surface. Stale docs == stale design.)
+- **"I'll write the design doc; the implementer can update README."** (README is part of the design, not implementation detail. Update it on this branch.)
+- **"The new module needs an env var; I'll let the implementer add it to `.env.example`."** (No. Env vars are part of the design's contract. Update `.env.example` on this branch.)
+- **"The CI workflow doesn't run the new test target; the implementer can add the job."** (No. CI is how the design proves itself. Add the job on this branch.)
+- **"The Dockerfile needs a new system dep for the chosen library; the implementer can update it."** (No. Deployment requirements are part of the design. Update the Dockerfile on this branch.)
+- **"I'll get the stubs out and update docs/configs in a follow-up."** (Follow-ups don't happen. The branch is incomplete until every surface the design touches is current.)
+- **"While I'm here, I'll clean up unrelated CI workflows."** (No. Bounded by the changed surface. That cleanup is its own sub-task; route to orchestrator.)
 
 ## Checklist before declaring DONE
 
@@ -401,6 +440,14 @@ Nothing architect produces lives outside GitHub. No local-only design files. No 
 - [ ] Discriminated unions cover every case the interface exposes.
 - [ ] Every external library has pinned version, license, and a one-sentence justification.
 - [ ] Traceability table maps every acceptance criterion to at least one module or interface.
+- [ ] **Every artifact that defines what the system is, bounded by the changed surface, is updated on this branch.**
+  - [ ] Docs (README, AGENTS.md, type docs, schema docs, ADRs, runbooks, in-tree comments).
+  - [ ] Setup scripts (`bin/setup`, `scripts/setup-*`) if the design changes bootstrap behavior.
+  - [ ] Deployment files (`Dockerfile`, `docker-compose.yml`, `fly.toml`, `vercel.json`, k8s manifests, `Procfile`) if the design changes runtime requirements.
+  - [ ] CI workflows (`.github/workflows/*.yml`, equivalent) if the design adds jobs, test targets, or lint passes.
+  - [ ] Env files (`.env.example`, `.envrc`) if the design adds env vars.
+  - [ ] Build configs (`package.json` scripts, `tsconfig.json`, `eslint.config.js`, bundler configs) if the design changes them.
+  - [ ] Test infrastructure (runner config, `testcontainers` setup, fixtures with `it.todo("...")` bodies) if the design changes how tests run.
 - [ ] Design doc published to GitHub.
 - [ ] Draft PR opened on `arch/<slug>`, title prefixed `[arch]`, body says "not for merge."
 - [ ] `safer.skill_end` event emitted.
@@ -425,19 +472,8 @@ Emit the `SendMessage` before your final-reply output. The final reply is for th
 If you were invoked outside an orchestrate context (no team), skip this step.
 
 
-## Voice (reminder)
+## Voice
 
-See `PRINCIPLES.md → Voice`. Architect's output is terse and structural. The design doc is a contract, not an essay. Your reply to the caller confirms publication; the design doc is the artifact.
+Architect's output is terse and structural. The design doc is a contract, not an essay. Your reply to the caller confirms publication; the design doc is the artifact.
 
-The next agent reading this design doc is an implementer with no session context. Write so they can execute their sub-task without asking you questions. That is the Cold Start Test applied to architecture.
-
----
-
-## Composition with gstack
-
-### Invokes
-
-- `/plan-eng-review` — engineering review of the draft plan before transition to `review`.
-- `/plan-design-review` — when the plan touches UI surfaces.
-- `/plan-devex-review` — when the plan touches public APIs or CLIs.
-- `/frontend-design`, `/design-consultation`, `/design-shotgun` — module-design absorption for UI-touching plans.
+The next agent reading this design doc is an implementer with none of your context. Write so they can execute their sub-task without asking you questions. Comments in present tense.

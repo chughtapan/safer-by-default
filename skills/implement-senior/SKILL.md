@@ -36,7 +36,7 @@ Read `PRINCIPLES.md` at the plugin root before writing any code. Your projection
 - **Principle 2 (Validate at every boundary)** — a module-to-module seam is not always a boundary, but anywhere data comes from outside the package, schemas decode it once.
 - **Principle 3 (Errors are typed, not thrown)** — when composing functions across modules, the error channel of the composed function is the union of the component error channels. Name it.
 - **Principle 4 (Exhaustiveness over optionality)** — cross-module switches fan out fast. Every switch ends in `absurd`. No exceptions.
-- **Principle 5 (Junior Dev Rule)** — senior is still junior to the architect. The plan is your scope. Capability to revise it is not the instruction to revise it.
+- **Principle 5 (Discipline over capability)** — senior is still junior to the architect. The plan is your scope. Capability to revise it is not the instruction to revise it.
 - **Principle 6 (Budget Gate)** — shape is "multi-module refactor inside one feature area per the plan." New modules and new public contracts are out of scope.
 - **Principle 8 (The Ratchet)** — if the plan needs revision, ratchet back to architect. Never sideways: no boolean flags to patch a plan gap, no workarounds to avoid re-opening the architect step.
 
@@ -261,7 +261,7 @@ Apply all findings unless a finding conflicts with a plan-approved architect dec
 
 ### Phase 7 — Open the PR
 
-Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`. See `PRINCIPLES.md#code-references-are-pinned`.
+Code references in the PR body use the canonical pinned form `path:N[-M]@<sha7>`.
 
 ```bash
 git add <changed files>
@@ -430,7 +430,7 @@ SendMessage({
 })
 ```
 
-The `Process issues` field is mandatory (per PRINCIPLES.md → Process issues are first-class artifacts). If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
 
 Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
 
@@ -439,19 +439,6 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 ## Voice (reminder)
 
-See `PRINCIPLES.md → Voice`. Your PR body is terse, concrete, and plan-anchored. The plan-anchor table is the reviewer's fastest path to confidence; do not bury it.
+Your PR body is terse, concrete, and plan-anchored. The plan-anchor table is the reviewer's fastest path to confidence; do not bury it.
 
 The next agent reading this PR is `review-senior`. Write so they can judge the diff against the plan without reconstructing your reasoning. The plan-anchor table is the handoff.
-
----
-
-## Composition with gstack
-
-### Invokes
-
-- `/freeze`, `/careful`, `/guard` — guards while editing.
-- `/simplify` — mandatory before opening the PR; reviews diff for redundancy and over-abstraction.
-
-### Invoked by
-
-- `/safer:review-senior` runs after the draft PR opens (mandatory). For PRs touching public surface or escalating to staff-tier shape, `/safer:stamina --pr` replaces the single-reviewer path.
