@@ -8,26 +8,6 @@ Your coding agent is miscalibrated. It was trained on human-written code — dec
 
 It is not. This plugin recalibrates.
 
-## Four parts
-
-**Part 1 — Craft.** Four principles for compiler-grade output:
-- **Types beat tests:** Move constraints into the type system. Branded types, discriminated unions, exhaustive matches — the compiler catches every site, every reader, forever.
-- **Validate at every boundary:** Inside a module, trust your types. At boundaries (disk, env, network, another package), decode with a schema.
-- **Errors are typed, not thrown:** Tagged unions or discriminated results. No `throw new Error("bad")`, no bare `catch {}`, no `Promise<T>` that erases the error channel.
-- **Exhaustiveness over optionality:** Every switch ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches.
-
-**Part 2 — Discipline.** Four principles for scope:
-- **Discipline over capability:** The question is not "can I do this." The question is "is this mine to do."
-- **The Budget Gate:** Shape, not volume. A 500-line module is fine; one line across two modules is not.
-- **The Brake:** Stop rules are literal. When fired, stop writing code. Produce the escalation artifact.
-- **The Ratchet:** Escalate up, never sideways. No quick fixes in sibling modules.
-
-**Part 3 — Stamina.** How leverage-class artifacts earn `done`. N heterogeneous review passes, set by blast radius × reversibility, capped at 4. Internal one-module changes ship on N=1; public-surface or destructive changes go up to N=4.
-
-**Part 4 — Communication.** How work hands off. Contracts (autonomy is granted, not assumed). Durable records (the forge is the record; edit in place, never amend; doctrine SHA-stamped at OK time; code references pinned). Output receipts (status, confidence, effort, process issues — every artifact declares all four). Writing for the cold-start reader (present-tense; portable; the next agent has none of your context).
-
-Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `SKILL.md` for one projection of the principles onto one kind of work.
-
 ## Quick start
 
 **Claude Code** (canonical):
@@ -59,6 +39,40 @@ Creates the GitHub issue labels skills publish under. Idempotent.
 **First skill**: in any repo, type `/safer:orchestrate` to start a new pipeline from intent, or pick a modality skill from the [catalog below](#skill-catalog).
 
 For dependency requirements, source-resolution detail, working from source, and troubleshooting, see [INSTALL.md](./INSTALL.md).
+
+## Four parts
+
+The doctrine factors into four orthogonal axes. The first two govern *what code looks like*; the third governs *when it earns done*; the fourth governs *how work hands off*. Each safer skill projects from these four into one modality. The full text lives in [PRINCIPLES.md](./PRINCIPLES.md); the catalog of bullet points below is the operational summary.
+
+**Part 1 — Craft.** Four principles for compiler-grade output:
+
+- **Types beat tests.** Move constraints into the type system. Branded types, discriminated unions, exhaustive matches — the compiler catches every site, every reader, forever. Rules out `as Record<string, unknown>`, untagged optionals, runtime `typeof` checks for things the type already knows.
+- **Validate at every boundary.** Inside a module, trust your types. At boundaries (disk, env, network, another package), decode with a schema. Rules out `process.env.FOO!` reads, untyped `JSON.parse`, blind trust in external API shapes.
+- **Errors are typed, not thrown.** Tagged unions or discriminated results. No `throw new Error("bad")`, no bare `catch {}`, no `Promise<T>` that erases the error channel. Every error site has a name the caller can match on.
+- **Exhaustiveness over optionality.** Every `switch` ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches. Adding a new variant is a compile error at every site that didn't expect it — that's the point.
+
+**Part 2 — Discipline.** Four principles for scope:
+
+- **Discipline over capability.** The question is not "can I do this." The question is "is this mine to do." A skill with the *capability* to fix a sibling module's bug must still defer the work to the modality that owns it.
+- **The Budget Gate.** Shape, not volume. A 500-line addition to one module is fine; one line across two modules is not. The gate measures *how many places* a change touches, not how big it is.
+- **The Brake.** Stop rules are literal. When fired, stop writing code. Produce the escalation artifact and hand off. There is no "let me just finish this part first."
+- **The Ratchet.** Escalate up, never sideways. A junior implementer hitting a missing module routes to senior or staff; it does not "just add the module." A reviewer finding architectural issues routes to architect; it does not rewrite the code itself.
+
+**Part 3 — Stamina.** How leverage-class artifacts earn `done`. Higher blast radius warrants more review.
+
+- **Blast radius × reversibility sets N.** A one-module internal change ships on N=1. Public-surface changes go to N=2. Doctrine, schema, or destructive changes go to N=3–4. The table lives in [PRINCIPLES.md](./PRINCIPLES.md) → Part 3.
+- **Passes are heterogeneous.** N is not "the same reviewer N times." It's N different lenses — code review, dogfood, security audit, simplify pass, codex challenge — each looking for what the others miss. Same lens twice is one pass.
+- **Capped at 4.** A 5th pass is a smell that the artifact is wrong, not under-reviewed. Park, rethink, narrow.
+- **Stamina is a router, not a reviewer.** `/safer:stamina` dispatches the heterogeneous passes and aggregates verdicts; it never produces findings of its own.
+
+**Part 4 — Communication.** How work hands off across sessions, agents, and time.
+
+- **Contracts.** Autonomy is granted, not assumed. Every orchestration runs against a `## Contract` block (goal, acceptance, autonomy budget, always-park items) authored on the parent epic. Out-of-budget next steps park; ratchet-up always parks.
+- **Durable records.** The forge (GitHub) is the record. Edit in place; never amend. Every artifact is doctrine-SHA-stamped at OK time so the reviewer knows which doctrine the work was approved against. Code references pinned by file:line, never "the function we discussed."
+- **Output receipts.** Every artifact declares four numbers: status (DONE / DONE_PARKED / REVISE), confidence, effort, and process issues. Four lines, every time. The next reader knows what the producer believed without reading the body.
+- **Cold-start writing.** The next agent has none of your context. Present-tense, portable references, no "earlier in this session." If a fact is load-bearing, it lives in the artifact body, not in the chat.
+
+Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `SKILL.md` for one projection of the principles onto one kind of work.
 
 ## Skill catalog
 
