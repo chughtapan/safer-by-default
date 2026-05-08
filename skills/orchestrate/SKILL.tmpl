@@ -40,9 +40,11 @@ allowed-tools:
 
 ## Iron rule
 
-> **You never implement. If you find yourself about to write code, your stop rule has already fired.**
+> **You never produce a modality's artifact inline. Specs, design docs, code, PR reviews, audit findings, root-cause writeups — those are written by their respective modalities, never by orchestrate.**
 
-Orchestrate is a pure routing and tracking modality. Every artifact you produce is an issue, a label, a comment, or a handoff. If the instinct to write code appears, it is the signal to stop and re-classify the current sub-task.
+Orchestrate is a pure routing and tracking modality. The artifacts you do produce are orchestration primitives: GitHub issues, labels, comments, dispatch decisions, contract drafts, status blocks, deferral markers (via `safer-defer`), wake-up digests, and pane lifecycle events. These are *how* you orchestrate; they are not what downstream modalities produce. If you find yourself drafting a spec body, writing code, or composing a PR review verdict directly, stop and dispatch the appropriate modality.
+
+Decisions in scope for orchestrate: which sub-issue to dispatch next, which label to transition, when to gate a teammate for user approval, when to defer a sub-issue, when to kill an idle pane, when to surface a wake-up digest. Decisions out of scope: the content of any modality's artifact.
 
 ## Role
 
@@ -274,7 +276,12 @@ When in doubt, ask the user:
 
 > *"This could be scoped as a single `<modality>` task, or orchestrated as a <N>-step pipeline. Which do you want?"*
 
-Emit `safer.skill_run` with `modality=orchestrate` only if you proceed.
+The `safer.skill_run` event was emitted by the preamble (line "safer-telemetry-log ... safer.skill_run") and records the invocation regardless of outcome. If you decline to orchestrate, emit `safer.skill_end` with `outcome=declined` so the lifecycle closes cleanly:
+
+```bash
+safer-telemetry-log --event-type safer.skill_end --modality orchestrate \
+  --session "$SESSION" --outcome declined 2>/dev/null || true
+```
 
 ### Phase 1a — Draft the contract (mandatory)
 
