@@ -19,7 +19,7 @@ Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:spec`, `
 - `PRINCIPLES.md` — the 4-part doctrine (craft, discipline, stamina, communication). Every skill projects from these principles.
 - `docs/contracts/` — four worked-example contract templates (invitation, bug-fix-end-to-end, scrum-master-backlog, architect-and-stop) plus a README explaining when to reach for each.
 - `scenarios/` — cc-judge calibration suite for evaluating doctrine adherence; see `scenarios/README.md`.
-- `bin/` — 13 standalone helpers (publish, telemetry, escalate, etc.). All are on `PATH` in any session that has the plugin enabled.
+- `bin/` — 15 standalone helpers (publish, telemetry, escalate, etc.). All are on `PATH` in any session that has the plugin enabled. See `ARCHITECTURE.md` → CLI helpers for the full list.
 - `lib/` — helper shell modules sourced by `bin/` scripts.
 
 ## Skill routing

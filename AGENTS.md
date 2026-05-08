@@ -45,7 +45,7 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 ## Where things live
 
 - **Skills**: `skills/<name>/SKILL.md` — one folder per modality. Each is self-contained.
-- **CLI helpers**: `bin/safer-*` — auto-prepended to `PATH` in any session with the plugin enabled. Skills invoke them by bare name.
+- **CLI helpers**: `bin/safer-*` — auto-prepended to `PATH` in any session with the plugin enabled. Skills invoke them by bare name. Reference table in [`ARCHITECTURE.md`](./ARCHITECTURE.md#cli-helpers-binsafer) lists every helper's purpose, signature, and exit codes; consult it when you hit a `safer-*` call you haven't seen before.
 - **Doctrine**: [`PRINCIPLES.md`](./PRINCIPLES.md) at repo root.
 - **Architecture map**: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 - **Contract templates**: `docs/contracts/` — worked examples for orchestration contracts.

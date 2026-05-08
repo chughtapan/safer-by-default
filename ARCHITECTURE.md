@@ -39,7 +39,7 @@ safer-by-default/
 │   ├── ux-audit/
 │   ├── typescript/
 │   └── setup/
-├── bin/                       ← 13 CLI helpers; auto-PATH at session start
+├── bin/                       ← 15 CLI helpers; auto-PATH at session start (see "CLI helpers" below)
 ├── lib/                       ← shell modules sourced by bin/ scripts
 ├── docs/contracts/            ← worked-example contract templates
 ├── scenarios/                 ← cc-judge calibration suite
@@ -66,6 +66,30 @@ Each `skills/<name>/SKILL.md` follows a fixed structure (codified in [`SKILL.md.
 12. **`## Checklist before declaring DONE`** — verifiable preconditions.
 
 Skills read `PRINCIPLES.md` in their preamble and project the relevant principles onto their modality. They publish artifacts via `safer-publish` to GitHub.
+
+## CLI helpers (`bin/safer-*`)
+
+Each helper is a standalone bash script. The plugin marketplace install auto-prepends `bin/` to `PATH`, so skills invoke them by bare name. Skills should reference this table when calling a helper for the first time.
+
+| Helper | Purpose | Signature |
+|---|---|---|
+| `safer-publish` | Publish artifact to GitHub (issue / comment / PR review); routes via zapbot when present | `--kind issue\|comment\|review [--title --body-file --labels --parent --issue --pr --repo]` |
+| `safer-escalate` | Emit standard escalation markdown to stdout | `--from <modality> --to <target> --cause <cause> [--status --issue --parent --context --attempted]` |
+| `safer-transition-label` | Atomic state-label transition on a GitHub issue | `--issue --from --to [--repo]` → `TRANSITIONED #<n>: <from> → <to>` |
+| `safer-defer` | Atomically write deferral marker + add `safer:deferred` label | `--issue --reason --until` / `--issue --clear` / `--issue --check` |
+| `safer-load-context` | Load issue (and optionally parent epic) as JSON | `--issue [--parent --repo]` → JSON |
+| `safer-diff-scope` | Classify the current diff into junior / senior / staff tier | (no args; reads `git diff`) → JSON `{tier, files, modules, exports, new_deps, rationale}` |
+| `safer-peer-message` | Peer-channel transport for cross-modality coordination | `--to-role --kind [--to-session --artifact-url --correlation-id] (--body-file \| --body-stdin)`; exit codes 0/10/20/21/22/30/64 |
+| `safer-update-check` | Poll remote VERSION with 1h cache | (no args) → empty if current; `UPGRADE_AVAILABLE <local> <remote>` on mismatch |
+| `safer-slug` | Emit `SLUG=<owner>-<repo>` from git origin (sh-evalable) | (no args) |
+| `safer-telemetry-log` | Append JSONL event to `~/.safer/analytics/events.jsonl` | `--event-type [--modality --session --outcome --duration-s --issue]` |
+| `safer-setup-labels` | Create the `safer:*` issue labels on a repo (idempotent) | `[--quiet]` |
+| `safer-vp` | VP-level dashboard (funnel + throughput + calibration + in-flight) | `[7d\|30d\|all] [--repo]` |
+| `safer-calibration` | Per-modality health dashboard from events.jsonl | `[7d\|30d\|all]` |
+| `safer-acg-sync` | Regenerate ACG rule table in `skills/typescript/SKILL.md` | (no args) |
+| `safer-gen-skills` | Render `skills/<name>/SKILL.md` from `SKILL.tmpl + PRINCIPLES.md` | `[--check]` |
+
+Conventions: helpers exit non-zero on missing required args; skills wrap calls with `2>/dev/null || true` only when the helper is optional plumbing (telemetry, update-check), never when it's load-bearing. `safer-publish` routes through zapbot's bot-token broker when zapbot is detected on the host; absent zapbot, falls back to the user's `gh auth`.
 
 ## Install paths
 
