@@ -64,7 +64,7 @@ echo "  ok  gh authenticated; $REPO accessible"
 echo "── integration: ensure labels ──"
 LABELS_TO_ENSURE=(
   "safer:spec" "safer:architect" "safer:implement-junior" "safer:implement-senior"
-  "safer:implement-staff" "safer:investigate" "safer:spike" "safer:research"
+  "safer:implement-staff" "safer:diagnose" "safer:spike" "safer:research"
   "safer:review-senior" "safer:verify"
   "planning" "review" "plan-approved" "implementing" "verifying" "done" "triaged" "abandoned"
 )

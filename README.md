@@ -86,7 +86,7 @@ Each skill is invoked as a **Claude slash-command** within a Claude Code session
 |---|---|---|
 | `/safer:spec` | ambiguous intent; no acceptance criteria | spec doc → GitHub issue |
 | `/safer:architect` | need module/interface/data-flow structure | design doc + interface stubs + every artifact that defines the system (docs, configs, scripts, CI, deploy files) |
-| `/safer:investigate` | reproducible bug | root-cause writeup + fix recommendation (no fix) |
+| `/safer:diagnose` | reproducible bug | smallest repro + codex verdict |
 | `/safer:spike` | "is X feasible?" | throwaway code + go/no-go |
 | `/safer:research` | open question, no known answer | hypothesis ledger + validated insights |
 | `/safer:ux-audit` | UI surface needs heuristic audit (Nielsen, WCAG, etc.) | findings ledger routed to downstream modality |
@@ -143,8 +143,6 @@ Every skill publishes its artifact to GitHub before considering itself done. Sta
 safer is the SDS modality spine. [gstack](https://github.com/chughtapan/gstack) is a parallel toolbox of interactive workflow skills (`/codex`, `/qa`, `/ship`, `/plan-*`, `/health`, etc.). gstack is a hard dependency: every safer skill assumes the gstack tools it names are present. Install gstack alongside this plugin.
 
 Individual skills name their own gstack tool usage inline in the workflow prose where the tool is called. There is no central routing table; the skill body is the dispatcher.
-
-**Investigate name collision.** safer and gstack both ship a skill named `investigate`. Always qualify in safer docs: `/safer:investigate` (reproduce-and-name-the-cause); `/gstack:investigate` (gstack workflow). Bare `/investigate` is disallowed in safer docs.
 
 **Ship hop.** safer's `verify` modality emits SHIP/HOLD; the post-verify hop routes through gstack `/ship` (VERSION + CHANGELOG + PR). `/safer:orchestrate` handles that routing.
 

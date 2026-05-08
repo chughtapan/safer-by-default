@@ -72,7 +72,7 @@ echo "  ok  gh authenticated; $REPO accessible"
 # --- 1. Ensure required labels exist ---
 echo "── orchestrate-pipeline: ensure labels ──"
 LABELS_TO_ENSURE=(
-  "safer:architect" "safer:investigate" "safer:implement-junior"
+  "safer:architect" "safer:diagnose" "safer:implement-junior"
   "planning" "review" "plan-approved" "done" "triaged"
 )
 for L in "${LABELS_TO_ENSURE[@]}"; do
@@ -91,7 +91,7 @@ cat > "$TMP_BODY" <<EOF
 | # | Modality | Depends on | Acceptance | Sub-issue |
 |---|---|---|---|---|
 | 1 | architect   | — | design doc; walks planning→review→plan-approved→done | TBD |
-| 2 | investigate | — | root cause writeup; walks planning→review→done         | TBD |
+| 2 | diagnose    | — | repro + codex verdict; walks planning→review→done       | TBD |
 
 [integration-test-marker: $TS_SUFFIX]
 EOF
@@ -133,13 +133,13 @@ CREATED_ISSUES+=("$SUB1")
 echo "  ok  created sub-1 #$SUB1 (parent #$EPIC_NUM)"
 PASSED=$((PASSED + 1))
 
-echo "── orchestrate-pipeline: create sub-issue 2 (investigate) ──"
+echo "── orchestrate-pipeline: create sub-issue 2 (diagnose) ──"
 SUB2_OUT=$("$BIN/safer-publish" \
   --kind issue \
-  --title "[safer:investigate] integration sub-2 $TS_SUFFIX" \
+  --title "[safer:diagnose] integration sub-2 $TS_SUFFIX" \
   --body "Integration test sub-2. Parent: #$EPIC_NUM" \
   --parent "$EPIC_NUM" \
-  --labels "safer:investigate,planning" \
+  --labels "safer:diagnose,planning" \
   --repo "$REPO")
 SUB2=$(echo "$SUB2_OUT" | grep -oE '[0-9]+$')
 if [ -z "$SUB2" ]; then
@@ -253,20 +253,20 @@ SUB_SESSION="orch-sub-$TS_SUFFIX"
 "$BIN/safer-telemetry-log" --event-type safer.skill_run \
   --modality architect --session "$SUB_SESSION" --issue "$SUB1" >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.skill_run \
-  --modality investigate --session "$SUB_SESSION" --issue "$SUB2" >/dev/null
+  --modality diagnose --session "$SUB_SESSION" --issue "$SUB2" >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.skill_end \
   --modality architect --session "$SUB_SESSION" --outcome success --duration-s 12 >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.skill_end \
-  --modality investigate --session "$SUB_SESSION" --outcome success --duration-s 9 >/dev/null
+  --modality diagnose --session "$SUB_SESSION" --outcome success --duration-s 9 >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.stop_rule_fired \
-  --modality investigate --session "$SUB_SESSION" \
+  --modality diagnose --session "$SUB_SESSION" \
   --cause "simulated re-triage" --issue "$SUB2" >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.escalation_triggered \
-  --modality investigate --session "$SUB_SESSION" \
-  --from-modality investigate --to-modality architect --cause "scope miscalibration" >/dev/null
+  --modality diagnose --session "$SUB_SESSION" \
+  --from-modality diagnose --to-modality architect --cause "scope miscalibration" >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.modality_handoff \
-  --modality investigate --session "$SUB_SESSION" \
-  --from-modality investigate --to-modality architect >/dev/null
+  --modality diagnose --session "$SUB_SESSION" \
+  --from-modality diagnose --to-modality architect >/dev/null
 
 EVENTS_FILE="$STATE/analytics/events.jsonl"
 if [ -s "$EVENTS_FILE" ]; then
@@ -315,8 +315,8 @@ else
   echo "$VP" | sed 's/^/    /'
   FAILED=$((FAILED + 1))
 fi
-if echo "$VP" | grep -qE "^architect " && echo "$VP" | grep -qE "^investigate "; then
-  echo "  ok  calibration rows show architect + investigate"
+if echo "$VP" | grep -qE "^architect " && echo "$VP" | grep -qE "^diagnose "; then
+  echo "  ok  calibration rows show architect + diagnose"
   PASSED=$((PASSED + 1))
 else
   echo "  FAIL: calibration rows missing expected modalities:"

@@ -265,7 +265,7 @@ Decision rule (carry into Phase 3 aggregation):
 | `CI_STATUS` | Effect on verdict |
 |---|---|
 | `green` | proceed; surface `CI status: green` in the verdict body |
-| `failing` | aggregate verdict cannot be `APPROVE`. Either `CHANGES-REQUESTED` (if the diff caused the failure) or `HOLD` (with a route to `/safer:investigate` if the cause is unclear). Surface `CI status: failing N tests` with the failing-check names. |
+| `failing` | aggregate verdict cannot be `APPROVE`. Either `CHANGES-REQUESTED` (if the diff caused the failure) or `HOLD` (with a route to `/safer:diagnose` if the cause is unclear). Surface `CI status: failing N tests` with the failing-check names. |
 | `pending` | aggregate verdict caps at `APPROVE-PENDING-CI`. The orchestrator's auto-monitor must withhold merge until CI clears. Surface `CI status: pending`. |
 | `no-checks` | repos without CI configured: treat as `green` (no signal); surface `CI status: no-checks configured` in the verdict body. |
 | `unknown` | classifier hit an unexpected check state; treat as `pending` (fail-safe) and surface the raw `CI_JSON` for the next reviewer to triage. |

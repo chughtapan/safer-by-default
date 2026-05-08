@@ -14,7 +14,7 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 |---|---|---|
 | **Design** | `/safer:spec` | Ambiguous intent → spec doc |
 | | `/safer:architect` | Approved spec → module layout + interface stubs |
-| | `/safer:investigate` | Reproducible bug → root cause writeup |
+| | `/safer:diagnose` | Reproducible bug → smallest repro + codex verdict |
 | | `/safer:spike` | Feasibility question → throwaway code + verdict |
 | | `/safer:research` | Open question → hypothesis ledger |
 | | `/safer:ux-audit` | UI surface → heuristic findings |
@@ -55,7 +55,7 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 ## The update gate
 
-User-initiated entry-point skills (`/safer:spec`, `/safer:architect`, `/safer:investigate`, `/safer:spike`, `/safer:research`, `/safer:setup`, `/safer:ux-audit`) halt at the preamble when `safer-update-check` reports an upgrade and `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. The user is told to run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` before re-running.
+User-initiated entry-point skills (`/safer:spec`, `/safer:architect`, `/safer:diagnose`, `/safer:spike`, `/safer:research`, `/safer:setup`, `/safer:ux-audit`) halt at the preamble when `safer-update-check` reports an upgrade and `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. The user is told to run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` before re-running.
 
 `/safer:orchestrate` gates only on fresh-pipeline starts (no open `safer:parent` epic exists yet). Autonomous re-entry — cron-loop ticks, parent-epic polling — skips the gate so in-flight pipelines drain.
 
@@ -65,7 +65,7 @@ Dispatched skills (when running under `SAFER_PARENT_ISSUE`) skip the gate entire
 
 safer-by-default treats [`gstack`](https://github.com/garrytan/gstack) as a hard dependency. Every safer skill that needs broad-toolbox capability (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/plan-devex-review`, `/security-review`, `/ship`) calls into gstack inline. `/safer:setup` fails fast if gstack is absent.
 
-Doctrine precedence: safer wins on scope; gstack ETHOS wins on quality-within-scope. See `PRINCIPLES.md` → "Composing with gstack" for the precedence rule and the `/investigate` name-collision rule.
+Doctrine precedence: safer wins on scope; gstack ETHOS wins on quality-within-scope. See `PRINCIPLES.md` → "Composing with gstack" for the precedence rule.
 
 User-prompting gstack skills run hold-scope autonomous when invoked from inside a safer skill body. User-facing prompts route up to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`. No skill body initiates a user prompt directly.
 

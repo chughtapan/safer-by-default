@@ -29,7 +29,7 @@
 - Merge implement-* PRs after their planned review chain passes.
 
 **Always-park.**
-- Adding a new sub-issue (even a follow-up surfaced by investigate or impl).
+- Adding a new sub-issue (even a follow-up surfaced by diagnose or impl).
 - Editing the decomposition table (adding rows, changing dependency order, changing acceptance criteria).
 - Ratchet-up from any sub-issue.
 - Three-strikes on any sub-issue.

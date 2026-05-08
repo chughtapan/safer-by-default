@@ -441,7 +441,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 | `spec` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
-| `investigate` | ~3× | Research / exploration |
+| `diagnose` | ~3× | Research / exploration |
 | `spike` | ~5× | Architecture / design |
 | `implement-junior` | ~30× | Feature implementation |
 | `implement-senior` | ~30× | Feature implementation |
@@ -715,7 +715,7 @@ LABEL=$(gh issue view "$SUB_ISSUE" --json labels -q '.labels[].name' | grep '^sa
 | sub-issue label | N |
 |---|---|
 | `safer:implement-junior` | 1 |
-| `safer:implement-senior`, `safer:investigate`, `safer:spike`, `safer:research` | 2 |
+| `safer:implement-senior`, `safer:diagnose`, `safer:spike`, `safer:research` | 2 |
 | `safer:spec`, `safer:architect` | 3 |
 | `safer:implement-staff` | 3 |
 

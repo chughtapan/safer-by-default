@@ -1,21 +1,20 @@
 ---
-name: investigate
+name: diagnose
 version: 0.1.0
 description: |
-  Reproduce a defect, isolate the failing code path, and name the root cause
-  with file:line evidence. Produces a written writeup and a fix recommendation
-  routed to the correct implementation modality. Use when a bug is reported,
-  when production is misbehaving, or when a test fails for non-obvious reasons.
-  Do NOT use to apply the fix; that is a separate modality. Investigation and
-  remediation are different budgets.
+  Reproduce a bug in the smallest possible test, then hand the artifact to
+  /codex for cross-model validation: logical fallacy in the reasoning, or a
+  real symptom with N hypotheses to investigate. Produces a published
+  reproduction artifact + codex verdict; the orchestrator routes the next
+  step. Use when a bug is reported, when production is misbehaving, or
+  when a test fails for non-obvious reasons. Do NOT use to apply the fix;
+  that is a separate modality.
 triggers:
-  - investigate this bug
-  - find the root cause
+  - diagnose this bug
+  - reproduce this issue
+  - smallest repro for
   - why is this broken
   - debug this failure
-  - reproduce the issue
-  - trace the regression
-  - diagnose the error
   - root cause analysis
 allowed-tools:
   - Bash
@@ -27,9 +26,7 @@ allowed-tools:
 
 <!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
 
-# /safer:investigate
-
-> **Name collision.** `/safer:investigate` and gstack's `/investigate` are different skills. Always qualify with the plugin prefix in safer docs; bare `/investigate` is disallowed.
+# /safer:diagnose
 
 ## Doctrine
 
@@ -443,7 +440,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 | `spec` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
-| `investigate` | ~3× | Research / exploration |
+| `diagnose` | ~3× | Research / exploration |
 | `spike` | ~5× | Architecture / design |
 | `implement-junior` | ~30× | Feature implementation |
 | `implement-senior` | ~30× | Feature implementation |
@@ -505,30 +502,27 @@ End with what to do. Every output names its status marker and, where applicable,
 
 ## How this modality projects from the doctrine
 
-- **Principle 5 (Discipline over capability)** investigation is its own scope. Finding the bug and fixing the bug are two tasks, not one. Your charter ends at the root cause.
-- **Principle 7 (Brake)** fires when (a) the root cause has `file:line` evidence AND (b) confidence is at least MED. After both are true, the workflow produces only the writeup + recommended fix modality — no new isolation, no new instrumentation, no fix code. "Recommended fix modality" is a single-line route (e.g., "Route to: implement-senior") plus a one-line fix shape, not the fix itself.
-- **Principle 8 (Ratchet)** the fix routes forward to `implement-junior`, `implement-senior`, `architect`, or back to `spec`. It does not route back to you.
-- **Part 4 (Communication)** the writeup is the artifact. A root cause held in conversation memory is not an artifact.
+- **Principle 1 (Types beat tests)** the smallest reproduction is itself a test that the type system could not prevent. Make it minimal so the bug is impossible to misread.
+- **Principle 5 (Discipline over capability)** reproduction is your scope. Naming the root cause is `/codex`'s job; proposing the fix modality is the orchestrator's. You read, you reproduce, you publish.
+- **Principle 7 (Brake)** fires when the smallest possible reproduction is in hand and `/codex` has stamped a verdict. After both, no further isolation, no further hypotheses, no fix code. Hand off.
+- **Part 4 (Communication)** the artifact is the reproduction plus codex's verdict. A bug "diagnosed" in conversation memory is not an artifact.
 
 ## Iron rule
 
-> **No fixes without root cause. Once the root cause is named (with file:line evidence at confidence ≥ MED), you stop investigating. The fix is a separate modality. The recommendation single-line is permitted; the fix code is not.**
+> **The smallest possible reproduction is the artifact. Naming the root cause is `/codex`'s job, not yours; proposing the fix modality is the orchestrator's. You produce the repro and the reasoning that points at it.**
 
-If the instinct to "just patch this one line" appears, it is the signal that the Brake should have fired already. Publish the writeup with the recommendation. Let the next modality apply the fix.
+If the instinct to "I think I see what's wrong, let me trace deeper" appears, stop. Hand the smallest repro you have to codex; let codex's verdict tell you whether it's a logical fallacy in your reasoning, a symptom with N directions to investigate, or a confirmed root cause.
 
 ## Role
 
-You are a diagnostician. Given a symptom, you:
+You are the reproduction half of the bug-triage loop. Given a symptom, you:
 
 1. Collect the evidence the user already has.
-2. Trace the implicated code path.
-3. Reproduce the failure deterministically.
-4. Isolate by varying one thing at a time.
-5. Name the root cause with `file:line` evidence.
-6. Recommend which modality owns the fix.
-7. Publish the writeup.
+2. Reduce the failure to the smallest possible reproduction (script, failing test, command sequence).
+3. Hand the reproduction to `/codex` for cross-model validation.
+4. Publish the artifact (repro + codex verdict + directions, if any).
 
-You do not edit source files. You do not commit. You do not open a PR. You read, you run, you report.
+You do not edit source files. You do not name the root cause yourself. You do not propose the fix modality. The orchestrator reads the published artifact and routes the next step — which may be a re-run of this skill against a narrower hypothesis, a fork to a sibling diagnose covering a sibling direction, or a hand-off to `implement-*` / `architect`.
 
 ## MoltZap peer-channel preamble (when dispatched under a roster)
 
@@ -552,15 +546,15 @@ PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
   --correlation-id "$SESSION-1" \
   --body-stdin) || case $? in
     10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
-    21) safer-escalate --from investigate --to orchestrate --cause recipient-retired ;;
-    20|22) safer-escalate --from investigate --to orchestrate --cause peer-transport-invalid ;;
-    30|*) safer-escalate --from investigate --to orchestrate --cause peer-transport-failed ;;
+    21) safer-escalate --from diagnose --to orchestrate --cause recipient-retired ;;
+    20|22) safer-escalate --from diagnose --to orchestrate --cause peer-transport-invalid ;;
+    30|*) safer-escalate --from diagnose --to orchestrate --cause peer-transport-failed ;;
   esac
 ```
 
 Peer messages reference durable artifacts via `--artifact-url`; they do
-NOT carry the artifact body (Invariant 8). Every design doc, spec, PR,
-and review verdict is published as a GitHub comment or PR body first;
+NOT carry the artifact body (Invariant 8). Every reproduction, codex
+verdict, and direction list is published as a GitHub comment first;
 the peer message is the pointer. When the session is NOT MoltZap-capable
 (no env), skip peer emission and let the orchestrator reconcile from
 GitHub.
@@ -568,6 +562,7 @@ GitHub.
 ## Inputs required
 
 - A bug description: error message, stack trace, reproduction steps, affected commit range, or a link to a bug issue.
+- Optional `SAFER_DIAGNOSE_DIRECTION`: when the orchestrator forks this skill on a multi-direction codex verdict, it sets this to the specific direction (one hypothesis from codex's list) for this fork to pursue. When unset, treat the bug as fresh.
 - `gh` CLI authenticated for publication.
 - Read access to the repo under investigation.
 
@@ -577,7 +572,7 @@ GitHub.
 gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated"; exit 1; }
 eval "$(safer-slug 2>/dev/null)" || true
 SESSION="$$-$(date +%s)"
-safer-telemetry-log --event-type safer.skill_run --modality investigate --session "$SESSION" 2>/dev/null || true
+safer-telemetry-log --event-type safer.skill_run --modality diagnose --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
 # Update gate: halt user-initiated work when an upgrade is available.
@@ -594,38 +589,41 @@ MSG
 fi
 ```
 
-If `safer-slug`, `safer-telemetry-log`, or `safer-update-check` is missing, continue. Telemetry is plumbing; the investigation stands on its own.
+If `safer-slug`, `safer-telemetry-log`, or `safer-update-check` is missing, continue. Telemetry is plumbing; the diagnosis stands on its own.
 
 ## Scope
 
 **In scope:**
-- Reading error messages, logs, stack traces, and existing bug-issue context.
-- Tracing implicated code paths via Read and Grep.
-- Running `git log`, `git blame`, `git bisect`, and `git diff` to find regression boundaries.
-- Running existing tests, scripts, or reproductions from the repo.
-- Running the failing code with instrumentation that does not modify committed files (temp scripts, environment variables, ephemeral flags).
-- Writing the root-cause writeup and publishing it.
+- Reading error messages, logs, stack traces, existing bug-issue context, and any orchestrator-supplied direction.
+- Tracing implicated code paths via Read and Grep to find the minimum surface that reproduces the bug.
+- Running `git log`, `git blame`, `git bisect`, and `git diff` to narrow regression windows.
+- Constructing a minimal reproduction: the smallest test, script, or command sequence that fails the way the user described.
+- Dispatching `/codex` with the reproduction artifact for cross-model verdict.
+- Publishing the reproduction + codex verdict.
 
 **Forbidden:**
 - Editing source files. Ever.
 - Opening a PR.
 - Running the fix to see if it works.
-- Guessing at causes when evidence is thin. Ask for more evidence, or mark confidence LOW and enumerate hypotheses.
-- Expanding the investigation into adjacent bugs. If you see a second bug, note it in the writeup as a separate finding; do not investigate it here.
+- Naming the root cause yourself. Codex does that. Your reasoning points at the candidate hypotheses; codex's verdict either confirms one, rejects all (logical fallacy), or names a multi-hypothesis fan-out.
+- Recommending the fix modality. The orchestrator decides based on codex's verdict.
+- Investigating a second direction in the same dispatch. If codex returns >1 direction, the orchestrator forks; one diagnose per direction.
 
 ## Scope budget
 
-The writeup has exactly these sections, in this order:
+The published artifact has exactly these sections, in this order:
 
 1. **CLAIM** one sentence, the observable symptom.
-2. **EVIDENCE** what you collected: logs, traces, reproduction output, commit ranges. Direct quotes and `file:line` references. For regressions, includes the pre-bug behavior of the failing path (quoted from `git show <prior-commit>:<file>`).
-3. **REPRO** exact commands, inputs, or conditions that trigger the bug on demand. If you cannot repro, state so explicitly and move to ESCALATED.
-4. **ISOLATION** what you varied and what changed with each variation. One variable per row.
-5. **ROOT CAUSE** the mechanism, in two layers — **Immediate** (symptom-level: what the runtime observes, with `file:line`) and **Underlying** (the logic mistake or behavior change that produces the immediate observation, with `file:line`). For regressions, the Underlying layer names the pre-vs-post behavior delta (cite both old and new with `path:N@<sha7>`). If you can name Immediate but not Underlying, the investigation is incomplete — keep digging or escalate `BLOCKED`. Classify the Underlying as structural, logical, or environmental.
-6. **RECOMMENDATION** the modality that should fix it (`implement-junior`, `implement-senior`, `architect`, or `spec`), with a one-line justification. For regressions, the default recommendation shape is "restore pre-refactor behavior" routed to `implement-junior`; only propose a new pattern (architect-tier) when the writeup explicitly rules out restoration with evidence.
-7. **CONFIDENCE** LOW, MED, or HIGH, with the evidence supporting the level.
+2. **REPRO** the smallest reproduction that fails the way the user described. Exact commands, inputs, environment, expected vs observed output. If the repro is a test file or script, the contents go in this section verbatim. If it's a command sequence, every command is listed. The reader runs the REPRO block end-to-end and sees the bug.
+3. **REASONING** what you ruled in or out while shrinking the repro. One paragraph or a small table. This is what codex evaluates: did your shrink preserve the bug, or did you accidentally throw away the load-bearing condition?
+4. **DIRECTION** (if dispatched with `SAFER_DIAGNOSE_DIRECTION`): the specific hypothesis this fork is pursuing, restated. Skip when not a fork.
+5. **CODEX VERDICT** the structured response from `/codex --mode diagnose`:
+   - `logical-fallacy`: codex says the repro doesn't actually demonstrate the claimed symptom; cite the gap.
+   - `symptom`: codex confirms the bug is real; lists N hypotheses (each with a one-line direction). N≥1.
+   - `confirmed-root-cause`: codex identifies the cause from the repro alone; cites file:line evidence.
+6. **CONFIDENCE** LOW, MED, or HIGH on the reproduction's faithfulness to the user's symptom. Codex confidence on the verdict is separate, captured in section 5.
 
-The writeup does not have: the fix, a diff, a patch, or a PR link. Those belong to the downstream modality.
+The artifact does not have: the fix, a root-cause writeup beyond what codex says, an isolation matrix, a recommended modality. Those belong to codex (root cause), the orchestrator (modality routing), or downstream skills (the fix).
 
 ## Workflow
 
@@ -637,133 +635,58 @@ Read the bug report start to finish. Record:
 - The exact error message and stack trace if present.
 - The user's reproduction steps.
 - The affected commits, branches, or deploy windows, if named.
+- If `SAFER_DIAGNOSE_DIRECTION` is set: the specific hypothesis this fork is pursuing.
 
-Set `CLAIM_SUMMARY` to a one-sentence rephrasing of the observable symptom (e.g., `CLAIM_SUMMARY="checkout dialog crashes on empty cart"`). Phase 8 publish uses this as the issue title when opening a fresh bug issue.
+Set `CLAIM_SUMMARY` to a one-sentence rephrasing of the observable symptom (e.g., `CLAIM_SUMMARY="checkout dialog crashes on empty cart"`). Phase 4 publish uses this as the issue title when opening a fresh bug issue.
 
-If any of those are missing and you cannot proceed without them, use `AskUserQuestion` once. Ask the smallest number of questions that unblock you. Prefer one focused question over a broad checklist.
+If any required input is missing and you cannot proceed without it, use `AskUserQuestion` once. Ask the smallest number of questions that unblock you. Prefer one focused question over a broad checklist.
 
-### Phase 2 — Trace the code path
+### Phase 2 — Reproduce in the smallest possible test
 
-Use `Grep` and `Read` to find the files implicated by the stack trace or the described behavior. Read them in full; do not skim. Record `file:line` pointers as you go.
+The output of this phase is the reproduction artifact: the minimum surface that fails the way the user described. Start broad — replicate the user's full repro — then shrink, one variable at a time:
 
-If the stack trace crosses a package boundary, note the boundary. Bugs that cross boundaries are usually caused by boundary validation failures, not by the inner code (see Principle 2).
+- Drop dependencies that aren't load-bearing for the symptom.
+- Replace real data with the smallest synthetic input that still fails.
+- Inline external service calls with stubs that return the failing response.
+- If the bug is in a code path inside a larger flow, write a focused test that hits only that path.
+- For regressions, use `git bisect` to narrow the regression window before reducing the input.
 
-### Phase 3 — Check recent changes
+Keep shrinking until the repro is one of: a single failing test case, a single script ≤30 lines, or a single command (or short sequence) the user can run cold. If you cannot shrink below the user's input, that's still the artifact — publish what you have and let codex evaluate.
 
-Run:
+If the bug is intermittent, run the repro at least 10 times. Record pass/fail counts. Flaky-but-reproducible repros are valid; intermittent-with-no-failures-in-10 is not — escalate `BLOCKED` for more evidence.
 
-```bash
-git log --oneline -20 -- <affected-files>
-git log --oneline -40 --all --since="30 days ago" -- <affected-files>
+If you were dispatched with `SAFER_DIAGNOSE_DIRECTION`, the repro must be focused on that specific hypothesis. Do not investigate sibling directions in this fork — that's the sibling diagnose's job.
+
+### Phase 3 — Hand to codex
+
+Run `/codex` with the published reproduction artifact. Codex is the cross-model second opinion: it reads the repro + reasoning and returns a structured verdict. Bare slash command, hold-scope flag mandatory:
+
+```
+/codex --mode diagnose --artifact <repro-URL> --hold-scope
 ```
 
-Classify the bug:
+(`--hold-scope` keeps codex from prompting the user mid-run; if codex would prompt, it escalates to `/safer:orchestrate` per the same convention as architect/spec/verify.)
 
-- **Regression** the code worked; a recent commit broke it. Identify the commit range.
-- **Original** the code never worked for this input. The bug has been latent.
-- **Environmental** the code is fine; the environment changed (dep version, env var, data shape).
+Codex returns one of three verdicts:
 
-The classification points at which modality owns the fix. Regressions usually route to `implement-junior` (restore the pre-refactor behavior). Originals in a single module usually route to `implement-junior`. Originals spanning modules route to `implement-senior`. Environmental bugs may route to `architect` (if a boundary is missing a schema) or `spec` (if the environment assumption was never stated).
+- **`logical-fallacy`**: the repro doesn't demonstrate the claimed symptom. The shrink threw away a load-bearing condition, or the reasoning conflates two different causes, or the symptom isn't what it appears to be. Codex names the gap. The next step is a re-run of this skill (same sub-issue, new round) with the reasoning corrected.
+- **`symptom`**: the repro is real but codex cannot identify the cause from the repro alone. Codex lists N hypotheses, each as a one-line direction to investigate. N can be 1 (single direction → same diagnose continues with that hypothesis) or N>1 (orchestrator forks: one new diagnose per additional direction).
+- **`confirmed-root-cause`**: codex can identify the cause from the repro. Codex names the mechanism with file:line evidence. The orchestrator hands off to the appropriate fix modality.
 
-### Phase 3a — Compare to last-known-good (regressions only)
+Capture codex's verdict verbatim. Do not summarize, do not interpret — codex's words go in the CODEX VERDICT section.
 
-If the bug is a regression, locate the pre-bug version of the failing logic and identify the behavior delta. The right fix for a regression is usually to restore what the prior version did, not to invent a new pattern that compensates for the symptom.
+### Phase 4 — Publish
 
-```bash
-git blame <affected-file> -L <start>,<end>            # which commit changed each line
-git log --follow --oneline -- <affected-file>          # commits that touched this file
-git show <prior-commit>:<affected-file>                # pre-bug version of the file
-git diff <prior-commit>..<bug-commit> -- <affected-file>  # the delta itself
-```
-
-Record the pre-vs-post behavior delta in EVIDENCE. Quote both versions with `path:N@<sha7>`. Name the function or call site whose behavior changed. The delta is what the Underlying layer of the root cause names. If the delta is intentional (the refactor commit's PR body or commit message explains the new behavior is the desired one), the investigation may still conclude that the new behavior has an unhandled case — but the writeup must show you saw the delta, not that you skipped it.
-
-### Phase 4 — Reproduce deterministically
-
-Can you trigger the bug at will? Record the exact commands and inputs. If the bug is intermittent:
-
-- Try running the repro 10 times. Count how many fail.
-- Look for order-dependence, time-dependence, or shared-state dependence.
-- If you cannot get a deterministic repro after reasonable effort, state so explicitly. Intermittent bugs without a repro are `BLOCKED`; ask the user for more evidence (full logs, a failing CI run link, a traced scenario).
-
-Do not guess root causes without a repro. An un-reproduced bug with a named root cause is a guess with a receipt.
-
-### Phase 5 — Isolate
-
-Vary one thing at a time. A clean isolation table looks like:
-
-| Variable | Value A | Value B | Result A | Result B |
-|---|---|---|---|---|
-| Input size | 10 | 10_000 | pass | fail |
-| Env var `FOO` | set | unset | fail | pass |
-| Commit | HEAD | HEAD~5 | fail | pass |
-
-Write the table as you go. The table becomes part of the writeup. Do not skip rows you actually ran; the table is the receipt for the root-cause claim.
-
-Bisect when the regression window is wider than 10 commits:
-
-```bash
-git bisect start
-git bisect bad HEAD
-git bisect good <last-known-good>
-```
-
-Record the bisect result as a row in the isolation table.
-
-### Phase 6 — Name the root cause
-
-Code references in the root-cause writeup use the canonical pinned form `path:N[-M]@<sha7>`.
-
-The root cause is named in **two layers**:
-
-- **Immediate** the symptom-level mechanism: what the runtime observes (timeout fired, pointer null, validation failed, response empty, hang in phase X), with the `file:line` of the observation.
-- **Underlying** the logic mistake or behavior change that produces the Immediate observation. Names the class of mistake (missing validation, wrong branch, stale invariant, schema drift, unhandled case, race, overflow, off-by-one, missing exhaustiveness check) and the conditions under which it fires. For regressions, the Underlying layer names the **pre-vs-post behavior delta** (cite both old and new with `path:N@<sha7>`).
-
-State the mechanism for both layers. **If you can name Immediate but cannot name Underlying, the investigation is incomplete.** That is the signal — keep digging, or escalate `BLOCKED` with the unresolved Underlying layer named in the escalation. A symptom held up as the root cause is a guess with a receipt: the Immediate layer alone is what the runtime gave you, not what the code did wrong.
-
-Classify the Underlying layer as structural, logical, or environmental.
-
-Examples of well-formed root causes (paths below use `<placeholder>/...` as schematic placeholders; they are illustrative, not real files in this repo, per the schematic-placeholder exception of the code-citation doctrine):
-
-- "Immediate: at `<placeholder>/api/session.ts:41`, the call to `decodeToken` returns `null` and the caller treats `null` as anonymous, granting access. Underlying: at `<placeholder>/auth/token.ts:83`, `decodeToken` returns `null` on malformed input instead of a tagged error, leaving the caller no way to distinguish 'no token' from 'invalid token'. Classification: logical (missing typed error channel; violates Principle 3)."
-- "Immediate: at `<placeholder>/pipeline/ingest.ts:112`, runtime objects have `undefined` fields after batch decode. Underlying: the schema decodes only the first event in the batch; later events are cast with `as Event`. The shape was tolerable until upstream changed the event shape on 2026-03-15. Classification: structural (missing boundary validation; violates Principle 2)."
-- "Immediate: at `<placeholder>/scheduling.ts:217`, `DAY_VOTE` phase never exits. Underlying: in commit `abc1234`, the phase-end condition was changed from `hasVoteParticipationQuorum` (everyone-voted, `<placeholder>/scheduling.ts:204@<old-sha7>`) to `tally(...) !== null` (decision-quorum-reached, `<placeholder>/scheduling.ts:217@<new-sha7>`). Under the live game's voting distribution, `tally` returns `null` when no candidate has the decision quorum even though every player has voted, so the phase never ends. Classification: logical (silent semantic change in a refactor; the pre-refactor function still exists, just stopped being called)."
-
-Examples of malformed root causes (do not ship these):
-
-- "The auth token handling is fragile." too vague; no `file:line`; no two-layer naming.
-- "A recent change broke login." symptom restated, no Underlying mechanism.
-- "It might be a race condition in `session.ts`." hypothesis, not a root cause. If you cannot prove it, label it LOW confidence and enumerate ruled-out alternatives.
-- "The day_vote phase has no hard deadline." symptom-only — names the missing safeguard, not the logic mistake. If a deeper Underlying exists ("the phase-end condition was changed"), name it; otherwise this is incomplete.
-- "The timeout exceeded after 60s." that is the runtime observation. Why? The Underlying layer is missing.
-
-### Phase 7 — Recommend the fix modality
-
-Classify the fix shape, then route:
-
-| Fix shape | Route to |
-|---|---|
-| One module, internals only | `implement-junior` |
-| Crosses modules within an approved design | `implement-senior` |
-| New module or architectural shift | `architect` (spec the fix first) |
-| Contract is wrong; bug is the spec | `spec` |
-
-Do not name "the" fix; name the modality. The downstream agent picks the fix. Your job is to make that pick well-informed.
-
-**Regressions: prefer restoration over reinvention.** When the bug is a regression and the Underlying layer named a pre-refactor behavior delta, the **default recommendation shape is "restore the pre-refactor behavior"** routed to `implement-junior`. Restoration usually requires no new architecture, no new public surface, and no spec revision — the working version of the logic still exists in git history. Only recommend a new pattern (architect-tier) when the writeup explicitly rules out restoration with evidence (e.g., the pre-refactor behavior also has a known defect, or the new public contract committed by the refactor depends on the new behavior). State the ruling-out evidence in the recommendation; do not skip it. A regression writeup that recommends architect-tier without ruling out restoration is incomplete.
-
-### Phase 8 — Publish
-
-Write the writeup to a temp file, then publish. The block sets every variable it uses explicitly:
+Write the artifact to a temp file and publish via `safer-publish`. The block sets every variable it uses explicitly:
 
 ```bash
 # CLAIM_SUMMARY: one-sentence symptom phrasing from Phase 1, used as the issue
 # title when no parent bug issue exists. Set it before this block runs.
 : "${CLAIM_SUMMARY:?Phase 1 must set CLAIM_SUMMARY (one-sentence symptom)}"
 
-# SAFER_BUG_ISSUE: optional. When the investigator was dispatched against a
-# pre-existing bug issue, the orchestrator sets this; the writeup posts as a
-# comment on that issue. When unset, this phase opens a fresh issue.
+# SAFER_BUG_ISSUE: optional. When dispatched against a pre-existing bug issue,
+# the orchestrator sets this; the artifact posts as a comment on that issue.
+# When unset, this phase opens a fresh issue.
 TARGET_BUG="${SAFER_BUG_ISSUE:-}"
 
 TMP=$(mktemp)
@@ -771,43 +694,32 @@ cat > "$TMP" <<EOF
 ## CLAIM
 <one-sentence symptom>
 
-## EVIDENCE
-<logs, traces, file:line pointers>
-<for regressions: pre-bug behavior of the failing path, quoted from git show <prior-commit>:<file>>
-
 ## REPRO
-<exact commands or conditions>
+<smallest reproduction: failing test, script ≤30 lines, or command sequence>
 
-## ISOLATION
-<table of varied variables>
+## REASONING
+<one paragraph or short table: what you ruled in/out while shrinking>
 
-## ROOT CAUSE
+## DIRECTION
+<the specific hypothesis this fork pursues, when SAFER_DIAGNOSE_DIRECTION is set; omit otherwise>
 
-### Immediate
-<symptom-level mechanism + file:line>
-
-### Underlying
-<logic mistake or behavior change + file:line>
-<for regressions: pre-vs-post delta, both cited as path:N@<sha7>>
-Classification: <structural | logical | environmental>
-
-## RECOMMENDATION
-Route to: <modality>
-Fix shape: <restore pre-refactor behavior | new pattern | spec revision | …>
-Justification: <one line>
-<for regressions recommending non-restoration: explicit ruling-out evidence>
+## CODEX VERDICT
+<verbatim from /codex --mode diagnose>
+- logical-fallacy: <gap codex named>
+- symptom: <list of N directions; one per line>
+- confirmed-root-cause: <mechanism + file:line evidence>
 
 ## CONFIDENCE
-<LOW|MED|HIGH> <evidence>
+<LOW|MED|HIGH on the reproduction's faithfulness to the symptom>
 EOF
 
 if [ -n "$TARGET_BUG" ]; then
   URL=$(safer-publish --kind comment --issue "$TARGET_BUG" --body-file "$TMP")
 else
   URL=$(safer-publish --kind issue \
-    --title "[safer:investigate] $CLAIM_SUMMARY" \
+    --title "[safer:diagnose] $CLAIM_SUMMARY" \
     --body-file "$TMP" \
-    --labels "safer:investigate,review")
+    --labels "safer:diagnose,review")
 fi
 
 echo "$URL"
@@ -823,28 +735,29 @@ safer-transition-label --issue "$ISSUE" --from planning --to review 2>/dev/null 
 Emit the end event:
 
 ```bash
-safer-telemetry-log --event-type safer.skill_end --modality investigate \
+safer-telemetry-log --event-type safer.skill_end --modality diagnose \
   --session "$SESSION" --outcome success --issue "$ISSUE" 2>/dev/null || true
 ```
 
 ## Stop rules
 
-Each stop rule fires on a specific condition. When fired, you produce the escalation artifact via `safer-escalate --from investigate --to <target> --cause <CAUSE>` and stop.
+Each stop rule fires on a specific condition. When fired, you produce the escalation artifact via `safer-escalate --from diagnose --to <target> --cause <CAUSE>` and stop.
 
-1. **Applied the fix.** You edited, staged, or committed any source file. Iron rule violation. Status: internal failure; revert the edit (if uncommitted, discard; if committed, revert commit), publish an incident note on the bug issue, and re-run the investigation cleanly. The writeup cannot ship with a fix attached.
-2. **Three attempts, no root cause.** You have run three distinct isolation passes and still have multiple viable hypotheses. Status: `ESCALATED`. Publish the hypothesis ledger (each hypothesis, evidence for, evidence against, confidence) and hand back to the user or orchestrator.
-3. **The "bug" is a spec ambiguity.** The code behaves per its contract; the contract is what the user disagrees with. Status: `ESCALATED` to `spec`. Name the ambiguity; the spec modality resolves it.
-4. **The "bug" is an architectural mismatch.** The code satisfies the spec but the spec requires a different architecture. Status: `ESCALATED` to `architect`.
-5. **Cannot reproduce.** After reasonable effort, the bug is not deterministic and evidence is insufficient. Status: `BLOCKED`. Ask the user for the missing evidence: full logs, failing CI link, traced scenario, data snapshot.
-6. **Scope creep.** You discovered a second, unrelated bug. Do not investigate it here. Note it in the writeup as a separate finding and, if significant, file a new bug issue. Continue with the original investigation.
+1. **Applied the fix.** You edited, staged, or committed any source file. Iron rule violation. Status: internal failure; revert the edit and re-run cleanly. The artifact cannot ship with a fix attached.
+2. **Cannot reproduce.** After reasonable effort, the bug is not deterministic and evidence is insufficient. Status: `BLOCKED`. Ask the user for the missing evidence: full logs, failing CI link, traced scenario, data snapshot.
+3. **Three rounds of `logical-fallacy`.** Codex returned `logical-fallacy` three times in a row on this same sub-issue. The reasoning isn't converging. Status: `ESCALATED` to user — the bug as described may not be the bug as it actually exists; the user should re-state the symptom.
+4. **Scope creep.** You discovered a second, unrelated bug. Note it as a separate finding; do not investigate it here. File a new bug issue if significant. Continue with the original.
+5. **Codex unavailable.** `/codex` is not present in the environment or the dispatch failed. Status: `ESCALATED` to orchestrator with the repro published; the orchestrator decides whether to proceed without cross-model validation or to escalate to user.
+
+The "three diagnose splits without convergence" stop rule lives at the orchestrator (not in this skill) — it counts splits across the fork tree, which is information the individual diagnose doesn't have.
 
 ## Completion status
 
 Every invocation ends with exactly one status marker on the last line of your response:
 
-- `DONE` root cause named with `file:line`; writeup published; recommendation stated; confidence at least MED.
-- `DONE_WITH_CONCERNS` root cause named but confidence is LOW, or secondary hypotheses remain plausible; state each.
-- `ESCALATED` stop rule fired; handed to `spec`, `architect`, or user.
+- `DONE` reproduction published, codex verdict captured, confidence at least MED.
+- `DONE_WITH_CONCERNS` reproduction published but confidence on faithfulness is LOW (e.g., flaky repro), or codex's verdict was `symptom` with weak directions.
+- `ESCALATED` stop rule fired.
 - `BLOCKED` cannot reproduce; name the missing evidence.
 - `NEEDS_CONTEXT` ambiguity only the user can resolve; state the question.
 
@@ -853,7 +766,7 @@ Every invocation ends with exactly one status marker on the last line of your re
 Emit via `safer-escalate`. Do not freehand.
 
 ```markdown
-# Escalation from investigate
+# Escalation from diagnose
 
 **Status:** <ESCALATED|BLOCKED|NEEDS_CONTEXT>
 
@@ -862,6 +775,7 @@ Emit via `safer-escalate`. Do not freehand.
 ## Context
 - Bug issue: #<N>
 - Session: <SESSION>
+- Direction (if forked): <SAFER_DIAGNOSE_DIRECTION>
 
 ## What was attempted
 - <bullet>
@@ -870,9 +784,9 @@ Emit via `safer-escalate`. Do not freehand.
 ## What blocked progress
 - <bullet>
 
-## Hypothesis ledger (if applicable)
-| # | Hypothesis | Evidence for | Evidence against | Confidence |
-|---|---|---|---|---|
+## Codex verdicts so far (if applicable)
+| Round | Verdict | Notes |
+|---|---|---|
 
 ## Recommended next action
 - <one action>
@@ -887,40 +801,36 @@ Post as a comment on the bug issue; transition the issue label to reflect the es
 
 | Scenario | Published as |
 |---|---|
-| Invoked under `orchestrate` with a sub-issue | Writeup as comment on the sub-issue; label `planning` to `review` |
-| Invoked with an existing bug issue | Writeup as comment on the bug issue |
-| Invoked standalone with no bug issue | New issue labeled `safer:investigate,review` |
+| Invoked under `orchestrate` with a sub-issue | Artifact as comment on the sub-issue; label `planning` to `review` |
+| Invoked with an existing bug issue | Artifact as comment on the bug issue |
+| Invoked standalone with no bug issue | New issue labeled `safer:diagnose,review` |
+| Forked by orchestrator on multi-direction verdict | Artifact as comment on the fork's sub-issue; the fork body cites the parent diagnose's repro URL and names `SAFER_DIAGNOSE_DIRECTION` |
 
-Every code-review output is a comment on the bug issue or the sub-issue. Nothing lives in local scratch.
+Every artifact lives on GitHub. Nothing in local scratch.
 
 ## Anti-patterns
 
 - **"The fix is one line; I'll just apply it."** Iron rule violation. Publish; let `implement-junior` apply the fix.
-- **"I have a theory; let me write it up as the root cause."** A theory is not a root cause. Reproduce or label LOW confidence.
-- **"The stack trace points at `foo.ts`; that is the root cause."** A stack trace is a symptom. Read the code; name the mechanism.
-- **"The timeout exceeded / pointer was null / validation failed; that is the root cause."** Those are runtime observations — the Immediate layer. Name the Underlying layer (the logic mistake that produces the observation) or the writeup is incomplete.
-- **"The phase has no hard deadline."** Names a missing safeguard, not a logic mistake. If a deeper Underlying exists ("the phase-end condition was changed"), name it. A symptom-level recommendation that paves over a logic bug ships scar tissue.
-- **"This is a regression; I'll propose a new pattern that handles the new symptom."** For regressions, the default recommendation is to restore the pre-refactor behavior. Propose a new pattern only when the writeup explicitly rules out restoration with evidence.
-- **"I see the regression commit but I won't read the pre-bug version."** Phase 3a is mandatory for regressions. The pre-bug version is the contract the new code silently broke; reading it is how the Underlying layer becomes nameable.
+- **"I have a theory; let me write it up as the root cause."** A theory is not a root cause. Codex names the root cause; you name the repro and the reasoning that points at it.
+- **"The stack trace points at `foo.ts`; that is the root cause."** A stack trace is a symptom. Read the code, shrink the repro, hand to codex.
+- **"I'll skip codex; the cause is obvious from the repro."** No. Codex is the cross-model check that catches the logical fallacies you can't see in your own reasoning. The verdict is mandatory.
+- **"Codex returned three directions; I'll investigate them all in this dispatch."** No. The orchestrator forks one diagnose per direction. Your job ends at publishing the verdict.
+- **"The repro is flaky; I'll publish anyway with a note."** Flaky repro plus codex stamp is a guess with a receipt. Either get a deterministic repro (run 10 times, count) or escalate `BLOCKED`.
+- **"I'll add a log line to see what happens."** Not if it requires editing committed code. Use a temp script or a debugger; do not modify source files.
 - **"I'll patch this while I'm in the file."** Scope creep. Note the second bug; do not investigate or patch it.
-- **"The repro is flaky; I'll investigate anyway."** Flaky repro plus named root cause is a guess with a receipt. Either get a deterministic repro or escalate `BLOCKED`.
-- **"I'll add a log line to see what happens."** Not if it requires editing committed code. Use a temp script or a debugger; do not modify source files as part of investigation.
-- **"The writeup is in my conversation history."** GitHub is the record. Publish.
+- **"The artifact is in my conversation history."** GitHub is the record. Publish.
 
 ## Checklist before declaring `DONE`
 
 - [ ] CLAIM is one sentence naming the observable symptom.
-- [ ] EVIDENCE contains concrete logs, traces, or `file:line` pointers.
-- [ ] For regressions: EVIDENCE includes the pre-bug behavior of the failing path (quoted from `git show <prior-commit>:<file>`); Phase 3a was run.
-- [ ] REPRO gives exact commands or conditions; or the writeup is explicitly `BLOCKED` on non-reproducibility.
-- [ ] ISOLATION table has at least two rows (one variable varied at minimum).
-- [ ] ROOT CAUSE has both an **Immediate** layer and an **Underlying** layer, each with `file:line` evidence; the Underlying layer is classified structural / logical / environmental.
-- [ ] For regressions: the Underlying layer names the pre-vs-post behavior delta with both `path:N@<sha7>` citations.
-- [ ] RECOMMENDATION names exactly one downstream modality with justification and a fix-shape line.
-- [ ] For regressions: RECOMMENDATION either says "restore pre-refactor behavior" or explicitly rules out restoration with evidence.
-- [ ] CONFIDENCE is LOW, MED, or HIGH with evidence.
-- [ ] No source files were edited during the investigation (`git status` is clean of tracked-file edits).
-- [ ] Writeup published to GitHub (bug issue, sub-issue, or new `safer:investigate` issue).
+- [ ] REPRO is the smallest reproduction you could shrink to (failing test, script ≤30 lines, or command sequence).
+- [ ] REPRO actually fails the way the user described (you ran it; you saw the symptom).
+- [ ] REASONING names what you ruled in/out while shrinking.
+- [ ] If forked: DIRECTION restates `SAFER_DIAGNOSE_DIRECTION`.
+- [ ] CODEX VERDICT is verbatim from `/codex --mode diagnose --hold-scope` (not summarized, not interpreted).
+- [ ] CONFIDENCE on faithfulness is LOW, MED, or HIGH with evidence.
+- [ ] No source files were edited (`git status` clean of tracked-file edits).
+- [ ] Artifact published to GitHub (bug issue, sub-issue, or new `safer:diagnose` issue).
 - [ ] `safer.skill_end` event emitted.
 - [ ] Status marker on the last line of your reply.
 
@@ -934,7 +844,7 @@ Before you post a status marker or close your turn, **SendMessage to `team-lead`
 SendMessage({
   to: "team-lead",
   summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>."
+  message: "STATUS: DONE. Artifact: <URL>. Verdict: <logical-fallacy|symptom (N directions)|confirmed-root-cause>. Process issues: <none | one-line list>."
 })
 ```
 
@@ -944,9 +854,8 @@ Emit the `SendMessage` before your final-reply output. The final reply is for th
 
 If you were invoked outside an orchestrate context (no team), skip this step.
 
-
 ## Voice (reminder)
 
-Write for the cold-start reader. The next agent applying the fix has none of your context. Every `file:line` pointer, every isolation row, every bit of evidence is what lets them pick up the work without asking you.
+Write for the cold-start reader. The next agent — codex, the orchestrator, or a sibling diagnose fork — has none of your context. Every command in REPRO, every variable in REASONING, every quoted gap in CODEX VERDICT is what lets the next step pick up the work without asking you.
 
-Do not narrate the investigation in prose. The writeup is structured sections, not a story. The next agent is a junior.
+Do not narrate the diagnosis in prose. The artifact is structured sections, not a story. The next reader is a junior, a codex pass, or a sibling diagnose — all of them want the structure.

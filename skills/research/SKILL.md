@@ -443,7 +443,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 | `spec` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
-| `investigate` | ~3× | Research / exploration |
+| `diagnose` | ~3× | Research / exploration |
 | `spike` | ~5× | Architecture / design |
 | `implement-junior` | ~30× | Feature implementation |
 | `implement-senior` | ~30× | Feature implementation |

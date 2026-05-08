@@ -33,7 +33,7 @@ allowed-tools:
 
 - **Principle 6 (Budget Gate)** verify has the narrowest budget of any modality. You run, you check, you report. Nothing else.
 - **Principle 7 (Brake)** the first failing test or unmet acceptance criterion fires the stop. You do not triage, diagnose, or retry. You hold.
-- **Principle 8 (Ratchet)** a failure routes forward: to `investigate` if the cause is unclear, or back to `implement-*` if the cause is clear. It does not route to you.
+- **Principle 8 (Ratchet)** a failure routes forward: to `diagnose` if the cause is unclear, or back to `implement-*` if the cause is clear. It does not route to you.
 - **Part 4 (Communication)** the verdict is the artifact. A verdict held in conversation memory is not a verdict.
 
 ## Iron rule
@@ -124,7 +124,7 @@ The verdict is a single structured artifact with these sections, in this order:
 5. **Findings** failures, unmet criteria, or evidence gaps; each with `file:line` or a test identifier.
 6. **Routing** if HOLD, the modality the failure routes to.
 
-The verdict does not contain: fixes, suggested diffs, speculation about causes beyond a one-line hypothesis. The cause analysis is `investigate`'s budget, not yours.
+The verdict does not contain: fixes, suggested diffs, speculation about causes beyond a one-line hypothesis. The cause analysis is `diagnose`'s budget, not yours.
 
 ## Workflow
 
@@ -177,7 +177,7 @@ Phase 3 owns ring 1 (the project's lint, typecheck, and test commands). Phase 3.
 | `/health` | sub-issue acceptance references "health score", "code quality", "lint floor"; OR diff touches `package.json` / `tsconfig.json` / lint config | composite score + per-axis breakdown | score below explicit per-repo threshold (default: not gated) → `SHIP_WITH_CONCERNS` |
 | `/qa` | sub-issue acceptance references "QA", "user flow", "test the app"; AND a deployed URL is supplied (env var `VERIFY_QA_URL` or sub-issue body) | bug list + before/after screenshots | any critical-severity bug → `HOLD`; any high-severity → `SHIP_WITH_CONCERNS` |
 | `/qa-only` | sub-issue acceptance references "QA report" without "fix"; deployed URL supplied | bug list (no fixes applied) | any critical-severity bug → `HOLD`; high-severity → `SHIP_WITH_CONCERNS` |
-| `/canary` | post-deploy verify (after merge); deployed URL supplied; only when sub-issue is in `verifying` label state | anomaly list | any anomaly → `SHIP_WITH_CONCERNS`; routes to `/safer:investigate` for follow-up |
+| `/canary` | post-deploy verify (after merge); deployed URL supplied; only when sub-issue is in `verifying` label state | anomaly list | any anomaly → `SHIP_WITH_CONCERNS`; routes to `/safer:diagnose` for follow-up |
 | `/design-review` | sub-issue acceptance references "visual", "design", "UI", "look"; deployed URL supplied | screenshot diff + visual issue list | any blocker visual issue → `HOLD`; non-blocker → `SHIP_WITH_CONCERNS` |
 | `/devex-review` | sub-issue acceptance references "developer experience", "DX", "API design", "CLI", "docs onboarding"; deployed/runnable URL supplied | DX scorecard | scorecard threshold below explicit per-repo target → `SHIP_WITH_CONCERNS` |
 | `/benchmark` | sub-issue acceptance references "performance", "benchmark", "page speed", "web vitals"; baseline exists | metric deltas vs baseline | regression beyond explicit per-repo threshold → `HOLD`; smaller regression → `SHIP_WITH_CONCERNS` |
@@ -263,7 +263,7 @@ Total: N  Passed: N  Failed: N  Skipped: N  Flaky: N
 - ... (omit rows for targets whose trigger did not fire)
 
 ## Routing
-<if HOLD: route to implement-junior | implement-senior | investigate | architect>
+<if HOLD: route to implement-junior | implement-senior | diagnose | architect>
 <if SHIP or SHIP_WITH_CONCERNS: "merge ready">
 EOF
 
@@ -308,7 +308,7 @@ Each stop rule fires on a specific condition. When fired, produce an escalation 
 2. **Acceptance criteria unverifiable without more context.** Multiple criteria need external evidence verify cannot collect. Status: `BLOCKED`. Name each unverifiable criterion and what would verify it.
 3. **The tests themselves are broken.** The test file has a syntax error, or the test harness does not start, or a test is asserting against stale fixtures that were never updated with the diff. Status: `ESCALATED` to `spec` or `architect` (the contract the tests encode is wrong). Do not patch the tests.
 4. **Missing test infrastructure.** The repo has no runnable test command and no lint command. Status: `BLOCKED` to user; the repo is not verify-ready.
-5. **Persistent flakiness.** A test passes on retry but fails again on a third run. Status: `HOLD` with "flaky test is a regression" as the finding; route to `investigate`. Do not `SHIP_WITH_CONCERNS` for a test that is unstable at this level.
+5. **Persistent flakiness.** A test passes on retry but fails again on a third run. Status: `HOLD` with "flaky test is a regression" as the finding; route to `diagnose`. Do not `SHIP_WITH_CONCERNS` for a test that is unstable at this level.
 6. **Scope mismatch mid-run.** The diff grew between review-senior's review and your checkout (the author pushed more commits). Status: `BLOCKED`; ask review-senior to re-review the new head. Do not verify a diff that has not been reviewed at the current SHA.
 
 ## Completion status
@@ -345,7 +345,7 @@ A `HOLD` verdict is a valid terminal output for this modality: verify's job is t
 <each failing command or criterion, with file:line or test name>
 
 ## Recommended route
-<implement-junior | implement-senior | investigate | architect | spec>
+<implement-junior | implement-senior | diagnose | architect | spec>
 
 ## Confidence
 <LOW|MED|HIGH> <evidence>
@@ -417,4 +417,4 @@ If you were invoked outside an orchestrate context (no team), skip this step.
 
 The verdict is terse, mechanical, and evidence-backed. Not "looks good to me" but "SHIP: lint 0, typecheck 0, test 142/142; criteria 1-3 met with evidence at `<placeholder>/foo.ts:18`, `<placeholder>/foo.test.ts:42`." *Schematic example; `<placeholder>/...` paths are illustrative placeholders, not real files in this repo (schematic-placeholder exception of the code-citation doctrine).*
 
-Quality judgments are the downstream modality's budget, not yours. You report facts. The next agent reading your verdict is a junior; they should be able to act on it (merge, re-implement, investigate) without asking you follow-up questions.
+Quality judgments are the downstream modality's budget, not yours. You report facts. The next agent reading your verdict is a junior; they should be able to act on it (merge, re-implement, diagnose) without asking you follow-up questions.

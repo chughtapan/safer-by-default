@@ -162,7 +162,7 @@ If any required binary (`safer-slug`, `safer-telemetry-log`, `safer-update-check
 - Promoting a sub-task to its next state without the expected artifact published.
 - "Helping" a blocked modality by doing part of its work.
 - Inferring a sub-task's modality when the shape is ambiguous — ask the user.
-- Dispatching `implement-*` on a bug that has not been reproduced by investigate.
+- Dispatching `implement-*` on a bug that has not been reproduced by diagnose.
 - Merging a PR or closing a sub-issue based solely on a teammate `SendMessage` summary, without reading the reviewer body on GitHub via the Step 5c.0 procedure.
 - Letting a teammate `permission_request` sit unanswered past one sweep tick. Decide and respond that tick — approve via SendMessage, deny via Escape + SendMessage, or take the action from team-lead context. Idle permission_requests are a stop-rule violation.
 
@@ -174,7 +174,7 @@ Orchestrate operates at the **project** level. Boundaries:
 - **N sub-tasks** — one sub-issue each.
 - **Each sub-issue** carries exactly **one modality label** and exactly **one state label** at a time.
 - **State labels:** `planning`, `review`, `plan-approved`, `implementing`, `verifying`, `done`, `abandoned`.
-- **Modality labels:** `safer:spec`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:investigate`, `safer:spike`, `safer:research`, `safer:review-senior`, `safer:verify`.
+- **Modality labels:** `safer:spec`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:diagnose`, `safer:spike`, `safer:research`, `safer:review-senior`, `safer:verify`.
 
 If a sub-task cannot be represented in this shape, you have the wrong decomposition. Re-triage.
 
@@ -224,7 +224,7 @@ implement-junior  implement-senior  implement-staff
                    SHIP / HOLD
 
 orthogonal (invokable anywhere):
-   investigate    spike    research
+   diagnose       spike    research
       (bug)      (yes/no)  (open)
 ```
 
@@ -243,7 +243,7 @@ The routing target for every sub-task. If the sub-task does not fit one row, re-
 | `implement-junior` | internals of one module | exported signatures, new deps, cross-module reach | touching a 2nd module |
 | `implement-senior` | cross-module within an approved plan | new modules, new architectural patterns | plan revision needed |
 | `implement-staff` | new modules per approved spec | revising the spec | work not traceable to plan |
-| `investigate` | repro + isolation + root cause | applying the fix | anything that ships code |
+| `diagnose` | smallest repro + codex verdict + directions | naming the root cause yourself; applying the fix | anything that ships code |
 | `spike` | throwaway yes/no code | shipping the spike code | the spike graduates |
 | `research` | hypotheses + validated insights | shipping code | insight maturing to spec |
 | `review-senior` | reading diff, writing verdict | applying fixes | any code write |
@@ -263,13 +263,13 @@ Classification table:
 | If the intent looks like... | Route to |
 |---|---|
 | Ambiguous goal, no acceptance criteria | `/safer:spec` directly — no orchestration yet |
-| A reproducible bug, one symptom | `/safer:investigate` directly |
-| A flagged-but-unreproduced bug (reviewer / dogfood / escalation observation, no repro in hand) | `/safer:investigate` first — never `implement-*`. Eligible for `implement-*` only after investigate publishes a reproduction artifact. |
+| A reproducible bug, one symptom | `/safer:diagnose` directly |
+| A flagged-but-unreproduced bug (reviewer / dogfood / escalation observation, no repro in hand) | `/safer:diagnose` first — never `implement-*`. Eligible for `implement-*` only after diagnose publishes a reproduction artifact and codex returns `confirmed-root-cause`. |
 | "Can we do X?" / "Is X feasible?" | `/safer:spike` directly |
 | "How do X systems work?" / open question | `/safer:research` directly |
-| "Fix this bug and ship the fix" | Orchestrate: investigate → implement-* → verify |
+| "Fix this bug and ship the fix" | Orchestrate: diagnose → implement-* → verify |
 | "Build feature X" | Orchestrate: spec → architect → implement-* → verify |
-| "Investigate and fix if tractable" | Orchestrate: investigate → (decide) → implement-* → verify |
+| "Investigate and fix if tractable" | Orchestrate: diagnose → (decide) → implement-* → verify |
 | Clearly one modality, clearly done when that finishes | Decline; route directly |
 
 When in doubt, ask the user:
@@ -294,7 +294,7 @@ A contract has exactly five fields: **Mode**, **Goal**, **Acceptance**, **Autono
 - **Mode** — one of `feature-ship`, `refactor`, `burndown` (see `PRINCIPLES.md` → Contracts → Goal modes). The mode bounds the orchestrator's defaults: whether to defer adjacent findings, whether to open new sub-issues, default stamina N. If the user's instruction names the mode (verbs like "ship", "refactor", "burn down the backlog", "clean up X"), use it. Otherwise ask once via `AskUserQuestion`. Do not guess — the wrong mode silently re-shapes the entire pipeline.
 - **Goal** — restate the user's intent in one paragraph. Use their words where possible.
 - **Acceptance** — convert "done" signals from the instruction into a checklist. If the instruction names a deliverable (PR merged, dogfood green, spec published), that's an item. If acceptance is implicit, ask once before drafting; do not invent criteria.
-- **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes investigate + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction. The mode shifts the default: `feature-ship` includes "open follow-up sub-issues for adjacent findings" by default; `refactor` does not (findings are addressed inline); `burndown` excludes new-sub-issue creation entirely.
+- **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes diagnose + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction. The mode shifts the default: `feature-ship` includes "open follow-up sub-issues for adjacent findings" by default; `refactor` does not (findings are addressed inline); `burndown` excludes new-sub-issue creation entirely.
 - **Always-park** — start from the Recommended defaults below. Add ratchet-up as a default park reason. Add any irreversible action the instruction implies the user cares about.
 
 **Recommended Always-park defaults.** Every contract should include these unless the contract explicitly opts out (sandbox repos may opt out of force-push restrictions, etc.):
@@ -373,7 +373,7 @@ Build the decomposition table. Columns:
 - "We'll figure out the architecture as we go." *(No. Architecture sub-task first.)*
 - "This is all one `implement-staff` task." *(If it would touch >5 files or cross modules, it wants an `architect` sub-task before it.)*
 - "We'll skip verify." *(No. The verify sub-task is how the pipeline knows the thing shipped.)*
-- "We'll investigate in the same session we fix." *(Separate sub-tasks. Investigation is its own modality.)*
+- "We'll diagnose in the same session we fix." *(Separate sub-tasks. Diagnosis is its own modality.)*
 
 ### Phase 3 — Publish parent epic
 
@@ -542,7 +542,7 @@ Poll the sub-issue until one of:
   - **If the sub-issue modality is `spec` or `architect` (high-blast-radius by default):** invoke `/safer:stamina --plan <sub-issue-URL>`.
   - **Else:** read the artifact and judge against acceptance (existing path). Ask the user if any criterion is ambiguous.
   - **Setup/deploy path detection (additive).** If the spec or architect plan describes infra, deploy, CI, or env setup work (mentions Railway, Vercel, Docker, GitHub Actions, env vars, deploy targets, infrastructure-as-code), the spec/architect skill itself runs `/plan-devex-review --hold-scope --artifact <doc-URL>` after `/plan-eng-review` and before `/codex` (see `skills/architect/SKILL.md` Phase 7 and `skills/spec/SKILL.md` Phase 5 for the runtime contract). Orchestrate's role here is verification: confirm the gate ran by reading the sub-issue body for a `plan-devex-review:` audit-trail line. Missing → request the spec/architect re-run with the gate.
-- For exploration sub-tasks (`investigate`, `spike`, `research`): read the writeup; judge against acceptance.
+- For exploration sub-tasks (`diagnose`, `spike`, `research`): read the writeup; judge against acceptance. **Diagnose verdict routing** (see Step 5c.5 below for the fork mechanism): if the artifact's CODEX VERDICT is `logical-fallacy`, route the sub-issue back to `planning` for a re-run with the correction; if `symptom` with N>1 directions, fork into N siblings (Step 5c.5); if `symptom` with 1 direction, re-dispatch the same diagnose with `SAFER_DIAGNOSE_DIRECTION` set; if `confirmed-root-cause`, transition to `done` and proceed to the next sub-task.
 - For verify sub-tasks: the sub-task itself is the review. Trust its verdict.
 
 If accepted:
@@ -554,7 +554,7 @@ safer-transition-label --issue $N --from review --to plan-approved
 Then cascade forward per modality lifecycle:
 - `spec` / `architect` → `plan-approved` → (next sub-task starts, this one closes to `done`).
 - `implement-*` → `plan-approved` → `implementing` (the PR is merged) → `verifying` (verify sub-task runs) → `done`.
-- `investigate` / `spike` / `research` → `plan-approved` → `done` (these produce writeups, not code).
+- `diagnose` / `spike` / `research` → `plan-approved` → `done` (these produce writeups, not code).
 
 **Step 5c.-1 — Contract-budget check (mandatory; runs before everything else in this step).**
 
@@ -733,7 +733,34 @@ Use `TeamCreate` + `Agent` with `team_name` per Phase 5a. Never standalone subag
 
 Capacity check: if the team roster already holds the configured max active teammates, skip the dispatch and leave the sub-issue in `planning`. The next auto-monitor tick retries once a seat frees up.
 
-**Guardrails for the whole 5c.1–5c.4 sequence.**
+**Step 5c.5 — Diagnose verdict routing (only when the closing sub-issue's modality is `safer:diagnose`).**
+
+The diagnose artifact carries a `## CODEX VERDICT` section. Read it; do not summarize from the teammate `SendMessage`. The verdict drives one of four routes:
+
+1. **`logical-fallacy`.** Codex says the repro doesn't demonstrate the claimed symptom. The diagnose teammate's reasoning was broken; the next round corrects it.
+   - Transition the sub-issue label `review` → `planning` (the modality revises).
+   - Append a comment on the sub-issue: `Round N+1: codex returned logical-fallacy. Gap: <quoted from artifact>. Re-running diagnose with the correction.`
+   - Re-dispatch the same diagnose teammate (Step 5c.4) with the same sub-issue. The teammate reads the new comment as the round seed.
+   - Do not advance to the next decomposition row.
+2. **`symptom` with N=1 direction.** Codex confirms the bug is real and names a single hypothesis to investigate next.
+   - Transition the sub-issue label `review` → `planning`.
+   - Re-dispatch the same diagnose teammate with `SAFER_DIAGNOSE_DIRECTION=<the one direction, verbatim from codex>` set in the dispatch environment.
+   - Do not advance to the next decomposition row.
+3. **`symptom` with N>1 directions.** Codex names multiple hypotheses; one diagnose cannot pursue them concurrently. Fork.
+   - Transition the closing sub-issue's label `review` → `planning`. Set its `SAFER_DIAGNOSE_DIRECTION` to direction[0] (the first hypothesis from codex's list).
+   - For each direction[1..N-1], create a NEW `safer:diagnose` sub-issue on the parent epic, body cites the parent diagnose's repro URL and names `SAFER_DIAGNOSE_DIRECTION=<that direction>`. Append the new sub-issue rows to the parent epic's decomposition table.
+   - Append (or create) a `## Diagnose splits` section on the parent epic with one row per fork: `| <round> | <parent sub-issue> | <fork sub-issues> | <directions> |`. Increment the split counter in the section heading: `## Diagnose splits (count: <N>)`.
+   - Dispatch the original diagnose teammate against direction[0] AND a teammate per fork sub-issue against its assigned direction. Each fork is a sibling, not nested; each pursues exactly one direction.
+   - Do not advance to the next decomposition row until at least one fork (or the parent diagnose's round on direction[0]) returns `confirmed-root-cause`.
+4. **`confirmed-root-cause`.** Codex named the cause from the repro alone. The orchestrator hands off.
+   - Proceed with Steps 5c.1–5c.4 as normal: gating comment, transition `review` → `done`, advance the decomposition table to the next sub-issue (typically `implement-junior` for restoration / fix work, or `architect` if the cause is structural).
+   - The next sub-issue body cites the diagnose artifact URL and quotes the codex `confirmed-root-cause` mechanism + file:line evidence verbatim. The implementer reads this; no re-investigation.
+
+If the artifact is missing the `## CODEX VERDICT` section, treat as a stop-rule violation: post a comment on the sub-issue requesting the diagnose teammate to run `/codex --mode diagnose --hold-scope` and re-publish. Do not invent a verdict; codex's stamp is mandatory.
+
+**Three-splits stop rule.** If the parent epic's `## Diagnose splits (count: N)` reaches 3 and no fork has returned `confirmed-root-cause`, fire runtime stop condition #6 (Three diagnose splits without convergence — see Stop rules below). Park the active sub-issues; escalate to spec/architect.
+
+**Guardrails for the whole 5c.1–5c.5 sequence.**
 
 - Never auto-close a sub-issue whose artifact is missing or ambiguous. The artifact must be a specific comment, PR, or label change already published on the sub-issue. "Teammate said DONE in chat" is not an artifact.
 - Never skip the human-visible gating comment in 5c.1. The comment is what proves the gate fired; without it, a future reader cannot reconstruct the decision.
@@ -894,7 +921,7 @@ For each comment body, scan in priority order:
 
    **Updated:** <ISO timestamp>
 
-   **Contract:** <one-line summary derived from Goal>; <budget summary, e.g., "investigate → impl-junior → review → verify → merge"> (`OK'd <ts>`).
+   **Contract:** <one-line summary derived from Goal>; <budget summary, e.g., "diagnose → impl-junior → review → verify → merge"> (`OK'd <ts>`).
 
    **In flight:**
    - #<N> <modality> — <state, e.g., "implementing">; teammate: <name>; PR: <url or none>.
@@ -1400,32 +1427,32 @@ Update the decomposition table on the parent epic to reflect the re-triage. Emit
 
 #### Flagged vs reproduced
 
-**Rule.** A bug that has been *flagged* (reviewer observation, dogfood comment, teammate self-report) but not yet *reproduced* routes to `/safer:investigate`, never directly to `implement-*`. Re-label any `safer:implement-*` sub-issue opened against an unreproduced bug to `safer:investigate` before dispatch; wait for investigate to publish a reproduction artifact before re-opening the implement-* path.
+**Rule.** A bug that has been *flagged* (reviewer observation, dogfood comment, teammate self-report) but not yet *reproduced* routes to `/safer:diagnose`, never directly to `implement-*`. Re-label any `safer:implement-*` sub-issue opened against an unreproduced bug to `safer:diagnose` before dispatch; wait for diagnose to publish a reproduction artifact + codex verdict before re-opening the implement-* path.
 
-**Rationale.** A flagged symptom description is a hypothesis about the failure mode, not a fact. Dispatching `implement-*` against a hypothesis wastes a pane on the wrong cause and lands a fix that drifts from the real defect. The reproduction artifact is what turns the hypothesis into a fact the implementer can act on.
+**Rationale.** A flagged symptom description is a hypothesis about the failure mode, not a fact. Dispatching `implement-*` against a hypothesis wastes a pane on the wrong cause and lands a fix that drifts from the real defect. The reproduction artifact + codex verdict is what turns the hypothesis into a fact the implementer can act on.
 
 **Three-strikes rule.** If a single sub-task has been re-triaged **3 times without reaching `done`**, the project is mis-scoped. Stop and escalate to the user via the Confusion Protocol (below). Do not attempt a fourth triage.
 
 #### Post-refactor regressions
 
-**Rule.** When a bug surfaced *after* a recent refactor (the user mentions the refactor PR, or the symptom started landing in a window the refactor straddles), the investigate sub-issue body MUST cite the refactor PR URL and request a pre-vs-post behavior comparison.
+**Rule.** When a bug surfaced *after* a recent refactor (the user mentions the refactor PR, or the symptom started landing in a window the refactor straddles), the diagnose sub-issue body MUST cite the refactor PR URL and request a pre-vs-post behavior comparison.
 
-**Brief addition for the investigate sub-issue body.** Append a `## Post-refactor context` section with:
+**Brief addition for the diagnose sub-issue body.** Append a `## Post-refactor context` section with:
 
 ```
 ## Post-refactor context
 Refactor PR: <full URL>
 Symptom started: <approximate window or commit range>
 Hypothesis: silent behavior change in the refactor.
-Investigate must:
-- run Phase 3a (Compare to last-known-good) against the affected file(s),
-- name the pre-vs-post behavior delta in the Underlying layer of ROOT CAUSE,
-- default the recommendation to "restore pre-refactor behavior" unless restoration is explicitly ruled out.
+Diagnose must:
+- include "compare to last-known-good" reasoning in the REASONING section of the published artifact (what changed in the refactor window that could plausibly produce the observed symptom?),
+- pass the candidate pre-vs-post delta to /codex as one of the directions to evaluate,
+- if codex returns confirmed-root-cause naming the refactor as the cause, the orchestrator's default fix routing is "restore pre-refactor behavior" unless restoration is explicitly ruled out by the user.
 ```
 
-**Rationale.** Post-refactor bugs that look novel are usually silent behavior deltas. Investigators not primed for "compare to last-known-good" tend to design new patterns that handle the new symptom while leaving the original logic mistake in place. The brief addition surfaces the refactor PR and primes the Phase 3a pre-vs-post comparison so the Underlying layer can be named, and routes the default fix-shape toward restoration rather than reinvention.
+**Rationale.** Post-refactor bugs that look novel are usually silent behavior deltas. Diagnose runs not primed for "compare to last-known-good" tend to publish repros that don't surface the delta, and codex then has nothing to evaluate. The brief addition primes the comparison in the REASONING section so codex sees the candidate hypothesis, and routes the default fix-shape toward restoration rather than reinvention.
 
-**When the dispatch is for `/safer:architect` after `/safer:investigate` on a post-refactor regression.** Include the same `## Post-refactor context` section in the architect sub-issue body, plus a pointer to the investigate writeup. The architect must read "what was this doing before?" before designing — restoration is a one-line plan; new pattern requires evidence.
+**When the dispatch is for `/safer:architect` after `/safer:diagnose` on a post-refactor regression.** Include the same `## Post-refactor context` section in the architect sub-issue body, plus a pointer to the diagnose artifact. The architect must read "what was this doing before?" before designing — restoration is a one-line plan; new pattern requires evidence.
 
 ### Phase 7 — Close out
 
@@ -1459,15 +1486,16 @@ Orchestrate has stop rules in two groups: **decomposition-time** stop rules (fir
 4. **Missing modality.** You classified a sub-task into a modality that does not exist in the catalog. → Either the catalog is incomplete or your classification is wrong. Status: `NEEDS_CONTEXT` to user.
 5. **Implementation instinct.** You notice yourself about to write code. → This is the Iron Law firing. Stop; re-classify the current sub-task. Status: internal; abort the current action.
 
-### Contract-level runtime stop conditions (5)
+### Contract-level runtime stop conditions (6)
 
-Five runtime conditions park even when the action is technically inside the contract budget. These fire during execution, not decomposition. Each posts a stop-the-line comment to the parent epic, sets the active sub-issue to `awaiting-amendment`, and returns `DONE_PARKED`.
+Six runtime conditions park even when the action is technically inside the contract budget. These fire during execution, not decomposition. Each posts a stop-the-line comment to the parent epic, sets the active sub-issue to `awaiting-amendment`, and returns `DONE_PARKED`.
 
 1. **Three-strikes mis-scoping** (same as stop rule 3, but at the contract level: project mis-scoped, escalate to user with what was learned).
 2. **Confusion protocol fires.** Orchestrator cannot proceed without user direction.
 3. **Peer-review disagreement.** `/safer:review-senior` and `/codex` split verdicts on the same PR. Park; user resolves.
 4. **Stamina returns BLOCK** on a high-blast-radius artifact. Park; user resolves the BLOCK.
 5. **LOW-confidence on a non-junior recommendation.** Anything above implement-junior with LOW-confidence is asking the user to authorize a risky bet. Park.
+6. **Three diagnose splits without convergence.** When the parent epic's `## Diagnose splits (count: N)` section reaches 3 and no fork has returned codex `confirmed-root-cause`, the bug surface is wider than diagnose can map. Park the active diagnose sub-issues at `awaiting-amendment`. Escalate-target: `/safer:spec` (the symptom needs re-statement) or `/safer:architect` (the failure is structural, not localized). Quote the codex verdicts from each fork in the stop-the-line comment; the user picks the next modality.
 
 ---
 
@@ -1568,7 +1596,7 @@ Nothing orchestrate produces lives outside GitHub. The forge is the record.
 - **"I'll skip the VP dashboard; the user can see the PRs."** → No. The dashboard is how the pipeline proves itself healthy.
 - **"The user wants it fast; I'll skip the spec sub-task."** → Three-strikes rule will find you within 2 re-triages. Do the spec.
 - **"This is the same sub-task that escalated last week; I'll just run it again."** → Re-triage. Something is structurally different; find it.
-- **"I'll just dispatch impl; investigate is overhead for an obvious bug."** → No. If you cannot point at a reproduction artifact, you do not know the bug. Route to `/safer:investigate` first.
+- **"I'll just dispatch impl; diagnose is overhead for an obvious bug."** → No. If you cannot point at a reproduction artifact + codex verdict, you do not know the bug. Route to `/safer:diagnose` first.
 - **"The teammate said APPROVE, so I merged."** → No. Read the reviewer body via the Step 5c.0 procedure. Approve against the stated acceptance is conditional on all named gates (verify, re-review, out-of-band checks) having run. The teammate summary compresses; conditions live in the body.
 - **"Teammate pane is quiet; task must be progressing."** → No. Quiet pane + roster `isActive=false` has three causes: (a) task done, (b) process crashed, (c) stuck on a permission dialog the team-lead never saw. Capture the pane (Step 1a) before assuming (a). The existing Path (a) cleanup is correct only when the pane is missing from `$ALIVE`, not when it is alive but quiet.
 

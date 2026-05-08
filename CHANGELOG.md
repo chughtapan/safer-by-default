@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- `safer:investigate` renamed to `safer:diagnose`. The skill's iron rule shifts from "name the root cause" to "the smallest possible reproduction is the artifact"; root-cause naming moves to `/codex --mode diagnose --hold-scope` validation; orchestrate forks a second diagnose when codex returns `symptom` with multiple directions; three diagnose splits without convergence escalates to spec/architect (new runtime stop condition #6). The 8-phase workflow (Collect / Trace / Recent / Reproduce / Isolate / Name root cause / Recommend / Publish) collapses to a 4-phase one (Collect / Reproduce smallest / Codex validate / Publish). Cross-references updated in orchestrate, spec, verify, review-senior, stamina, AGENTS, README, PRINCIPLES, contract templates, and integration tests. The `/investigate` name-collision callout is dropped from README/AGENTS/PRINCIPLES — the rename eliminates the collision. Label `safer:investigate` becomes `safer:diagnose`; in-flight epics carrying the old label need re-labeling.
+
 ## 0.1.3 — 2026-05-07
 
 Combined release. Subsumes the locally-numbered-but-unpublished `0.1.3` (WS3 framing) and `0.1.4` (composition cleanup) working sections, plus the prior `Unreleased` work (ux-audit, contracts, gates) and an install-path + manifest cleanup. Only `0.1.2` actually shipped to the marketplace; the in-flight numbering has been collapsed so the published version increments cleanly from there.
