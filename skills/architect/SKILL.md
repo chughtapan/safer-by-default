@@ -233,6 +233,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -633,7 +643,7 @@ If the spec URL was not provided with the invocation, ask for it via `AskUserQue
 - Modifying files unrelated to the design (the design's scope is the changed surface, not the whole repo).
 - Mass repo cleanup, refactoring touches, or "while I'm here" doc/config rewrites that the design did not require.
 - Revising the spec. If the spec has a gap, escalate to `/safer:spec`.
-- Picking a dependency that requires a change to `package.json` without naming the exact version and a one-sentence license/maintenance note.
+- Introducing tools the spec did not authorize.
 
 ## Scope budget
 
@@ -641,7 +651,7 @@ Architect's budget is about output shape, not line count. Hard rules:
 
 1. The design doc is one markdown document with the fixed sections below. No appendices, no linked sub-docs, no parallel documents.
 2. Every stub file contains only type declarations, exported signatures, and `throw new Error("not implemented")` bodies. No control flow, no data transformations, no inline logic.
-3. No `package.json` edits in this PR. Library choices are named in the design doc; the actual install lands in an `implement-*` PR.
+3. `package.json` is in scope: dependencies, devDependencies, scripts, and the lockfile all land in this PR. Architect picks libraries (a design decision) AND installs them (the necessary side effect to make stub-compileable interfaces actually compile). Each new dep names its exact version and a one-sentence license/maintenance note in the design doc's Dependencies table.
 4. No edits to files that pre-date this branch, except for a single barrel export added where the new modules need to be reachable.
 5. If the design spans more than 5 new modules, you are architecting something the spec did not authorize. Split or escalate.
 
@@ -681,18 +691,7 @@ Is the spec architect-ready? Check each:
 
 If the spec fails any check, stop. Escalate to `/safer:spec` via `safer-escalate --from architect --to spec --cause <CAUSE>`. Do not fill the gap yourself.
 
-**User-authored carve-out (invariants only).** If the spec lacks invariants AND no `/safer:spec` sub-issue exists in the parent epic (i.e., the user authored the plan directly without dispatching `/safer:spec`), waive the invariants gate but record the absence as a `DONE_WITH_CONCERNS` line in the design doc's "Process notes" section. The reasoning: the user took authorship responsibility; the architect proceeds but flags. Detection:
-
-```bash
-[ -z "$SAFER_PARENT_ISSUE" ] || \
-  HAS_SPEC_SUBISSUE=$(gh issue list --label safer:spec --state all \
-    --search "in:body Parent: #$SAFER_PARENT_ISSUE" \
-    --json number -q '.[0].number' 2>/dev/null || echo "")
-# If HAS_SPEC_SUBISSUE is empty, the user authored; lenient gate.
-# Otherwise spec produced (or escalated) and the strict gate applies.
-```
-
-This carve-out applies to invariants only — goals, non-goals, and acceptance criteria remain strict regardless of authorship. A user-authored plan without goals or acceptance criteria is not architect-ready.
+The readiness gate applies regardless of who authored the spec — `/safer:spec` skill, the user directly, or an upstream pipeline. A spec is architect-ready or it isn't; authorship doesn't change the requirement.
 
 ### Phase 3 — Decompose into modules
 

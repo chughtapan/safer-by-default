@@ -9,6 +9,10 @@ description: |
   the lint actually fires on a known anti-pattern; reports the lint baseline
   and asks the user how to handle it. User-invoked only; never auto-routes.
   Safe to re-run; idempotent by construction.
+
+  Hard dependency: gstack must be installed at ~/.claude/skills/gstack/.
+  This skill fails fast (exit 1) if gstack is absent; safer-by-default
+  treats gstack as required, not optional.
 triggers:
   - set up safer
   - install agent-code-guard

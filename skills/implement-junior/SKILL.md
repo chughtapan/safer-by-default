@@ -233,6 +233,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -563,7 +573,7 @@ GitHub.
 ## Inputs required
 
 - A sub-issue labeled `safer:implement-junior`, or an obvious-scope task explicitly scoped as junior by the caller.
-- Either (a) an architect plan covering this module, with stubs already on the branch, or (b) a self-contained small change (bug fix, added test, one-module feature) whose scope is obvious from the issue.
+- Either (a) an architect plan covering this module, with stubs already on the branch, or (b) a self-contained small change (bug fix, added test, one-module feature) where `safer-diff-scope` returns `tier: junior` AND no architect-plan sub-issue exists in the parent epic. The two-condition test is the operational definition of "obvious-scope": the diff shape is junior AND the pipeline didn't escalate to architect. Either condition failing means escalate.
 - `gh` authenticated.
 - Local repo on a clean working tree. You will create a branch.
 
@@ -774,12 +784,12 @@ Report `DONE` with the PR URL. If you left concerns (flaky upstream test, open q
 5. **`safer-diff-scope --head HEAD` reports `senior` or `staff`.** → `ESCALATED` with the diff-scope output attached.
 6. **Tests fail and the fix requires a second module to change.** → `ESCALATED` to `implement-senior` or architect, depending on whether the plan covers the other module.
 7. **The stub you are filling in has no architect plan and no obvious-scope sub-issue.** → `NEEDS_CONTEXT`. Ask for the plan before writing code.
-8. **You caught yourself about to write `any`, `as T`, `catch {}`, or `throw new Error("...")`.** → Stop. Re-read Principles 1-4. If the right shape really does require one of these, document why in the PR body and leave it as a `DONE_WITH_CONCERNS` for review-senior.
+8. **You caught yourself about to write `any`, `as T`, `catch {}`, or `throw new Error("...")`.** → Stop. Re-read Principles 1-4. The right typed shape requires architect-tier decisions (which branded type, which discriminated union, which tagged error class). Escalate via `safer-escalate --to architect --cause type-system-shortfall`. Do not ship the violation as `DONE_WITH_CONCERNS` — Principle 1-4 violations the agent caught itself about to write are stop rule fires, not concerns. The discriminator: could the agent have prevented this at junior tier? Choosing a different shape is always preventable, so it's a stop rule fire.
 
 ## Completion status
 
 - `DONE` — PR opened as draft, `safer-diff-scope` says `junior`, tests pass, sub-issue moved to `review`.
-- `DONE_WITH_CONCERNS` — as above, but 1-3 concerns named (e.g., test flake upstream, type workaround) for the reviewer.
+- `DONE_WITH_CONCERNS` — as above, but 1-3 concerns named for the reviewer. Concerns must be things the agent could not have prevented at junior tier (test flake upstream, plan ambiguity that doesn't block this module, unrecoverable external state). Type workarounds are NOT concerns — they're stop rule fires that escalate via `safer-escalate` (Stop rule 8).
 - `ESCALATED` — stop rule fired; escalation artifact posted on the sub-issue.
 - `BLOCKED` — external dependency (failing CI on main, missing credential). Name the blocker.
 - `NEEDS_CONTEXT` — user-resolvable ambiguity; state the question.

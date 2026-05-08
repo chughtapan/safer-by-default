@@ -229,6 +229,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -495,13 +505,9 @@ End with what to do. Every output names its status marker and, where applicable,
 
 > **You comment; you do not edit. The author applies fixes.**
 
-`/safer:review-senior` itself never writes to the diff. It dispatches
-composed gstack skills; some of those (notably `/review`) may write
-their own comments and some legacy flows write edits. The safer-side
-posture is read-only review: you aggregate verdicts and publish a
-comment, never a patch. If the instinct to "just fix this one line"
-appears, it is the stop rule firing. Write the comment; let the author
-push the fix.
+`/safer:review-senior` itself never writes to the diff. In normal mode it dispatches composed gstack skills; some of those (notably `/review`) may write their own comments and some legacy flows write edits. The safer-side posture is read-only review: aggregate verdicts and publish a comment, never a patch. If the instinct to "just fix this one line" appears, it is the stop rule firing. Write the comment; let the author push the fix.
+
+Mode carve-out: when no gstack composed skill is available (full environment miss), the skill runs in **fallback mode** — it reads the diff and emits the review itself, still as a comment, never a patch. This is a deliberate consumer-contract concession: orchestrate and stamina expect a verdict back, not BLOCKED. Fallback mode preserves the comment-not-patch posture and tags the verdict so consumers know the environment is degraded. See "Fallback mode (no gstack available)" below.
 
 ## Role
 
@@ -695,6 +701,17 @@ Classify the artifact per the inference rules above (or honour
 skill set in a comment on the artifact thread; that comment is the
 audit trail even if the dispatch itself fails.
 
+Each `KIND` produces a dispatch set. Phase 2 dispatches against this set; nothing else:
+
+| KIND | Composed skills |
+|---|---|
+| `pr` | `/review` `/simplify` `/codex` |
+| `plan` | `/plan-eng-review` `/codex` |
+| `pr+ui` | row 1 + `/plan-design-review` |
+| `plan+ui` | row 2 + `/plan-design-review` |
+| `pr+llm-prompt` | row 1 + repo eval suites |
+| `plan+llm-prompt` | row 2 + repo eval suites |
+
 ### Phase 1a — CI status gate (PR mode only)
 
 > **For PR-kind artifacts: CI must be green before any APPROVE verdict.** Diff-static review (this skill, `/codex review`, `/simplify`, `/review`) is blind to runtime regressions; CI is the runtime check. Real incident: a PR passed three diff-static reviewers but had 5 red CI tests because a Stream/Fiber refactor turned `client.close()` async.
@@ -729,7 +746,7 @@ This step is non-skippable and counts as **part of the review-senior pass** (not
 
 ### Phase 2 — Dispatch the composed skills
 
-For each composed gstack skill in the row determined by Phase 1, dispatch in order, collecting verdicts (APPROVE / REQUEST-CHANGES / HOLD / COMMENT) as each returns:
+For each composed gstack skill in the dispatch set Phase 1 selected (table above), dispatch in order, collecting verdicts (APPROVE / REQUEST-CHANGES / HOLD / COMMENT) as each returns. PR-kind dispatch:
 
 ```
 /review    --pr <PR-URL> --hold-scope
@@ -737,7 +754,16 @@ For each composed gstack skill in the row determined by Phase 1, dispatch in ord
 /codex     --mode review --artifact <PR-URL> --hold-scope
 ```
 
-Substitute the row's actual skill list. `--hold-scope` is mandatory: it tells the composed skill to run autonomous; user-facing prompts that would fire mid-run escalate to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`. (Same convention as `architect/SKILL.md` Phase 7 and `verify/SKILL.md` Phase 3.5.)
+Plan-kind dispatch:
+
+```
+/plan-eng-review --artifact <DOC-URL> --hold-scope
+/codex           --mode review --artifact <DOC-URL> --hold-scope
+```
+
+UI-touching artifacts add `/plan-design-review --artifact <URL> --hold-scope` to either dispatch above.
+
+`--hold-scope` is mandatory: it tells the composed skill to run autonomous; user-facing prompts that would fire mid-run escalate to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`.
 
 For PR rows, the composed skills post their verdicts as inline comments
 or PR reviews; for design/plan/spec rows, the composed skills post
@@ -818,10 +844,7 @@ Every invocation ends with exactly one status marker on the last line:
 
 ## Anti-patterns
 
-- **"I'll read the diff myself and write the review."** No. The review
-  is performed by the composed gstack skills; `review-senior` dispatches.
-  The architect design explicitly rules out a code-level dispatcher in
-  safer-by-default (Invariant 11); the rulebook *is* the dispatcher.
+- **"I'll read the diff myself and write the review."** Only in fallback mode (every composed gstack skill missing). In normal mode the review is performed by the composed gstack skills and `review-senior` dispatches. The architect design explicitly rules out a code-level dispatcher in safer-by-default (Invariant 11); the rulebook *is* the dispatcher.
 - **"`/simplify` isn't installed, so I'll just approve on the other two."**
   No. Silent skip is forbidden. Emit DONE_WITH_CONCERNS so the
   orchestrator can see that convergence is unmeasured.

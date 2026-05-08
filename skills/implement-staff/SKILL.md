@@ -232,6 +232,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -610,7 +620,14 @@ If the spec URL was not passed with the invocation, stop and ask. No spec, no st
 
 ## Scope budget
 
-Staff has no LOC ceiling. The budget is traceability: every line has a spec-anchor or a plan-anchor. Hard rules:
+Staff has no LOC ceiling and a 5-module cap. Two budgets, working at different scales:
+
+- **Traceability** is the line-level rule. Every line in the diff has a spec-anchor or a plan-anchor; no anchor → no ship.
+- **The 5-module cap** is the architectural-blast-radius safety net. Past 5 new modules per orchestration, traceability stops being a sufficient guard because reviewer cognitive budget runs out — even if every line is anchored, the reviewer can't hold the cross-module structure in working memory long enough to catch coordination defects. Bigger work decomposes upstream into multi-orchestration sequences; staff doesn't try to absorb it.
+
+Both budgets must hold. Staff hits 5 modules with all-anchored lines = ship. Hits 6 modules even fully anchored = escalate.
+
+Hard rules:
 
 1. Every new module is named or described in the spec's Goals or in the architect plan's Modules section. If a module has no anchor, it does not ship.
 2. Every new public export (function, type, class, constant) is named in the spec or plan.

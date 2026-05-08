@@ -234,6 +234,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -496,13 +506,13 @@ End with what to do. Every output names its status marker and, where applicable,
 ## How this modality projects from the doctrine
 
 - **Principle 5 (Discipline over capability)** investigation is its own scope. Finding the bug and fixing the bug are two tasks, not one. Your charter ends at the root cause.
-- **Principle 7 (Brake)** the moment the root cause is named with evidence, you stop. Writing "and here is the fix" is out of scope, even when the fix is one line.
+- **Principle 7 (Brake)** fires when (a) the root cause has `file:line` evidence AND (b) confidence is at least MED. After both are true, the workflow produces only the writeup + recommended fix modality — no new isolation, no new instrumentation, no fix code. "Recommended fix modality" is a single-line route (e.g., "Route to: implement-senior") plus a one-line fix shape, not the fix itself.
 - **Principle 8 (Ratchet)** the fix routes forward to `implement-junior`, `implement-senior`, `architect`, or back to `spec`. It does not route back to you.
 - **Part 4 (Communication)** the writeup is the artifact. A root cause held in conversation memory is not an artifact.
 
 ## Iron rule
 
-> **No fixes without root cause. Once the root cause is named, you stop. The fix is a separate modality.**
+> **No fixes without root cause. Once the root cause is named (with file:line evidence at confidence ≥ MED), you stop investigating. The fix is a separate modality. The recommendation single-line is permitted; the fix code is not.**
 
 If the instinct to "just patch this one line" appears, it is the signal that the Brake should have fired already. Publish the writeup with the recommendation. Let the next modality apply the fix.
 
@@ -628,6 +638,8 @@ Read the bug report start to finish. Record:
 - The user's reproduction steps.
 - The affected commits, branches, or deploy windows, if named.
 
+Set `CLAIM_SUMMARY` to a one-sentence rephrasing of the observable symptom (e.g., `CLAIM_SUMMARY="checkout dialog crashes on empty cart"`). Phase 8 publish uses this as the issue title when opening a fresh bug issue.
+
 If any of those are missing and you cannot proceed without them, use `AskUserQuestion` once. Ask the smallest number of questions that unblock you. Prefer one focused question over a broad checklist.
 
 ### Phase 2 — Trace the code path
@@ -742,9 +754,18 @@ Do not name "the" fix; name the modality. The downstream agent picks the fix. Yo
 
 ### Phase 8 — Publish
 
-Write the writeup to a temp file, then publish:
+Write the writeup to a temp file, then publish. The block sets every variable it uses explicitly:
 
 ```bash
+# CLAIM_SUMMARY: one-sentence symptom phrasing from Phase 1, used as the issue
+# title when no parent bug issue exists. Set it before this block runs.
+: "${CLAIM_SUMMARY:?Phase 1 must set CLAIM_SUMMARY (one-sentence symptom)}"
+
+# SAFER_BUG_ISSUE: optional. When the investigator was dispatched against a
+# pre-existing bug issue, the orchestrator sets this; the writeup posts as a
+# comment on that issue. When unset, this phase opens a fresh issue.
+TARGET_BUG="${SAFER_BUG_ISSUE:-}"
+
 TMP=$(mktemp)
 cat > "$TMP" <<EOF
 ## CLAIM
@@ -780,8 +801,8 @@ Justification: <one line>
 <LOW|MED|HIGH> <evidence>
 EOF
 
-if [ -n "${SAFER_BUG_ISSUE:-}" ]; then
-  URL=$(safer-publish --kind comment --issue "$SAFER_BUG_ISSUE" --body-file "$TMP")
+if [ -n "$TARGET_BUG" ]; then
+  URL=$(safer-publish --kind comment --issue "$TARGET_BUG" --body-file "$TMP")
 else
   URL=$(safer-publish --kind issue \
     --title "[safer:investigate] $CLAIM_SUMMARY" \

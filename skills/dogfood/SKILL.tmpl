@@ -114,7 +114,7 @@ One artifact per invocation. One report per artifact. The report has exactly the
 |---|---|
 | Artifacts per invocation | 1 |
 | Subagent invocations | 1 (re-invoke only on subagent timeout, max 2 total) |
-| Axes scored | 5 (clarity, completeness, actionability, trust; friction is a list) |
+| Axes scored | 4 numeric axes (clarity, completeness, actionability, trust) plus a friction list (not a fifth axis — it's a list of evidenced findings keyed to one or more axes) |
 | Score range | 0 to 10 per axis, integer |
 | Verdict options | `SHIP`, `REVISE`, or `REJECT`, exactly one |
 | Report destinations | 1 (the artifact's own thread, or stdout for local files) |
@@ -315,14 +315,13 @@ The `description` stays generic so no project-specific context leaks into the su
 
 The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file. The subagent is the only reader of the artifact text. That is the architectural enforcement.
 
-Capture the subagent's final reply into `$REPORT_FILE`:
+Capture the subagent's final reply into `$REPORT_FILE`. The Agent tool call returns the subagent's final assistant message as a string in this skill's tool result; write that string to disk:
 
 ```bash
 REPORT_FILE=$(mktemp)
-# Write the subagent's final reply (the text returned by the Agent tool call) to $REPORT_FILE.
-# The reply should contain the output-schema markdown (either between two fences, or raw).
-# Extract the block starting with "# Dogfood report" and write it to $REPORT_FILE.
 ```
+
+Then, in the same turn the Agent tool returned, use the `Write` tool with `file_path=$REPORT_FILE` and `content=<the agent's final reply, verbatim>`. If the reply contains a `# Dogfood report` block surrounded by conversational scaffolding, write only the block (everything from the `# Dogfood report` line through the `## Confidence` line, inclusive). If the reply is the block with no scaffolding, write the whole reply.
 
 `$REPORT_FILE` is the canonical handle used by Phases 5 and 6. Do not re-read the subagent's reply from memory after this point; Phases 5 and 6 operate on the file.
 
@@ -381,8 +380,8 @@ safer-telemetry-log --event-type safer.skill_end --modality dogfood \
 Clean up temporary files (`$PAYLOAD`, `$PROMPT`, `$REPORT_FILE`). Report the status based on the verdict:
 
 - Subagent emitted `SHIP`: status `DONE`.
-- Subagent emitted `REVISE`: status `DONE_WITH_CONCERNS`. The concerns are the friction log.
-- Subagent emitted `REJECT`: status `DONE_WITH_CONCERNS`. The artifact failed dogfood; the caller routes upstream.
+- Subagent emitted `REVISE`: status `DONE_WITH_CONCERNS`. The concerns are the friction log; the caller resolves them before the artifact lands.
+- Subagent emitted `REJECT`: status `ESCALATED` with cause `ARTIFACT_REJECTED`. REJECT means the artifact is unfixable in its current form (fundamental defect, scope mismatch, or non-recoverable framing) and the caller must route back to upstream authoring rather than treat it as a list of fixable concerns.
 
 ## Stop rules
 
@@ -390,7 +389,7 @@ Each stop rule fires on a specific condition. When fired, produce the escalation
 
 1. **Artifact is empty.** The issue body, PR description, or file is empty or whitespace-only. Status: `BLOCKED`. Cause: `ARTIFACT_EMPTY`. Report to caller: the artifact did not carry text; there is nothing to dogfood.
 2. **Artifact is not resolvable.** `gh issue view` or `gh pr view` returns an error, or the file path does not exist. Status: `BLOCKED`. Cause: `ARTIFACT_MISSING`. Include the resolver error in the escalation body.
-3. **Subagent reports prior context leak.** The subagent's friction log includes "the artifact does not carry the context a reader needs" or an equivalent. That is the iron rule firing and is a normal `REVISE` or `REJECT` outcome, not an escalation. No stop rule fires; publish the report. Note: `REVISE` and `REJECT` are normal-completion verdicts for this skill — they map to `DONE_WITH_CONCERNS` (see Completion status), not to `ESCALATED`. The dogfood run itself succeeded; the artifact failed the rubric, and the caller routes the artifact back to its upstream author.
+3. **Subagent reports prior context leak.** The subagent's friction log includes "the artifact does not carry the context a reader needs" or an equivalent. That is the iron rule firing and is a normal `REVISE` or `REJECT` outcome, not a stop-rule fire. Publish the report. The dogfood run itself succeeded; the artifact failed the rubric. Verdict→status mapping (per Completion status): `REVISE` → `DONE_WITH_CONCERNS` (caller resolves friction); `REJECT` → `ESCALATED` (artifact unfixable, route upstream).
 4. **Subagent could not produce a valid report.** Two invocations failed schema validation. Status: `ESCALATED`. Cause: `SUBAGENT_SCHEMA_FAILURE`. Attach both attempts to the escalation artifact.
 5. **Input argument missing or conflicting.** No `--issue`, `--pr`, or `--file`, or more than one of them set. Status: `NEEDS_CONTEXT`. Cause: `INVALID_INVOCATION`. Ask the caller for a single unambiguous input.
 6. **Implementation instinct.** The skill is about to read the artifact's surrounding project to "help the subagent." That is the Brake firing. Stop, discard whatever extra context was gathered, and dispatch the subagent with the original payload only.
@@ -400,8 +399,8 @@ Each stop rule fires on a specific condition. When fired, produce the escalation
 Every invocation ends with exactly one status marker on the last line of your reply.
 
 - `DONE` report published; subagent verdict is `SHIP`; no schema validation issues.
-- `DONE_WITH_CONCERNS` report published; verdict is `REVISE` or `REJECT`; the concerns are the friction entries named in the report.
-- `ESCALATED` stop rule fired (subagent schema failure or analogous); escalation artifact posted.
+- `DONE_WITH_CONCERNS` report published; verdict is `REVISE`; the concerns are the friction entries named in the report.
+- `ESCALATED` either (a) verdict is `REJECT` (artifact unfixable, cause `ARTIFACT_REJECTED`) or (b) stop rule fired (subagent schema failure or analogous, cause `SUBAGENT_SCHEMA_FAILURE`). Either way an escalation artifact is posted.
 - `BLOCKED` artifact empty or missing; escalation artifact posted; name the missing piece.
 - `NEEDS_CONTEXT` invocation arguments invalid; caller must resupply.
 

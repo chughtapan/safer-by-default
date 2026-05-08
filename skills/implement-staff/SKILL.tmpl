@@ -150,7 +150,14 @@ If the spec URL was not passed with the invocation, stop and ask. No spec, no st
 
 ## Scope budget
 
-Staff has no LOC ceiling. The budget is traceability: every line has a spec-anchor or a plan-anchor. Hard rules:
+Staff has no LOC ceiling and a 5-module cap. Two budgets, working at different scales:
+
+- **Traceability** is the line-level rule. Every line in the diff has a spec-anchor or a plan-anchor; no anchor → no ship.
+- **The 5-module cap** is the architectural-blast-radius safety net. Past 5 new modules per orchestration, traceability stops being a sufficient guard because reviewer cognitive budget runs out — even if every line is anchored, the reviewer can't hold the cross-module structure in working memory long enough to catch coordination defects. Bigger work decomposes upstream into multi-orchestration sequences; staff doesn't try to absorb it.
+
+Both budgets must hold. Staff hits 5 modules with all-anchored lines = ship. Hits 6 modules even fully anchored = escalate.
+
+Hard rules:
 
 1. Every new module is named or described in the spec's Goals or in the architect plan's Modules section. If a module has no anchor, it does not ship.
 2. Every new public export (function, type, class, constant) is named in the spec or plan.

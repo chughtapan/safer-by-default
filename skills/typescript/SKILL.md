@@ -232,6 +232,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -573,7 +583,7 @@ Every row below is a fork where the agent will feel pulled toward the human-era 
 | Cross-service boundary where a consumer is external or under SLA | Best-effort schema doc in a README | `@pact-foundation/pact` (Pact V4) contract test published to the broker |
 | Critical UI flow (auth, checkout, primary CRUD) | "Unit test the React component" | Playwright E2E scoped to that flow; retry policy; screenshot diff off by default |
 | Non-critical UI surface | Broad Playwright coverage "to be safe" | Component-level tests; skip E2E (Principle 6: scope the ladder to <N critical flows) |
-| Coverage threshold as a CI gate | `jest --coverage --coverageThreshold` set to 80% | Report coverage as a diagnostic artifact only; **never** gate CI on a percentage (Goodhart; Inozemtseva & Holmes ICSE 2014). Gate CI on mutation score for critical modules instead (see row 18). Coverage gaps are investigated for cause (dead code? missing path?), not chased with filler tests. |
+| Coverage threshold as a CI gate | `jest --coverage --coverageThreshold` set to 80% | Report coverage as a diagnostic artifact only; **never** gate CI on a percentage (Goodhart: line coverage is uncorrelated with bug-finding ability — Inozemtseva & Holmes 2014 measured this against mutation score and found near-zero correlation once test count is controlled for). Gate CI on mutation score for critical modules instead (see row 18). Coverage gaps are investigated for cause (dead code? missing path?), not chased with filler tests. |
 | Coverage report flags a gap in a module | Write tests until the number moves | Investigate: dead code? missing path? unreachable branch? Act on the cause, not the metric |
 | Repo has a `test/**/*.test.ts` suite | `"lint"` job in CI, run tests locally | CI runs a `test` job that executes the full suite on every PR. A lint-only CI with tests on disk is Principle 1 corollary item 4 violation: tests that do not run are decoration. |
 | Mutation testing on a critical module (auth, billing, parsing, crypto, webhook signing) | Skip, or run it everywhere | `@stryker-mutator/core` + `@stryker-mutator/typescript-checker`, **required CI gate**; scope the mutate glob to the critical module(s). Thresholds: `{ high: 80, low: 60, break: 50 }` as a starting point. |

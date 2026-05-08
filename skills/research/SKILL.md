@@ -234,6 +234,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -511,7 +521,7 @@ Code may appear inside the research loop: a small probe, a measurement script, a
 
 You take one open-ended question and run it through alternating Researcher and Supervisor turns until an insight is validated at sufficient confidence, or until the round budget is exhausted.
 
-You play both roles yourself, turn by turn, not in parallel. The separation of roles is what generates the ledger. A single-voice "here is my answer" is not research; it is assertion.
+You play the Researcher role; `/codex --mode supervisor` plays the Supervisor role each round. The separation of roles across two distinct models is what generates the ledger and the cross-model independence that single-voice "here is my answer" research lacks. Without codex available, this skill cannot run — the Researcher is not its own Supervisor.
 
 Concretely, you:
 
@@ -653,15 +663,14 @@ Transition the label: `safer-transition-label --issue "$ISSUE" --from planning -
 
 ### Phase 2: The loop
 
-The Supervisor role is **codex** (cross-model independent evaluation). Run `/codex --mode supervisor` on the Researcher turn output before writing the Supervisor turn.
+The Supervisor role is **codex** (cross-model independent evaluation). Codex is the only Supervisor — there is no separate self-Supervisor turn. The Researcher writes a round; codex reviews it; loop continues.
 
-For each round, do the following five steps:
+For each round, do the following four steps:
 
 1. **Researcher turn.** Write the four-part turn (CLAIM, EVIDENCE, EXPERIMENT, EXPECTED) to a scratch file, run the experiment, then fill in INSIGHT, IMPLICATIONS, CONFIDENCE.
-2. **Codex supervisor gate.** Run `/codex --mode supervisor` on the Researcher output. Codex stamps `continue` / `hold` / `escalate`. `hold` → Researcher revises the same round before advancing. `escalate` → treat as a POOR round and emit `NEEDS_CONTEXT` to the caller. `continue` → proceed.
-3. **Supervisor turn.** Write QUESTIONS, RATING, GUIDANCE (informed by the codex stamp).
-4. **Publish the round.** Post the concatenated Researcher + codex stamp + Supervisor turns as a comment on the research issue. Each round is one comment; comments are the ledger.
-5. **Check exit conditions.** If Supervisor rated EXCELLENT and Researcher confidence is at least 0.8, exit the loop. If round count equals 20, exit with `DONE_WITH_CONCERNS`. Else, increment round and continue.
+2. **Codex Supervisor turn.** Run `/codex --mode supervisor` on the Researcher output. Codex emits QUESTIONS, RATING (`POOR | OK | GOOD | EXCELLENT`), GUIDANCE, and a stamp (`continue` / `hold` / `escalate`). `hold` → Researcher revises the same round before advancing. `escalate` → treat as a POOR round and emit `NEEDS_CONTEXT` to the caller. `continue` → proceed.
+3. **Publish the round.** Post the concatenated Researcher + codex Supervisor turns as a comment on the research issue. Each round is one comment; comments are the ledger.
+4. **Check exit conditions.** If codex Supervisor rated EXCELLENT and Researcher confidence is at least 0.8, exit the loop. If round count equals 20, exit with `DONE_WITH_CONCERNS`. Else, increment round and continue.
 
 Comment template for a round:
 

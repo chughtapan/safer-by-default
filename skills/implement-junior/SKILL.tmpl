@@ -103,7 +103,7 @@ GitHub.
 ## Inputs required
 
 - A sub-issue labeled `safer:implement-junior`, or an obvious-scope task explicitly scoped as junior by the caller.
-- Either (a) an architect plan covering this module, with stubs already on the branch, or (b) a self-contained small change (bug fix, added test, one-module feature) whose scope is obvious from the issue.
+- Either (a) an architect plan covering this module, with stubs already on the branch, or (b) a self-contained small change (bug fix, added test, one-module feature) where `safer-diff-scope` returns `tier: junior` AND no architect-plan sub-issue exists in the parent epic. The two-condition test is the operational definition of "obvious-scope": the diff shape is junior AND the pipeline didn't escalate to architect. Either condition failing means escalate.
 - `gh` authenticated.
 - Local repo on a clean working tree. You will create a branch.
 
@@ -314,12 +314,12 @@ Report `DONE` with the PR URL. If you left concerns (flaky upstream test, open q
 5. **`safer-diff-scope --head HEAD` reports `senior` or `staff`.** → `ESCALATED` with the diff-scope output attached.
 6. **Tests fail and the fix requires a second module to change.** → `ESCALATED` to `implement-senior` or architect, depending on whether the plan covers the other module.
 7. **The stub you are filling in has no architect plan and no obvious-scope sub-issue.** → `NEEDS_CONTEXT`. Ask for the plan before writing code.
-8. **You caught yourself about to write `any`, `as T`, `catch {}`, or `throw new Error("...")`.** → Stop. Re-read Principles 1-4. If the right shape really does require one of these, document why in the PR body and leave it as a `DONE_WITH_CONCERNS` for review-senior.
+8. **You caught yourself about to write `any`, `as T`, `catch {}`, or `throw new Error("...")`.** → Stop. Re-read Principles 1-4. The right typed shape requires architect-tier decisions (which branded type, which discriminated union, which tagged error class). Escalate via `safer-escalate --to architect --cause type-system-shortfall`. Do not ship the violation as `DONE_WITH_CONCERNS` — Principle 1-4 violations the agent caught itself about to write are stop rule fires, not concerns. The discriminator: could the agent have prevented this at junior tier? Choosing a different shape is always preventable, so it's a stop rule fire.
 
 ## Completion status
 
 - `DONE` — PR opened as draft, `safer-diff-scope` says `junior`, tests pass, sub-issue moved to `review`.
-- `DONE_WITH_CONCERNS` — as above, but 1-3 concerns named (e.g., test flake upstream, type workaround) for the reviewer.
+- `DONE_WITH_CONCERNS` — as above, but 1-3 concerns named for the reviewer. Concerns must be things the agent could not have prevented at junior tier (test flake upstream, plan ambiguity that doesn't block this module, unrecoverable external state). Type workarounds are NOT concerns — they're stop rule fires that escalate via `safer-escalate` (Stop rule 8).
 - `ESCALATED` — stop rule fired; escalation artifact posted on the sub-issue.
 - `BLOCKED` — external dependency (failing CI on main, missing credential). Name the blocker.
 - `NEEDS_CONTEXT` — user-resolvable ambiguity; state the question.

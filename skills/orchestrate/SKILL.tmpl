@@ -1449,7 +1449,9 @@ safer-telemetry-log --event-type safer.skill_end \
 
 ## Stop rules
 
-Orchestrate has five internal stop rules. Each fires on a specific condition; each requires an escalation artifact via `safer-escalate --from orchestrate --to <target> --cause <CAUSE>`.
+Orchestrate has stop rules in two groups: **decomposition-time** stop rules (fire while routing intent into sub-tasks) and **contract-level runtime** conditions (fire during dispatch execution against an already-accepted contract). Each requires an escalation artifact via `safer-escalate --from orchestrate --to <target> --cause <CAUSE>`.
+
+### Decomposition-time stop rules (5)
 
 1. **Under-specified intent.** The intent is so vague that decomposition would be guessing. → Create a `spec` sub-task first; do not attempt further decomposition until the spec is `done`. Status: `NEEDS_CONTEXT`.
 2. **Circular dependency.** Two sub-tasks mutually depend on each other. → The decomposition is wrong. Re-decompose. Status: internal; do not publish.
@@ -1457,7 +1459,7 @@ Orchestrate has five internal stop rules. Each fires on a specific condition; ea
 4. **Missing modality.** You classified a sub-task into a modality that does not exist in the catalog. → Either the catalog is incomplete or your classification is wrong. Status: `NEEDS_CONTEXT` to user.
 5. **Implementation instinct.** You notice yourself about to write code. → This is the Iron Law firing. Stop; re-classify the current sub-task. Status: internal; abort the current action.
 
-### Contract-level stop conditions
+### Contract-level runtime stop conditions (5)
 
 Five runtime conditions park even when the action is technically inside the contract budget. These fire during execution, not decomposition. Each posts a stop-the-line comment to the parent epic, sets the active sub-issue to `awaiting-amendment`, and returns `DONE_PARKED`.
 

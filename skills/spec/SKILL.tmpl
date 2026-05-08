@@ -135,7 +135,7 @@ A spec is a single document. It has exactly these sections, in this order:
 1. **Intent** — one paragraph, in the user's words (lightly cleaned).
 2. **Goals** — numbered list. What this must do.
 3. **Non-goals** — numbered list. What this explicitly does not do.
-4. **Invariants** — properties that must hold true throughout (e.g., "response time < 500ms", "user data never leaves the server"). **Required.** A spec without invariants is incomplete; the architect's readiness gate will escalate it back. If the work genuinely has no invariants, write "(none)" — the explicit absence is itself the signal.
+4. **Invariants** — properties that must hold true throughout (e.g., "response time < 500ms", "user data never leaves the server"). **Required.** A spec without invariants is incomplete; the architect's readiness gate will escalate it back. If the work genuinely has no constraints to invariant-check, name the absence explicitly ("no rate-limit constraint", "no auth boundary", "no concurrency invariant") — every such line is an invariant. Empty section = incomplete spec.
 5. **Acceptance criteria** — a checklist. How we know it is done.
 6. **Assumptions** — what you are assuming to be true; the user must confirm.
 7. **Open questions** — what you could not resolve. Every question has a recommended default.

@@ -232,6 +232,16 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I think the stop rule was a false positive." *(Stop rules are not suggestions. If you think it misfired, name that in the escalation artifact.)*
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
+- "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+
+### Stop rules vs `DONE_WITH_CONCERNS`
+
+When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
+
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
+
+The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
 
 ---
 
@@ -519,6 +529,8 @@ The detection is one-shot. Once you are in Mode B for this invocation, all remai
 
 ### Mode B — escalation to team-lead
 
+Mode B is **fire-and-forget**. Stamina hands off the dispatch plan to the team-lead in one message and stops. The team-lead owns dispatch, collection, aggregation, AND publication. Stamina does not resume — there is no second turn waiting for results.
+
 In Mode B, stamina produces no consolidated GitHub comment and does not transition labels. Those artifacts are the team-lead's responsibility after it completes the fan-out stamina described. Stamina's deliverable in Mode B is the escalation message plus a status marker.
 
 Send exactly one message, shape below. Copy-pasteable template:
@@ -530,6 +542,7 @@ SendMessage({
   message: """
 STATUS: ESCALATED (stamina Mode B — in-team teammate cannot spawn sub-teammates)
 
+Correlation ID: $SESSION (use this in every dispatched reviewer's prompt and in the consolidated comment so all artifacts trace back to this stamina invocation)
 Target: <PR or sub-issue URL>
 Mode: <plan|pr>
 N: <N> (source: <table|user-override>; ceiling: <4|3 degraded>)
@@ -626,7 +639,7 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 
 1. One consolidated comment per invocation. Not one per reviewer — dispatched reviewers publish their own native artifacts.
 2. N is bounded: floor N=1, ceiling N=4 table-default, N>4 requires explicit user approval (captured in `--budget` or `safer-escalate`).
-3. Review family (PR mode): `/safer:review-senior`, `/safer:dogfood`, `/codex`, `/security-review`. Fixed list; no additions in v1. `/simplify` and `/review` are NOT in the stamina dispatch set — they run as mandatory pre-PR hygiene gates inside `/safer:implement-*` (see `skills/implement-junior/SKILL.md` Phases 6a-6b, `skills/implement-senior/SKILL.md` Phases 6a-6b, `skills/implement-staff/SKILL.md` Phases 8a + 8c) and do not count toward stamina N. Only independent reviewers count.
+3. Review family (PR mode): `/safer:review-senior`, `/review`, `/simplify`, `/safer:dogfood`, `/codex`, `/security-review`. Fixed list; no additions in v1. The implement-* skills also run `/review` and `/simplify` as pre-PR hygiene gates; the stamina-time pass is a separate, independent review run that counts toward stamina N regardless of whether implement-* already ran them.
 4. Review family (plan mode): `/safer:dogfood`, `/safer:review-senior` (re-targeted at the plan body), `/codex` (cross-model). Fixed list; no additions in v1.
 5. Persona diversity: every pass differs by *role* (acceptance-vs-diff, structural-diff, adversarial, security, simplification, cold-start-read) or by *model* (`/codex` is the cross-model channel). Two passes with the same role on the same model do not count as two passes; reject at dispatch time.
 
@@ -662,7 +675,7 @@ Decision rule (caps the Phase 4 aggregate):
 | `pending` | aggregate caps at `APPROVE-PENDING-CI`. Auto-monitor withholds merge until CI clears |
 | `unknown` | treat as `pending` (fail-safe); surface raw `statusCheckRollup` JSON for triage |
 
-Triage exception (same shape as `skills/review-senior/SKILL.md` Phase 1a): a failing check verifiably pre-existing on the base branch — confirmed by running the test on `origin/<base>` — may proceed to APPROVE with both base-branch and PR-head outputs quoted in the verdict. No verbal-only triage.
+Triage exception: a failing check verifiably pre-existing on the base branch — confirmed by running the test on `origin/<base>` — may proceed to APPROVE with both base-branch and PR-head outputs quoted in the verdict. "Verified" means a fresh run, not "I think it was already failing." No verbal-only triage.
 
 This phase is non-skippable for PR mode. It is NOT a separate stamina N pass; it is the precondition gate for any aggregate APPROVE.
 
@@ -714,10 +727,10 @@ LABEL=$(gh issue view "$SUB_ISSUE" --json labels -q '.labels[].name' | grep '^sa
 | structural-diff | `/review` (gstack) | — |
 | simplification | `/simplify` (gstack) | — |
 | cold-start-read | `/safer:dogfood` | `/safer:dogfood` |
-| adversarial, cross-model | `/codex` (optional) | `/codex` (optional) |
+| adversarial, cross-model | `/codex` | `/codex` |
 | security | `/security-review` (auto-skipped if no auth/crypto/secret touches per `safer-diff-scope`) | — |
 
-If the final set has fewer roles than N, cap N down to the set size and record `n-capped=true` in telemetry. If the capped N < 1 the classifier is broken → `NEEDS_CONTEXT`.
+PR mode reaches |set| = 6 with all six roles fired. Plan mode reaches |set| = 3 (acceptance-vs-diff + cold-start-read + cross-model); N capped at 3 in plan mode. If the final set has fewer roles than N, cap N down to the set size and record `n-capped=true` in telemetry. If the capped N < 1 the classifier is broken → `NEEDS_CONTEXT`.
 
 ```bash
 safer-telemetry-log --event-type safer.stamina_gate \

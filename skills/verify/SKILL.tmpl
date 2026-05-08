@@ -72,7 +72,8 @@ You do not edit source files. You do not write new tests. You do not rerun a fla
 
 ## Inputs required
 
-- A PR number or URL.
+- A PR number or URL (env var `PR`).
+- Optional: `SAFER_SUBISSUE` env var when dispatched by orchestrate. Set to the sub-issue number tracking this verify run; the publish phase posts the verdict on it and `safer-transition-label` flips its label `verifying` → `done` (or `implementing` on hold). When unset, verify posts only on the PR and skips the sub-issue label transition.
 - The sub-issue URL (if operating under `orchestrate`), or an explicit acceptance-criteria list.
 - `gh` CLI authenticated.
 - Repo checked out at the PR's head commit.
@@ -154,13 +155,13 @@ If you cannot detect any command, `BLOCKED`; ask the user which commands to run.
 
 ### Phase 3 — Run
 
-Run each command, capturing output to a temp file:
+`$LINT_CMD`, `$TYPECHECK_CMD`, and `$TEST_CMD` were detected in Phase 2 from `package.json` / `pyproject.toml` / `Cargo.toml` / `Makefile`. The example below uses pnpm; substitute whatever Phase 2 detected. Run each command, capturing output to a temp file:
 
 ```bash
 mkdir -p /tmp/safer-verify-$PR
-pnpm lint      > /tmp/safer-verify-$PR/lint.log      2>&1; LINT_EXIT=$?
-pnpm typecheck > /tmp/safer-verify-$PR/typecheck.log 2>&1; TYPE_EXIT=$?
-pnpm test      > /tmp/safer-verify-$PR/test.log      2>&1; TEST_EXIT=$?
+$LINT_CMD      > /tmp/safer-verify-$PR/lint.log      2>&1; LINT_EXIT=$?
+$TYPECHECK_CMD > /tmp/safer-verify-$PR/typecheck.log 2>&1; TYPE_EXIT=$?
+$TEST_CMD      > /tmp/safer-verify-$PR/test.log      2>&1; TEST_EXIT=$?
 ```
 
 Record exit codes. A non-zero exit from any command is a failure; aggregate all failures into the findings section. Do not short-circuit on the first failure; run every detected command so the verdict reports the full picture.
@@ -240,9 +241,9 @@ cat > "$TMP" <<EOF
 ## Commands run
 | Command | Exit | Log |
 |---|---|---|
-| pnpm lint | $LINT_EXIT | /tmp/safer-verify-$PR/lint.log |
-| pnpm typecheck | $TYPE_EXIT | /tmp/safer-verify-$PR/typecheck.log |
-| pnpm test | $TEST_EXIT | /tmp/safer-verify-$PR/test.log |
+| $LINT_CMD | $LINT_EXIT | /tmp/safer-verify-$PR/lint.log |
+| $TYPECHECK_CMD | $TYPE_EXIT | /tmp/safer-verify-$PR/typecheck.log |
+| $TEST_CMD | $TEST_EXIT | /tmp/safer-verify-$PR/test.log |
 
 ## Test summary
 Total: N  Passed: N  Failed: N  Skipped: N  Flaky: N
