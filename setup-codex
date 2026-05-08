@@ -8,7 +8,7 @@ PLUGIN_LINK="$SKILLS_DIR/safer-by-default"
 BIN_LINK_DIR="${SAFER_CODEX_BIN_DIR:-$HOME/.local/bin}"
 STATE_DIR="${SAFER_STATE_DIR:-$HOME/.safer}"
 XDG_SOURCE_DIR="${SAFER_XDG_SOURCE_DIR:-$HOME/.local/share/safer-by-default}"
-CC_PLUGIN_CACHE="$HOME/.claude/plugins/cache/safer-by-default/safer-by-default"
+CC_PLUGIN_CACHE="$HOME/.claude/plugins/cache/safer-by-default/safer"
 REPO_URL="${SAFER_REPO_URL:-https://github.com/chughtapan/safer-by-default.git}"
 MARKER="<!-- safer-by-default codex wrapper -->"
 
@@ -28,7 +28,7 @@ Installs Codex compatibility wrappers for the safer-by-default skill bundle.
 Source resolution order (Codex has no plugin marketplace, so we need a
 canonical on-disk root):
   1. $SAFER_SOURCE_DIR if set (developer escape hatch).
-  2. ~/.claude/plugins/cache/safer-by-default/safer-by-default/<latest>
+  2. ~/.claude/plugins/cache/safer-by-default/safer/<latest>
      if Claude Code marketplace install is present.
   3. ~/.local/share/safer-by-default (cloned/refreshed from GitHub).
 
@@ -166,22 +166,31 @@ ensure_dir() {
 
 ensure_plugin_link() {
   if [ -L "$PLUGIN_LINK" ] || [ -d "$PLUGIN_LINK" ]; then
-    local current
-    current="$(resolved_path "$PLUGIN_LINK")"
-    if [ "$current" = "$(resolved_path "$SOURCE_DIR")" ]; then
-      log "  ✓ plugin root linked at $PLUGIN_LINK"
-      return 0
-    fi
-    if [ -L "$PLUGIN_LINK" ]; then
+    if [ -L "$PLUGIN_LINK" ] && [ ! -e "$PLUGIN_LINK" ]; then
       if [ "$CHECK_ONLY" -eq 1 ]; then
-        warn "$PLUGIN_LINK points to stale target ($current); will re-link to $SOURCE_DIR"
+        warn "$PLUGIN_LINK is a dangling symlink; will re-link to $SOURCE_DIR"
         return 0
       fi
-      log "  ↻ updating $PLUGIN_LINK: $current → $SOURCE_DIR"
+      log "  ↻ removing dangling $PLUGIN_LINK"
       rm -f "$PLUGIN_LINK"
     else
-      err "$PLUGIN_LINK exists as a real directory and points elsewhere: $current"
-      return 1
+      local current
+      current="$(resolved_path "$PLUGIN_LINK")"
+      if [ "$current" = "$(resolved_path "$SOURCE_DIR")" ]; then
+        log "  ✓ plugin root linked at $PLUGIN_LINK"
+        return 0
+      fi
+      if [ -L "$PLUGIN_LINK" ]; then
+        if [ "$CHECK_ONLY" -eq 1 ]; then
+          warn "$PLUGIN_LINK points to stale target ($current); will re-link to $SOURCE_DIR"
+          return 0
+        fi
+        log "  ↻ updating $PLUGIN_LINK: $current → $SOURCE_DIR"
+        rm -f "$PLUGIN_LINK"
+      else
+        err "$PLUGIN_LINK exists as a real directory and points elsewhere: $current"
+        return 1
+      fi
     fi
   fi
 
@@ -249,14 +258,30 @@ link_bin() {
   bin_name="$(basename "$source_file")"
   dest_file="$BIN_LINK_DIR/$bin_name"
 
-  if [ -L "$dest_file" ] || [ -f "$dest_file" ]; then
+  if [ -L "$dest_file" ] && [ ! -e "$dest_file" ]; then
+    if [ "$CHECK_ONLY" -eq 1 ]; then
+      warn "$dest_file is a dangling symlink; will re-link to $source_file"
+      return 0
+    fi
+    log "  ↻ removing dangling $dest_file"
+    rm -f "$dest_file"
+  elif [ -L "$dest_file" ] || [ -f "$dest_file" ]; then
     current="$(resolved_path "$dest_file")"
     if [ "$current" = "$(resolved_path "$source_file")" ]; then
       log "  ✓ binary linked: $bin_name"
       return 0
     fi
-    err "$dest_file already exists and points elsewhere: $current"
-    return 1
+    if [ -L "$dest_file" ]; then
+      if [ "$CHECK_ONLY" -eq 1 ]; then
+        warn "$dest_file points to stale target ($current); will re-link to $source_file"
+        return 0
+      fi
+      log "  ↻ updating $dest_file: $current → $source_file"
+      rm -f "$dest_file"
+    else
+      err "$dest_file already exists as a regular file (not a symlink): $current"
+      return 1
+    fi
   fi
 
   if [ "$CHECK_ONLY" -eq 1 ]; then
