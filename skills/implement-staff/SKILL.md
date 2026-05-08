@@ -718,7 +718,16 @@ Fill in the stub bodies across the new modules. Apply the four craft principles 
 - Every switch over a union ends in `default: return absurd(x)`.
 - Every branded type is constructed at exactly one site (the schema decode) and trusted inside.
 
-When an algorithm choice is within the plan's envelope (e.g., "uses a bounded LRU cache"), pick a specific implementation and note it in a one-sentence comment pointing at the plan line. When the choice is outside the envelope, stop and escalate.
+When an algorithm choice is within the plan's envelope (e.g., "uses a bounded LRU cache"), pick a specific implementation and record it in the PR body's traceability table (plan line → file:line). Plan-anchor citations live in the table, not as comments in the code. When the choice is outside the envelope, stop and escalate.
+
+**Comment audit (mandatory before moving on).** Re-read every comment you inserted into the diff. Strip any comment that:
+
+- describes the present (`// this is the X`, `// we now do Y`, `// here we handle Z`),
+- describes the future (`// this will be called by`, `// the reviewer should check`, `// later we'll add`),
+- restates what the code does (`// loop over users`, `// return the result`),
+- references the current task, fix, PR, plan line, or caller (`// added for the X flow`, `// see issue #123`, `// per plan line 4.3`, `// part of the Y migration`).
+
+Keep only WHY-comments: a hidden constraint, a non-obvious invariant, a workaround for a specific upstream bug, behavior that would surprise a careful reader. Spec/plan traceability lives in the PR body's traceability and dependencies tables, not in code comments. If removing the comment would not confuse the next reader of the code, remove it.
 
 ### Phase 7 — Write tests
 
@@ -949,6 +958,7 @@ Post on the sub-issue; leave the branch in place with the anchored work committe
 - [ ] No unanchored refactors of pre-existing code.
 - [ ] Every public function declares its error channel (tagged error or discriminated result).
 - [ ] Every boundary has a schema; no `as T` across a boundary.
+- [ ] Every comment inserted in the diff is a WHY-comment; no narrative present/future-tense comments, no restatements of what the code does, no spec/plan traceability cross-refs (those live in the PR body tables).
 - [ ] Every switch over a union ends in `absurd`.
 - [ ] Tests cover success, each error tag, and each named invariant.
 - [ ] Lint, typecheck, and tests pass across touched packages.

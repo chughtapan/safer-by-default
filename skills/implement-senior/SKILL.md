@@ -682,6 +682,15 @@ Work the plan in dependency order. For each anchored change, write the code appl
 
 When a plan line is ambiguous, do not guess. If the ambiguity is small and the recommended default in the plan resolves it, apply the default and note it in the PR body. If the ambiguity is load-bearing, stop and escalate.
 
+**Comment audit (mandatory before moving on).** Re-read every comment you inserted into the diff. Strip any comment that:
+
+- describes the present (`// this is the X`, `// we now do Y`, `// here we handle Z`),
+- describes the future (`// this will be called by`, `// the reviewer should check`, `// later we'll add`),
+- restates what the code does (`// loop over users`, `// return the result`),
+- references the current task, fix, PR, or caller (`// added for the X flow`, `// see issue #123`, `// part of the Y refactor`).
+
+Keep only WHY-comments: a hidden constraint, a non-obvious invariant, a workaround for a specific upstream bug, behavior that would surprise a careful reader. Plan-anchor traceability lives in the PR body's plan-anchor table, not in code comments. If removing the comment would not confuse the next reader of the code, remove it.
+
 ### Phase 5 — Reshape tests
 
 Tests follow the code. If a test moved modules, update its imports. If the plan changed a function's error channel, update the test to cover each new tag. No test is silently disabled; a deliberately skipped test is documented in the PR body.
@@ -880,6 +889,7 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 - [ ] Every switch over a union ends in `absurd`.
 - [ ] Every error path is tagged; composed error channels are named explicitly.
 - [ ] Every package-boundary decode uses a schema.
+- [ ] Every comment inserted in the diff is a WHY-comment; no narrative present/future-tense comments, no restatements of what the code does, no plan-anchor cross-refs (those live in the PR body table).
 - [ ] Tests cover each cross-module path the plan names.
 - [ ] Lint, typecheck, and tests pass across touched packages.
 - [ ] Pre-PR `/simplify` pass run; findings applied or cited with skip reason in PR body.

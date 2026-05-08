@@ -673,6 +673,15 @@ Write the function bodies. Apply the four craft principles at every decision.
 
 When you are tempted to reach for `any`, `unknown`, `Record<string, unknown>`, `as T`, or `throw new Error(...)`: stop. Ask whether the constraint can live higher up. Usually it can.
 
+**Comment audit (mandatory before moving on).** Re-read every comment you inserted into the diff. Strip any comment that:
+
+- describes the present (`// this is the X`, `// we now do Y`, `// here we handle Z`),
+- describes the future (`// this will be called by`, `// the reviewer should check`, `// later we'll add`),
+- restates what the code does (`// loop over users`, `// return the result`),
+- references the current task, fix, PR, or caller (`// added for the X flow`, `// see issue #123`).
+
+Keep only WHY-comments: a hidden constraint, a non-obvious invariant, a workaround for a specific upstream bug, behavior that would surprise a careful reader. If removing the comment would not confuse the next reader of the code, remove it. Identifiers are the explanation; commit messages and PR descriptions carry task context.
+
 ### Phase 5 — Tests
 
 Write tests in the module's existing test file. Rules:
@@ -864,6 +873,7 @@ Post on the sub-issue; leave the branch in place with no cross-module edits comm
 - [ ] Every error path is tagged; no raw `throw new Error("bad")`.
 - [ ] Every boundary decode uses a schema.
 - [ ] Every `any`, `as T`, or `Record<string, unknown>` is either gone or documented in the PR body as a concern.
+- [ ] Every comment inserted in the diff is a WHY-comment; no narrative present/future-tense comments, no restatements of what the code does.
 - [ ] Tests cover the success branch and each named error tag.
 - [ ] Lint, typecheck, and tests pass locally.
 - [ ] Draft PR opened with title prefixed `[impl-junior]`.
