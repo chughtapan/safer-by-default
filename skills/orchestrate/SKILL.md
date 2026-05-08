@@ -112,6 +112,21 @@ SESSION="$$-$(date +%s)"
 safer-telemetry-log --event-type safer.skill_run --modality orchestrate --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
+# Update gate: halt only when starting a fresh orchestration, not during
+# autonomous re-entry (cron loop ticks, parent-epic polling). "Fresh start"
+# means no open safer:parent epic exists in this repo yet. If one exists,
+# orchestrate is mid-pipeline and must keep running so dispatched work
+# completes; the user can upgrade after the in-flight orchestration drains.
+_EXISTING_EPIC=$(gh issue list --label "safer:parent" --state open --limit 1 --json number -q '.[0].number' 2>/dev/null || echo "")
+if [ -n "$_UPD" ] && [ -z "$_EXISTING_EPIC" ] && [ -z "${SAFER_PARENT_ISSUE:-}" ] && [ -z "${SAFER_SUBISSUE:-}" ]; then
+  cat <<'MSG'
+PRECONDITION_FAIL: safer-by-default update available
+Run inside Claude Code:
+  /plugin marketplace update safer-by-default
+  /plugin install safer@safer-by-default
+Then re-run /safer:orchestrate.
+MSG
+fi
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "unknown/unknown")
 BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "REPO: $REPO"

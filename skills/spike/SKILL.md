@@ -72,6 +72,18 @@ _TEL_START=$(date +%s)
 safer-telemetry-log --event-type safer.skill_run --modality spike --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
+# Update gate: halt user-initiated work when an upgrade is available.
+# Dispatched runs (SAFER_PARENT_ISSUE / SAFER_SUBISSUE set by /safer:orchestrate)
+# skip the gate so pipelines don't stall mid-run.
+if [ -n "$_UPD" ] && [ -z "${SAFER_PARENT_ISSUE:-}" ] && [ -z "${SAFER_SUBISSUE:-}" ]; then
+  cat <<'MSG'
+PRECONDITION_FAIL: safer-by-default update available
+Run inside Claude Code:
+  /plugin marketplace update safer-by-default
+  /plugin install safer@safer-by-default
+Then re-run this skill.
+MSG
+fi
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "unknown/unknown")
 BASE=$(git branch --show-current 2>/dev/null || echo "main")
 echo "REPO:    $REPO"
