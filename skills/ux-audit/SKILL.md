@@ -656,16 +656,16 @@ Run each applicable protocol against the scope. Each protocol emits a list of fi
 
 #### H1 — Nielsen's 10 heuristics
 
-Navigate every in-scope page and screenshot each at default desktop viewport via the gstack `browse` skill:
-
 ```
-Skill({ skill: "browse", args: "--url <URL> --screenshot --viewport desktop" })
+/browse --url <URL> --screenshot --viewport desktop
 ```
 
-For each screenshot, dispatch to gstack `design-review` (composition target — runs hold-scope autonomous; if it would prompt mid-run, escalate to `/safer:orchestrate` which surfaces the prompt via `AskUserQuestion`):
+Navigate every in-scope page; screenshots are the artifact the rest of this protocol reads.
+
+For each screenshot, dispatch to gstack `/design-review` (composition target — runs hold-scope autonomous; if it would prompt mid-run, escalate to `/safer:orchestrate` which surfaces the prompt via `AskUserQuestion`):
 
 ```
-Skill({ skill: "design-review", args: "--screenshot <PATH> --hold-scope" })
+/design-review --screenshot <PATH> --hold-scope
 ```
 
 Re-tag every `/design-review` finding against the matching Nielsen heuristic before merging:
