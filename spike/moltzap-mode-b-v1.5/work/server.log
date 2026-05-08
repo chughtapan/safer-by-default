@@ -1,0 +1,51 @@
+{"level":30,"time":1777940113620,"pid":929298,"hostname":"moltzap-vm","service":"moltzap-server","environment":"development","msg":"Using embedded PGlite database (no external Postgres needed)"}
+{"level":30,"time":1777940113640,"pid":929298,"hostname":"moltzap-vm","msg":"Applying database schema..."}
+{"level":30,"time":1777940113720,"pid":929298,"hostname":"moltzap-vm","msg":"Encryption not configured — messages will be stored as plaintext"}
+{"level":30,"time":1777940113720,"pid":929298,"hostname":"moltzap-vm","msg":"Database schema applied successfully"}
+{"level":40,"time":1777940113723,"pid":929298,"hostname":"moltzap-vm","service":"moltzap-server","environment":"development","devModeUserId":"a991a1c5-bfe9-4a58-9097-12a31008a011","msg":"dev_mode.enabled=true — registered agents will be auto-owned; do not use in production"}
+{"level":30,"time":1777940113831,"pid":929298,"hostname":"moltzap-vm","service":"moltzap-server","environment":"development","port":41973,"mode":"standalone","db":"pglite","msg":"MoltZap server started (standalone mode)"}
+[17:15:13.846] [32mINFO[39m (929298): [36mMoltZap core server listening[39m
+    [35mport[39m: 41973
+[17:15:14.277] [32mINFO[39m (spike-claude/929298): [36mAgent registered[39m
+    [35magentId[39m: "5855034d-f798-4f2e-8036-751e87f4a8bb"
+[17:15:14.299] [32mINFO[39m (spike-peer/929298): [36mAgent registered[39m
+    [35magentId[39m: "5e4ee7b1-1548-4d5d-86ab-d54dd0239ef5"
+[17:15:16.593] [32mINFO[39m (929298): [36mRPC request completed[39m
+    [35mrequestId[39m: "rpc-1"
+    [35mmethod[39m: "auth/connect"
+    [35mdurationMs[39m: 27
+[17:15:16.539] [32mINFO[39m (929298): [36mWebSocket connected[39m
+    [35mconnId[39m: "1f466d7e-0d4f-43cc-8aab-fdf576ae6cba"
+[17:15:17.600] [32mINFO[39m (929298): [36mRPC request completed[39m
+    [35mrequestId[39m: "auth-1"
+    [35mmethod[39m: "auth/connect"
+    [35mdurationMs[39m: 14
+[17:15:17.567] [32mINFO[39m (929298): [36mWebSocket connected[39m
+    [35mconnId[39m: "9ccd2e55-3d17-4805-8a85-765e551dd1f7"
+[17:15:17.634] [32mINFO[39m (929298): [36mConversation created[39m
+    [35mconversationId[39m: "7d01806b-1183-47d6-bd27-ce6e0a88ff24"
+    [35mparticipantCount[39m: 2
+    [35mtype[39m: "dm"
+[17:15:17.640] [32mINFO[39m (929298): [36mRPC request completed[39m
+    [35mrequestId[39m: "conv-2"
+    [35mmethod[39m: "conversations/create"
+    [35mdurationMs[39m: 36
+[17:15:17.680] [32mINFO[39m (929298): [36mMessage sent[39m
+    [35mmessageId[39m: "a6927ea8-6a25-4ff0-a64c-2d56bbd0dbf0"
+    [35mconversationId[39m: "7d01806b-1183-47d6-bd27-ce6e0a88ff24"
+[17:15:17.682] [32mINFO[39m (929298): [36mRPC request completed[39m
+    [35mrequestId[39m: "send-3"
+    [35mmethod[39m: "messages/send"
+    [35mdurationMs[39m: 39
+[17:15:17.711] [32mINFO[39m (929298): [36mRPC request completed[39m
+    [35mrequestId[39m: "rpc-3"
+    [35mmethod[39m: "apps/authorizeDispatch"
+    [35mdurationMs[39m: 17
+[17:15:17.720] [32mINFO[39m (929298): [36mRPC request completed[39m
+    [35mrequestId[39m: "rpc-2"
+    [35mmethod[39m: "conversations/get"
+    [35mdurationMs[39m: 34
+[17:15:17.733] [32mINFO[39m (929298): [36mRPC request completed[39m
+    [35mrequestId[39m: "rpc-4"
+    [35mmethod[39m: "agents/lookup"
+    [35mdurationMs[39m: 11

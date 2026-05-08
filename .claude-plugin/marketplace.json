@@ -10,8 +10,8 @@
     {
       "name": "safer-by-default",
       "source": "./",
-      "version": "0.1.2",
-      "description": "13 skills (orchestrate, spec, architect, implement-{junior,senior,staff}, investigate, spike, research, review-senior, verify, typescript, setup) plus 10 bin/ utilities. Composes with eslint-plugin-agent-code-guard (lint floor) and zapbot (publish).",
+      "version": "0.1.3",
+      "description": "17 skills (architect, docs-reader, dogfood, implement-{junior,senior,staff}, investigate, orchestrate, research, review-senior, setup, spec, spike, stamina, typescript, ux-audit, verify) plus 13 bin/ utilities. Composes with eslint-plugin-agent-code-guard (lint floor) and zapbot (publish).",
       "author": {
         "name": "Tapan Chugh"
       },

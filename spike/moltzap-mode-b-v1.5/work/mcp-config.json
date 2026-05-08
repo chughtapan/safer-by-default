@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "moltzap": {
+      "command": "node",
+      "args": ["/home/tapanc/moltzap/packages/claude-code-channel/dist/bin.js"],
+      "env": {
+        "MOLTZAP_API_KEY": "moltzap_agent_75c85e41f12394a7_54fee0506b5703b6cfafdfb89862a80c847bc0658cd1decc",
+        "MOLTZAP_SERVER_URL": "http://localhost:41973",
+        "MOLTZAP_SERVER_NAME": "spike-claude"
+      }
+    }
+  }
+}

@@ -30,56 +30,66 @@ Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `S
 
 ## Install
 
-**Pre-check:** If `~/.claude/skills/safer-by-default` already exists (from a prior install), remove it or choose a different path.
+### Claude Code (plugin marketplace)
 
-**Step 1: Clone the plugin**
+Inside a Claude Code session:
 
-```bash
-git clone --single-branch --depth 1 https://github.com/chughtapan/safer-by-default.git ~/.claude/skills/safer-by-default
-cd ~/.claude/skills/safer-by-default
+```text
+/plugin marketplace add chughtapan/safer-by-default
+/plugin install safer-by-default@safer-by-default
 ```
 
-⚠️ **Integrity note:** This clone is fetched over HTTPS with no checksum verification. If you require git signature verification, pin to a release tag instead: add `--branch v<version>` to the clone command. See [Releases](https://github.com/chughtapan/safer-by-default/releases).
+Skills register under the `safer-by-default:<name>` namespace (`/safer-by-default:spec`, `/safer-by-default:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
 
-**Step 2: Install dependencies**
+⚠️ **Integrity note:** Marketplace installs are fetched over HTTPS without signature verification. If you need pinned, signed installs, install from a tagged release tarball instead. See [Releases](https://github.com/chughtapan/safer-by-default/releases).
 
-```bash
-./setup
-```
+### Codex
 
-`./setup` installs the `eslint-plugin-agent-code-guard` npm package into `.claude/plugins/`, configures `.claude/settings.json` with the lint rules, and probes for required CLIs (`gh`, `git`, `bash`, `bun`). It is idempotent and produces no output unless an error occurs.
-
-**Step 3: Configure GitHub labels** (one time per repo)
+Codex has no plugin marketplace, so we install via a script:
 
 ```bash
-./bin/safer-setup-labels
-```
-
-`./bin/safer-setup-labels` creates the GitHub issue labels used by safer-by-default skills (`safer:spec`, `safer:planning`, `safer:implementing`, etc.). Requires `gh` authenticated with `repo` scope and write access to the repository. It is idempotent; running it twice on the same repo is safe.
-
-**Requirements:**
-- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (for the template generator).
-- [gstack](https://github.com/chughtapan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
-
-**Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
-
-## Use with Codex
-
-This repository is authored as a **Claude-style skill plugin**, not a native Codex plugin. The quickest Codex path is to install a small compatibility layer that:
-
-- links this repo into `~/.codex/skills/safer-by-default`
-- creates Codex skill wrappers like `safer:spec`, `safer:architect`, `safer:review-senior`
-- links `bin/safer-*` into `~/.local/bin`
-
-Run:
-
-```bash
+git clone --depth 1 https://github.com/chughtapan/safer-by-default.git
+cd safer-by-default
 ./setup-codex
 ```
 
-Then restart Codex so it reloads skills.
+`./setup-codex` resolves the safer-by-default source in this order:
 
-Example prompts inside Codex:
+1. `$SAFER_SOURCE_DIR` if set (developer escape hatch).
+2. The Claude Code plugin cache at `~/.claude/plugins/cache/safer-by-default/safer-by-default/<latest>` if you've already installed via the CC marketplace.
+3. `~/.local/share/safer-by-default/` — cloned fresh from GitHub if absent, refreshed otherwise.
+
+It then symlinks `bin/safer-*` into `~/.local/bin/` and creates Codex skill wrappers at `~/.codex/skills/safer-<name>/`. Restart Codex to pick them up. The clone you used to invoke the script is not the source of truth and can be deleted.
+
+### Per-repo setup (both flavors)
+
+One-time, after the plugin is installed:
+
+```bash
+safer-setup-labels
+```
+
+Creates the GitHub issue labels (`safer:spec`, `safer:planning`, `safer:implementing`, …) the skills publish under. Requires `gh` authenticated with `repo` scope. Idempotent.
+
+### Working from source (developers)
+
+```bash
+git clone https://github.com/chughtapan/safer-by-default.git
+cd safer-by-default
+./setup       # sanity check; not an installer
+```
+
+`./setup` verifies dependencies (`gh`, `git`, `bash`, `gh auth status`), prepares the analytics state dir, makes binaries executable, and removes any legacy `~/.claude/skills/safer-*` symlinks left by previous versions of this script. The canonical install path is the marketplace command above.
+
+### Requirements
+
+- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (for the template generator).
+- [gstack](https://github.com/chughtapan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
+- **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
+
+## Use with Codex
+
+Once `./setup-codex` has run, Codex sees the safer skills as `safer:<name>` wrappers. Example prompts:
 
 - `Use safer:setup to bootstrap this TypeScript repo.`
 - `Use safer:spec to turn this idea into a spec.`
@@ -126,7 +136,7 @@ Each skill is invoked as a **Claude slash-command** within a Claude Code session
 | `/safer:orchestrate` | decomposition + routing + tracking (scrum master) |
 | `/safer:stamina` | fan-out reviewer for high-blast-radius artifacts (N heterogeneous passes) |
 | `/safer:dogfood` | cold-start read of any artifact; portability check before handoff |
-| `/safer:safer-docs-reader` | multi-persona docs review (4 ephemeral opus personas) |
+| `/safer:docs-reader` | multi-persona docs review (4 ephemeral opus personas) |
 
 ### Floor + bootstrap
 

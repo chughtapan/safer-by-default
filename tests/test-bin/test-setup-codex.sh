@@ -52,10 +52,15 @@ run_setup() {
   local bin_dir="$2"
   local fake_tools="$3"
 
+  # SAFER_SOURCE_DIR pins the resolver to the test's checkout. Without it,
+  # setup-codex would fall through to the CC plugin cache (host-state leak)
+  # or attempt a real git clone of REPO_URL (network dependency).
   HOME="$home_dir" \
   CODEX_HOME="$home_dir/.codex" \
   SAFER_CODEX_BIN_DIR="$bin_dir" \
   SAFER_STATE_DIR="$home_dir/.safer" \
+  SAFER_SOURCE_DIR="$PLUGIN_DIR" \
+  SAFER_XDG_SOURCE_DIR="$home_dir/.local/share/safer-by-default" \
   PATH="$fake_tools:$PATH" \
   "$BIN"
 }

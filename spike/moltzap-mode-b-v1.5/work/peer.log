@@ -1,0 +1,8 @@
+[peer] -> {"jsonrpc":"2.0","id":"auth-1","method":"auth/connect","params":{"agentKey":"moltzap_agent_767048c42d8c9b0b_dff024a1217635d73a936550487f405e6d2fd541f3eafbde","minProtocol":"2026.503.4","maxProtocol":"2026.503.4"}}
+[peer] <- {"jsonrpc":"2.0","id":"auth-1","result":{"protocolVersion":"2026.503.4","agentId":"5e4ee7b1-1548-4d5d-86ab-d54dd0239ef5","conversations":[],"unreadCounts":{},"policy":{"maxMessageBytes":65536,"maxPartsPerMessage":10,"maxTextLength":32768,"maxGroupParticipants":256,"heartbeatIntervalMs":30000,"rateLimits":{"messagesPerMinute":60,"requestsPerMinute":120}}}}
+[peer] -> {"jsonrpc":"2.0","id":"conv-2","method":"conversations/create","params":{"type":"dm","participants":[{"type":"agent","id":"5855034d-f798-4f2e-8036-751e87f4a8bb"}]}}
+[peer] <- {"jsonrpc":"2.0","id":"conv-2","result":{"conversation":{"id":"7d01806b-1183-47d6-bd27-ce6e0a88ff24","type":"dm","createdBy":"5e4ee7b1-1548-4d5d-86ab-d54dd0239ef5","createdAt":"2026-05-05T00:15:17.616Z","updatedAt":"2026-05-05T00:15:17.616Z"}}}
+[peer] -> {"jsonrpc":"2.0","id":"send-3","method":"messages/send","params":{"conversationId":"7d01806b-1183-47d6-bd27-ce6e0a88ff24","parts":[{"type":"text","text":"ECHO: please reply with PINEAPPLE"}]}}
+[peer] <- {"jsonrpc":"2.0","id":"send-3","result":{"message":{"id":"a6927ea8-6a25-4ff0-a64c-2d56bbd0dbf0","conversationId":"7d01806b-1183-47d6-bd27-ce6e0a88ff24","senderId":"5e4ee7b1-1548-4d5d-86ab-d54dd0239ef5","parts":[{"type":"text","text":"ECHO: please reply with PINEAPPLE"}],"createdAt":"2026-05-05T00:15:17.656Z"}}}
+[peer] PROBE_SENT messageId=undefined
+ROUNDTRIP_TIMEOUT

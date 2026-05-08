@@ -1,5 +1,5 @@
 ---
-name: safer-docs-reader
+name: docs-reader
 version: 0.1.0
 model: opus
 description: |
@@ -201,7 +201,7 @@ The team is scoped to this run only. It is torn down in Phase 8 on every exit pa
 
 For each persona in `PERSONAS_CSV`:
 
-1. Read the template: `skills/safer-docs-reader/prompts/<persona>.md`.
+1. Read the template: `skills/docs-reader/prompts/<persona>.md`.
 2. Assemble the full sub-agent prompt as `<template-body> + "\n\n# The artifact\n\n" + <payload> + "\n\nArtifact ref: <ARTIFACT_REF>"`.
 3. Write the assembled prompt to a temp file (do not interpolate any session context).
 

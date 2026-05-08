@@ -803,7 +803,6 @@ For each comment body, scan in priority order:
 
 2. **Review-ready sub-issues.** `gh issue list --label review --json number,title,url,labels` for this repo. Any hit is a candidate for Step 5c.
 3. **Open PRs.** `gh pr list --json number,url,isDraft,mergeable,statusCheckRollup` to see which draft PRs are green.
-   - **Linear project sync (if configured).** Run `safer-linear-setup assign-projects --since 5m --quiet` to backfill any issues filed in the last 5 minutes to their correct Linear project. Requires `LINEAR_API_KEY` env var; silently skips if not set.
 4. **Auto-shutdown + auto-delete idle done teammates.** Two paths run on every tick. The `shutdown_request` protocol is unreliable — teammates' system prompts frequently do not handle it — so direct pane kill plus roster rewrite is the reliable path.
 
    **First, compute the authoritative list of live panes.** This is the one command the loop depends on getting right:

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 SKILLS_DIR="$CODEX_HOME/skills"
 PLUGIN_LINK="$SKILLS_DIR/safer-by-default"
 BIN_LINK_DIR="${SAFER_CODEX_BIN_DIR:-$HOME/.local/bin}"
 STATE_DIR="${SAFER_STATE_DIR:-$HOME/.safer}"
+XDG_SOURCE_DIR="${SAFER_XDG_SOURCE_DIR:-$HOME/.local/share/safer-by-default}"
+CC_PLUGIN_CACHE="$HOME/.claude/plugins/cache/safer-by-default/safer-by-default"
+REPO_URL="${SAFER_REPO_URL:-https://github.com/chughtapan/safer-by-default.git}"
 MARKER="<!-- safer-by-default codex wrapper -->"
 
 QUIET=0
@@ -21,6 +24,20 @@ while [ $# -gt 0 ]; do
 Usage: ./setup-codex [--check] [--quiet]
 
 Installs Codex compatibility wrappers for the safer-by-default skill bundle.
+
+Source resolution order (Codex has no plugin marketplace, so we need a
+canonical on-disk root):
+  1. $SAFER_SOURCE_DIR if set (developer escape hatch).
+  2. ~/.claude/plugins/cache/safer-by-default/safer-by-default/<latest>
+     if Claude Code marketplace install is present.
+  3. ~/.local/share/safer-by-default (cloned/refreshed from GitHub).
+
+Override locations via env vars:
+  SAFER_SOURCE_DIR       skip resolution; use this tree directly
+  SAFER_XDG_SOURCE_DIR   change the XDG fallback location
+  SAFER_CODEX_BIN_DIR    where to symlink safer-* binaries (default: ~/.local/bin)
+  SAFER_REPO_URL         git remote for the XDG fallback clone
+  CODEX_HOME             Codex config root (default: ~/.codex)
 EOF
       exit 0
       ;;
@@ -34,6 +51,74 @@ done
 log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
 warn() { echo "WARN: $*" >&2; }
 err() { echo "ERROR: $*" >&2; }
+
+# Resolve a stable source directory for the safer-by-default install. Codex
+# does not have a plugin marketplace, so we need a canonical on-disk root
+# for the skills and bin/ helpers. Resolution order:
+#   1. $SAFER_SOURCE_DIR — explicit override (developer escape hatch).
+#   2. Newest version under $CC_PLUGIN_CACHE — reuse the Claude Code
+#      marketplace install if the user already has it.
+#   3. $XDG_SOURCE_DIR — if a clone exists there, refresh it; otherwise
+#      clone fresh from $REPO_URL.
+#
+# The resolved path must contain skills/ and bin/. Resolution prints which
+# branch was taken so the user can verify.
+resolve_source_dir() {
+  # Status lines go to stderr; only the resolved path is written to stdout
+  # so the caller can use SOURCE_DIR="$(resolve_source_dir)" cleanly.
+  if [ -n "${SAFER_SOURCE_DIR:-}" ]; then
+    if [ -d "$SAFER_SOURCE_DIR/skills" ] && [ -d "$SAFER_SOURCE_DIR/bin" ]; then
+      log "  ✓ using \$SAFER_SOURCE_DIR override: $SAFER_SOURCE_DIR" >&2
+      printf '%s\n' "$SAFER_SOURCE_DIR"
+      return 0
+    fi
+    err "\$SAFER_SOURCE_DIR=$SAFER_SOURCE_DIR is not a valid safer-by-default tree"
+    return 1
+  fi
+
+  if [ -d "$CC_PLUGIN_CACHE" ]; then
+    local newest
+    newest="$(ls -1 "$CC_PLUGIN_CACHE" 2>/dev/null | sort -V | tail -n1)"
+    if [ -n "$newest" ] && [ -d "$CC_PLUGIN_CACHE/$newest/skills" ]; then
+      log "  ✓ reusing Claude Code plugin install: $CC_PLUGIN_CACHE/$newest" >&2
+      printf '%s\n' "$CC_PLUGIN_CACHE/$newest"
+      return 0
+    fi
+  fi
+
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    if [ -d "$XDG_SOURCE_DIR/skills" ]; then
+      log "  ✓ existing XDG clone at $XDG_SOURCE_DIR" >&2
+      printf '%s\n' "$XDG_SOURCE_DIR"
+      return 0
+    fi
+    warn "no source dir resolved; would clone $REPO_URL → $XDG_SOURCE_DIR"
+    return 1
+  fi
+
+  if ! command -v git >/dev/null 2>&1; then
+    err "git is required to clone $REPO_URL → $XDG_SOURCE_DIR"
+    return 1
+  fi
+
+  if [ -d "$XDG_SOURCE_DIR/.git" ]; then
+    log "  ↻ refreshing existing clone: $XDG_SOURCE_DIR" >&2
+    git -C "$XDG_SOURCE_DIR" fetch --quiet --depth 1 origin HEAD >&2 || warn "git fetch failed; continuing with local clone"
+    git -C "$XDG_SOURCE_DIR" reset --quiet --hard FETCH_HEAD 2>/dev/null || true
+  else
+    log "  ↓ cloning $REPO_URL → $XDG_SOURCE_DIR" >&2
+    mkdir -p "$(dirname "$XDG_SOURCE_DIR")"
+    git clone --quiet --single-branch --depth 1 "$REPO_URL" "$XDG_SOURCE_DIR" >&2
+  fi
+
+  if [ -d "$XDG_SOURCE_DIR/skills" ] && [ -d "$XDG_SOURCE_DIR/bin" ]; then
+    chmod +x "$XDG_SOURCE_DIR/bin"/safer-* 2>/dev/null || true
+    printf '%s\n' "$XDG_SOURCE_DIR"
+    return 0
+  fi
+  err "clone at $XDG_SOURCE_DIR is missing skills/ or bin/"
+  return 1
+}
 
 resolved_path() (
   local target="$1"
@@ -83,12 +168,21 @@ ensure_plugin_link() {
   if [ -L "$PLUGIN_LINK" ] || [ -d "$PLUGIN_LINK" ]; then
     local current
     current="$(resolved_path "$PLUGIN_LINK")"
-    if [ "$current" = "$(resolved_path "$INSTALL_DIR")" ]; then
+    if [ "$current" = "$(resolved_path "$SOURCE_DIR")" ]; then
       log "  ✓ plugin root linked at $PLUGIN_LINK"
       return 0
     fi
-    err "$PLUGIN_LINK already points elsewhere: $current"
-    return 1
+    if [ -L "$PLUGIN_LINK" ]; then
+      if [ "$CHECK_ONLY" -eq 1 ]; then
+        warn "$PLUGIN_LINK points to stale target ($current); will re-link to $SOURCE_DIR"
+        return 0
+      fi
+      log "  ↻ updating $PLUGIN_LINK: $current → $SOURCE_DIR"
+      rm -f "$PLUGIN_LINK"
+    else
+      err "$PLUGIN_LINK exists as a real directory and points elsewhere: $current"
+      return 1
+    fi
   fi
 
   if [ "$CHECK_ONLY" -eq 1 ]; then
@@ -96,7 +190,7 @@ ensure_plugin_link() {
     return 0
   fi
 
-  ln -s "$INSTALL_DIR" "$PLUGIN_LINK"
+  ln -s "$SOURCE_DIR" "$PLUGIN_LINK"
   log "  ✓ linked plugin root to $PLUGIN_LINK"
 }
 
@@ -175,10 +269,14 @@ link_bin() {
 }
 
 log "safer-by-default Codex setup"
-log "  install dir:  $INSTALL_DIR"
+log "  script dir:   $SCRIPT_DIR"
 log "  codex home:   $CODEX_HOME"
 log "  skills dir:   $SKILLS_DIR"
 log "  bin link dir: $BIN_LINK_DIR"
+log ""
+
+log "Resolving safer-by-default source..."
+SOURCE_DIR="$(resolve_source_dir)" || { err "could not resolve a source dir; aborting"; exit 1; }
 log ""
 
 log "Checking recommended dependencies..."
@@ -210,7 +308,7 @@ ensure_plugin_link
 log ""
 
 log "Installing skill wrappers..."
-for skill_dir in "$INSTALL_DIR"/skills/*; do
+for skill_dir in "$SOURCE_DIR"/skills/*; do
   [ -d "$skill_dir" ] || continue
   [ -f "$skill_dir/SKILL.md" ] || continue
   write_wrapper "$(basename "$skill_dir")"
@@ -218,7 +316,7 @@ done
 log ""
 
 log "Linking safer binaries..."
-for source_file in "$INSTALL_DIR"/bin/safer-*; do
+for source_file in "$SOURCE_DIR"/bin/safer-*; do
   [ -f "$source_file" ] || continue
   link_bin "$source_file"
 done

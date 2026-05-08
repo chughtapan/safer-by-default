@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.1.3 — 2026-05-07
+
+Combined release. Subsumes the locally-numbered-but-unpublished `0.1.3` (WS3 framing) and `0.1.4` (composition cleanup) working sections, plus the prior `Unreleased` work (ux-audit, contracts, gates) and an install-path + manifest cleanup. Only `0.1.2` actually shipped to the marketplace; the in-flight numbering has been collapsed so the published version increments cleanly from there.
+
+### New skill: /safer:docs-reader (renamed from /safer:safer-docs-reader)
+
+Breaking rename. The skill directory `skills/safer-docs-reader/` is now `skills/docs-reader/`; YAML `name` is `docs-reader`. Other 16 skills already drop the `safer-` prefix on directory and YAML name, and the in-doc H1 was already `# /safer:docs-reader`. Anyone calling `safer-by-default:safer-docs-reader` explicitly must update to `safer-by-default:docs-reader` (or the documented `/safer:docs-reader` shorthand).
 
 ### New skill: /safer:ux-audit
 
@@ -35,9 +41,9 @@ Architect and spec gain mandatory plan-quality gates before transitioning to rev
 - `skills/orchestrate/SKILL.md` Step 5c: setup/deploy path detection on PRs (railway.toml, vercel.json, Dockerfile, .github/workflows, fly.toml, netlify.toml, package.json scripts, .env*, setup/) additively dispatches `/plan-devex-review`. Spec/architect plans that describe infra work run the gate at the spec/architect stage; orchestrate verifies via audit-trail check.
 - Order is plan-eng-review → codex (structured audit first; cross-model challenge on the audited plan).
 
-## 0.1.4 — Composition cleanup; opus everywhere
+### Composition cleanup; opus everywhere
 
-Tightens the per-skill `Composition with gstack` sections introduced in 0.1.3 and consolidates orchestrator dispatch on opus.
+Tightens the per-skill `Composition with gstack` sections and consolidates orchestrator dispatch on opus.
 
 - Each skill's section is now `### Invokes` and `### Invoked by` (omit either if empty). One bullet per target, target name plus when/why; no per-target metadata.
 - Stripped the universal "Eligible for zapbot-remote" tag (40/40 entries said yes; conveyed nothing).
@@ -46,9 +52,9 @@ Tightens the per-skill `Composition with gstack` sections introduced in 0.1.3 an
 - `PRINCIPLES.md` modality pipeline diagram: removed the `design-module* (Tier 2)` placeholder. There is no separate `design-module` modality; architect absorbs that work and composes with the gstack design skills. Knock-on cleanup in `skills/orchestrate/SKILL.md` (Phase 5c lists) and `skills/stamina/SKILL.md` (N-count table).
 - Verify: closing redundant gstack-target list deleted. Phase 3.5 is the canonical contract.
 - Orchestrator Model routing: opus for every dispatched modality. Removed the haiku/sonnet rows and the dogfood-on-haiku acid-test sidebar. Per-modality dispatch templates updated to say `model: opus` uniformly.
-- `safer-docs-reader`: persona sub-agents now dispatch on opus.
+- `docs-reader`: persona sub-agents now dispatch on opus.
 
-## 0.1.3 — WS3 framing: safer ↔ gstack composition
+### WS3 framing: safer ↔ gstack composition
 
 Doctrine-level decision on how safer composes with gstack. safer is the SDS modality spine; gstack is a parallel toolbox. Composition happens at the modality dispatch seam, per-skill — no central routing table.
 
@@ -56,6 +62,30 @@ Doctrine-level decision on how safer composes with gstack. safer is the SDS moda
 - `README.md`: brief overview section pointing at per-skill composition; not an encyclopedic mirror.
 - Each `skills/*/SKILL.md`: new `## Composition with gstack` section listing that skill's specific composition targets, interactivity labels (`non-interactive` / `two-gate`), and zapbot-remote eligibility. Per-skill locality means an agent invoking skill X reads only X's body.
 - Runtime contract (`PRINCIPLES.md` → Composing with gstack): interactive gstack skills run hold-scope autonomous; user-facing prompts are forbidden inside their bodies and route up to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`. Closes the cross-session question-relay design question without building a new primitive.
+
+### Install paths reworked
+
+The plugin marketplace is now the canonical Claude Code install path; the manual-clone-into-`~/.claude/skills/` flow is deprecated.
+
+- README install section rewritten. Sections for Claude Code (marketplace), Codex (`./setup-codex`), per-repo setup (`safer-setup-labels`), and working-from-source.
+- `setup` repurposed as a sanity check + legacy-symlink cleanup. No longer creates standalone `~/.claude/skills/safer-*` symlinks (those duplicated every skill description and silently dropped 100+ from the registry on hosts with both install paths active). Detects + cleans them.
+- `setup` zapbot probe extended to detect the marketplace-cache path (`~/.claude/plugins/cache/*/zapbot/`) in addition to the legacy standalone path.
+- `setup-codex` resolves the safer-by-default source via `$SAFER_SOURCE_DIR` → CC plugin cache → `~/.local/share/safer-by-default/` (clones fresh if absent). Decoupled from any specific working-tree path.
+- `tests/test-bin/test-setup-codex.sh` updated for the new resolution contract.
+
+### Removed
+
+- `safer-linear` feature: `lib/safer-linear/` (5 shell scripts), `bin/safer-linear-setup`, `tests/test-bin/test-linear-setup.sh`, `tests/test-linear-v2/` (~15 tests). Linear-project sync line removed from `skills/orchestrate/SKILL.md`. Replacement: none planned.
+- `plugins/safer-channel/` working-tree scratch (only untracked `node_modules/`; never committed). Anyone with `safer-channel@safer-by-default` enabled in their personal `~/.claude/settings.json` should disable it: `/plugin disable safer-channel@safer-by-default`.
+- `docs/arch/bot-token-routing.md` orphan planning doc.
+
+### Changed (manifests)
+
+- `VERSION`, `.claude-plugin/marketplace.json`, and `.claude-plugin/plugin.json` synced to `0.1.3`. Previously the manifests were stuck at `0.1.2` while `VERSION` had drifted to `0.1.4`. The marketplace description listed `13 skills (... ) plus 10 bin/ utilities`; actual counts are 17 skills and 13 bin utilities and the description now reflects that.
+
+### Docs
+
+- `CLAUDE.md` rewritten (~30 lines): plugin overview, namespacing (CC marketplace `safer-by-default:NAME` vs Codex `safer:NAME`), runtime paths, source-resolution order, where contracts/scenarios live.
 
 ## 0.1.2 — safer-docs-reader skill
 

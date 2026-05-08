@@ -66,9 +66,15 @@ if command -v gh >/dev/null 2>&1; then
   fi
 fi
 
-# Optional composition partner
-if [ -x "$HOME/.claude/skills/zapbot/skills/zapbot-publish/SKILL.md" ] \
-  || [ -d "$HOME/.claude/skills/zapbot" ]; then
+# Optional composition partner. Look in both the legacy standalone-skill
+# path and the marketplace cache (since the marketplace install is now the
+# canonical Claude Code path for zapbot).
+ZAPBOT_PRESENT=0
+[ -d "$HOME/.claude/skills/zapbot" ] && ZAPBOT_PRESENT=1
+ls -d "$HOME/.claude/plugins/cache/"*"/zapbot/"*/skills/zapbot-publish 2>/dev/null \
+  | head -n1 | grep -q . && ZAPBOT_PRESENT=1
+
+if [ "$ZAPBOT_PRESENT" -eq 1 ]; then
   log "  ✓ zapbot detected — safer-publish will compose with /zapbot-publish"
 else
   log "  ○ zapbot not detected — safer-publish will fall back to gh (this is fine)"
@@ -122,51 +128,40 @@ else
   log "  ○ safer-slug not runnable outside a git repo (expected when running from plugin dir)"
 fi
 
-# --- Register skills at the top level of ~/.claude/skills/ ---
-# Claude Code scans ~/.claude/skills/<name>/SKILL.md. Our skills live at
-# skills/<name>/SKILL.md one level deep in the repo, so create real dirs
-# at ~/.claude/skills/safer-<name>/ each containing a SKILL.md symlink.
-log "Registering skills with Claude Code..."
+# --- Verify Claude Code plugin install + clean up legacy symlinks ---
+# The canonical Claude Code install path is the plugin marketplace:
+#   /plugin marketplace add chughtapan/safer-by-default
+#   /plugin install safer-by-default@safer-by-default
+# It auto-registers skills under the safer-by-default:<name> namespace and
+# auto-prepends bin/ to PATH. This script does not install anything for
+# Claude Code — it only checks the install and removes symlinks left by
+# older versions of setup that registered skills as ~/.claude/skills/safer-*.
+log "Checking Claude Code plugin install..."
 CC_SKILLS="$HOME/.claude/skills"
-REGISTERED=0
+SETTINGS="$HOME/.claude/settings.json"
+if [ -f "$SETTINGS" ] && grep -q '"safer-by-default@safer-by-default"[[:space:]]*:[[:space:]]*true' "$SETTINGS"; then
+  log "  ✓ plugin enabled in $SETTINGS — skills load as safer-by-default:<name>"
+else
+  log "  ○ plugin not enabled. Inside Claude Code, run:"
+  log "      /plugin marketplace add chughtapan/safer-by-default"
+  log "      /plugin install safer-by-default@safer-by-default"
+fi
+
+log "Cleaning up legacy standalone skill symlinks..."
+REMOVED=0
 for d in "$INSTALL_DIR"/skills/*/; do
   [ -f "$d/SKILL.md" ] || continue
   name=$(basename "$d")
   target="$CC_SKILLS/safer-$name"
-  # Upgrade any pre-existing plain symlink to a real dir
-  if [ -L "$target" ]; then
-    rm -f "$target"
+  if [ -L "$target/SKILL.md" ] || [ -L "$target" ]; then
+    rm -rf "$target"
+    REMOVED=$((REMOVED + 1))
   fi
-  mkdir -p "$target"
-  ln -snf "$d/SKILL.md" "$target/SKILL.md"
-  REGISTERED=$((REGISTERED + 1))
 done
-log "  ✓ registered $REGISTERED skills under $CC_SKILLS/safer-*/"
-
-# --- Probe: check Claude Code install location ---
-log "Checking Claude Code plugin registration..."
-if [ -d "$CC_SKILLS/safer-by-default" ]; then
-  # Already installed at the canonical location — best case.
-  REAL_CC=$(cd "$CC_SKILLS/safer-by-default" && pwd -P)
-  REAL_INSTALL=$(cd "$INSTALL_DIR" && pwd -P)
-  if [ "$REAL_CC" = "$REAL_INSTALL" ]; then
-    log "  ✓ installed at the canonical location ($CC_SKILLS/safer-by-default)"
-  else
-    log "  ○ another safer-by-default install found at $CC_SKILLS/safer-by-default"
-    log "    running setup from $INSTALL_DIR"
-    log "    (not modifying either — re-run setup from the canonical location if desired)"
-  fi
+if [ "$REMOVED" -gt 0 ]; then
+  log "  ✓ removed $REMOVED legacy ~/.claude/skills/safer-* symlinks from prior installs"
 else
-  log "  ○ not installed at $CC_SKILLS/safer-by-default"
-  log "    Skills will not auto-load in Claude Code sessions unless this install"
-  log "    is at that path, or you use the marketplace (/plugin install)."
-  log ""
-  log "    To register, either:"
-  log "      a) Reinstall at the canonical path:"
-  log "         git clone --single-branch --depth 1 \\"
-  log "           https://github.com/chughtapan/safer-by-default.git \\"
-  log "           $CC_SKILLS/safer-by-default"
-  log "      b) Use /plugin install inside Claude Code."
+  log "  ✓ no legacy symlinks found"
 fi
 
 log ""
