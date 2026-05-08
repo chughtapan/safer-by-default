@@ -269,8 +269,15 @@ This step is non-skippable and counts as **part of the review-senior pass** (not
 
 ### Phase 2 — Dispatch the composed skills
 
-Invoke each composed gstack skill in order. Each produces its own verdict
-(APPROVE / REQUEST-CHANGES / HOLD / COMMENT). Collect them.
+For each composed gstack skill in the row determined by Phase 1, dispatch via the `Skill` tool in order, collecting verdicts (APPROVE / REQUEST-CHANGES / HOLD / COMMENT) as each returns:
+
+```
+Skill({ skill: "review",  args: "--pr <PR-URL> --hold-scope" })
+Skill({ skill: "simplify", args: "--pr <PR-URL> --hold-scope" })
+Skill({ skill: "codex",    args: "--mode review --artifact <PR-URL> --hold-scope" })
+```
+
+Substitute the row's actual skill list. `--hold-scope` is mandatory: composed gstack skills cannot prompt the user mid-run from inside review-senior; if they would, they escalate to `/safer:orchestrate` which surfaces the prompt via `AskUserQuestion`.
 
 For PR rows, the composed skills post their verdicts as inline comments
 or PR reviews; for design/plan/spec rows, the composed skills post

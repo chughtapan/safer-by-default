@@ -758,20 +758,20 @@ Key property: `PROMPT_EOF` is quoted, so the heredoc does not interpolate any lo
 
 Invoke the `Agent` tool with the prompt. The subagent runs cold. The skill waits for its structured report.
 
-Concrete invocation (copy-pasteable — read `$PROMPT` into the `prompt` parameter before calling):
-
-```
-Agent(
-  description="Dogfood cold-start read",
-  subagent_type="general-purpose",
-  prompt="<contents of file at $PROMPT, read with the Read tool and inlined here>"
-)
-```
-
 Mechanics:
-1. Read the prompt file into a string: `PROMPT_TEXT=$(cat "$PROMPT")` (or use the Read tool on `$PROMPT`).
-2. Pass that string as the `prompt` parameter to a single `Agent` tool call. No other parameters are set; no session history, parent epic, or extra files are attached.
-3. The `description` stays generic ("Dogfood cold-start read") so it leaks no project-specific context into the subagent's bootstrap.
+
+1. Read the prompt file into a string via the `Read` tool on `$PROMPT`. The full text becomes the value passed to the `prompt` parameter below.
+2. Call `Agent` with exactly these three parameters and nothing else (no session history, parent epic, sibling artifacts):
+
+```
+Agent({
+  description: "Dogfood cold-start read",
+  subagent_type: "general-purpose",
+  prompt: <text read from $PROMPT in step 1>
+})
+```
+
+The `description` stays generic so no project-specific context leaks into the subagent's bootstrap. The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file — the subagent is the only reader of the artifact text. That is the architectural enforcement.
 
 The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file. The subagent is the only reader of the artifact text. That is the architectural enforcement.
 

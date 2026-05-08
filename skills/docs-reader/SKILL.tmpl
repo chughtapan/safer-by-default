@@ -191,10 +191,17 @@ If the payload is empty or whitespace-only, fire stop rule `ARTIFACT_EMPTY`. Do 
 
 ### Phase 3 — Create the ephemeral team
 
+Compute the team name in bash, then call the `TeamCreate` tool:
+
 ```bash
 TEAM_NAME="docs-reader-${SESSION}"
-# TeamCreate call:
-#   TeamCreate({ team_name: "$TEAM_NAME", description: "docs-reader run for <ARTIFACT_REF>" })
+```
+
+```
+TeamCreate({
+  team_name: TEAM_NAME,
+  description: "docs-reader run for ARTIFACT_REF"
+})
 ```
 
 The team is scoped to this run only. It is torn down in Phase 8 on every exit path (success, stop rule, crash handler).
