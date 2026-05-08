@@ -28,77 +28,37 @@ It is not. This plugin recalibrates.
 
 Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `SKILL.md` for one projection of the principles onto one kind of work.
 
-## Install
+## Quick start
 
-### Claude Code (plugin marketplace)
-
-Inside a Claude Code session:
+**Claude Code** (canonical):
 
 ```text
 /plugin marketplace add chughtapan/safer-by-default
 /plugin install safer@safer-by-default
 ```
 
-Skills register under the `safer:<name>` namespace (`/safer:spec`, `/safer:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
+Skills load as `safer:<name>` (`/safer:spec`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
-### Codex
-
-Codex has no plugin marketplace, so we install via a script:
+**Codex**:
 
 ```bash
 git clone --depth 1 https://github.com/chughtapan/safer-by-default.git
-cd safer-by-default
-./setup-codex
+cd safer-by-default && ./setup-codex
 ```
 
-`./setup-codex` resolves the safer-by-default source in this order:
+The script auto-detects an existing CC plugin install or clones to `~/.local/share/safer-by-default/`. Codex sees skills as `safer:<name>` wrappers. The clone is not the source of truth — delete it after.
 
-1. `$SAFER_SOURCE_DIR` if set (developer escape hatch).
-2. The Claude Code plugin cache at `~/.claude/plugins/cache/safer-by-default/safer-by-default/<latest>` if you've already installed via the CC marketplace.
-3. `~/.local/share/safer-by-default/` — cloned fresh from GitHub if absent, refreshed otherwise.
-
-It then symlinks `bin/safer-*` into `~/.local/bin/` and creates Codex skill wrappers at `~/.codex/skills/safer-<name>/`. Restart Codex to pick them up. The clone you used to invoke the script is not the source of truth and can be deleted.
-
-### Per-repo setup (both flavors)
-
-One-time, after the plugin is installed:
+**Per-repo setup** (one-time, requires `gh` authenticated):
 
 ```bash
 safer-setup-labels
 ```
 
-Creates the GitHub issue labels (`safer:spec`, `safer:planning`, `safer:implementing`, …) the skills publish under. Requires `gh` authenticated with `repo` scope. Idempotent.
+Creates the GitHub issue labels skills publish under. Idempotent.
 
-### Working from source (developers)
+**First skill**: in any repo, type `/safer:orchestrate` to start a new pipeline from intent, or pick a modality skill from the [catalog below](#skill-catalog).
 
-```bash
-git clone https://github.com/chughtapan/safer-by-default.git
-cd safer-by-default
-./setup       # sanity check; not an installer
-```
-
-`./setup` verifies dependencies (`gh`, `git`, `bash`, `gh auth status`), prepares the analytics state dir, makes binaries executable, and removes any legacy `~/.claude/skills/safer-*` symlinks left by previous versions of this script. The canonical install path is the marketplace command above.
-
-### Requirements
-
-- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (for the template generator).
-- [gstack](https://github.com/chughtapan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
-- **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
-
-## Use with Codex
-
-Once `./setup-codex` has run, Codex sees the safer skills as `safer:<name>` wrappers. Example prompts:
-
-- `Use safer:setup to bootstrap this TypeScript repo.`
-- `Use safer:spec to turn this idea into a spec.`
-- `Use safer:architect for the approved spec in issue #123.`
-- `Use safer:review-senior to review this diff.`
-
-Notes:
-
-- The wrappers forward to the original skill docs in this repo; they do not rewrite the doctrine.
-- GitHub-backed flows still expect `gh` to be installed and authenticated.
-- The upstream docs say `AskUserQuestion`; in Codex that maps to a normal clarification question or the nearest available user-input mechanism.
+For dependency requirements, source-resolution detail, working from source, and troubleshooting, see [INSTALL.md](./INSTALL.md).
 
 ## Skill catalog
 
