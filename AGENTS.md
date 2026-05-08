@@ -80,12 +80,19 @@ User-prompting gstack skills run hold-scope autonomous when invoked from inside 
 
 ## Adding a new skill
 
-1. Read [`SKILL.md.tmpl`](./SKILL.md.tmpl) and copy it to `skills/<name>/SKILL.md`.
-2. Fill in the sections. Match the conventions of an existing same-modality skill.
-3. Update `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json` description if the skill count changes.
-4. Add a row to the table at the top of this file.
-5. Run `tests/run-tests.sh` to confirm nothing regressed.
-6. Bump VERSION + add a CHANGELOG entry.
+Skills are generated from `.tmpl` source files. Edit the template, run the generator, commit both.
+
+1. Copy [`SKILL.md.tmpl`](./SKILL.md.tmpl) to `skills/<name>/SKILL.tmpl` (note: `.tmpl` extension, not `.md`).
+2. Fill in the sections. The `{{> principles}}` marker is preserved verbatim — the generator inlines `PRINCIPLES.md` there at render time.
+3. Run `bin/safer-gen-skills` to produce `skills/<name>/SKILL.md`. Both files are committed.
+4. Update `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json` description if the skill count changes.
+5. Add a row to the table at the top of this file.
+6. Run `tests/run-tests.sh` to confirm nothing regressed.
+7. Bump VERSION + add a CHANGELOG entry.
+
+**Editing an existing skill**: edit `skills/<name>/SKILL.tmpl`, then run `bin/safer-gen-skills`. The `SKILL.md` carries an `AUTO-GENERATED` marker — manual edits to it will be overwritten on the next render.
+
+**Updating doctrine**: edit `PRINCIPLES.md`, then run `bin/safer-gen-skills` to propagate changes to all skill bodies. CI should fail if `bin/safer-gen-skills --check` finds any stale `SKILL.md`.
 
 ## When in doubt
 

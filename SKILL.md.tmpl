@@ -1,8 +1,18 @@
 <!--
   Template for a new safer-by-default skill.
 
-  Copy to skills/<modality>/SKILL.md and fill in. Anchor placeholders are
-  written as {{LIKE_THIS}}; replace each before shipping.
+  Copy to skills/<modality>/SKILL.tmpl (NOT SKILL.md — SKILL.md is the
+  generated artifact). Anchor placeholders are written as {{LIKE_THIS}};
+  replace each before shipping. The {{> principles}} marker is preserved
+  verbatim — bin/safer-gen-skills replaces it with PRINCIPLES.md content
+  at render time.
+
+  After editing, run:
+    bin/safer-gen-skills
+
+  This emits skills/<modality>/SKILL.md with the AUTO-GENERATED marker.
+  CI / human review should treat SKILL.md as a derived artifact; edits go
+  to the .tmpl.
 
   Conventions:
   - YAML frontmatter `name:` matches the directory name (no `safer-` prefix on
@@ -13,8 +23,8 @@
     by /safer:orchestrate (SAFER_PARENT_ISSUE / SAFER_SUBISSUE set) skip the
     gate; user-initiated runs halt with PRECONDITION_FAIL until upgrade.
   - Every published artifact goes through safer-publish. No "trust me" outputs.
-  - PRINCIPLES.md is the authoritative doctrine; this skill projects it onto
-    one modality. Don't restate doctrine — name the principle and link.
+  - PRINCIPLES.md is inlined verbatim via {{> principles}}; the projection
+    section names which Parts/principles this modality leans on.
 -->
 ---
 name: {{NAME}}
@@ -38,9 +48,11 @@ allowed-tools:
 
 # /safer:{{NAME}}
 
-## Read first
+## Doctrine
 
-Read [`PRINCIPLES.md`](../../PRINCIPLES.md) at the plugin root before invoking this skill. The projection onto this modality:
+{{> principles}}
+
+## How this modality projects from the doctrine
 
 - **Part {{N}} → {{principle name}}.** {{One sentence on how this skill embodies the principle.}}
 - **{{Cross-cutting principle, e.g. "Discipline over capability"}}.** {{One sentence on the scope discipline this skill enforces.}}

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# safer-gen-skills — render skills/<name>/SKILL.md from skills/<name>/SKILL.tmpl
+#
+# The .tmpl is the human-edited source. It contains the YAML frontmatter and
+# modality-specific content. The generator inlines PRINCIPLES.md verbatim where
+# {{> principles}} appears, and stamps an AUTO-GENERATED marker right after
+# the frontmatter so CI / humans can detect manual edits to the rendered file.
+#
+# Usage:
+#   bin/safer-gen-skills          # render every skills/*/SKILL.tmpl
+#   bin/safer-gen-skills --check  # exit non-zero if any SKILL.md is stale
+#
+# The generator is idempotent. Skills that don't yet have a .tmpl are skipped
+# (no SKILL.md is touched), so migration can land one skill at a time.
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PRINCIPLES_FILE="$PLUGIN_DIR/PRINCIPLES.md"
+MARKER='<!-- AUTO-GENERATED from this directory'\''s SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->'
+
+CHECK_ONLY=0
+case "${1:-}" in
+  --check) CHECK_ONLY=1 ;;
+  -h|--help)
+    sed -n '2,/^set/p' "$0" | sed 's/^# *//;s/^#//'
+    exit 0
+    ;;
+  '') ;;
+  *) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
+esac
+
+[ -f "$PRINCIPLES_FILE" ] || { echo "ERROR: $PRINCIPLES_FILE not found" >&2; exit 1; }
+
+render_one() {
+  local tmpl="$1"
+  awk -v principles_file="$PRINCIPLES_FILE" -v marker="$MARKER" '
+    BEGIN { fm = 0; injected = 0 }
+    /^---$/ {
+      print
+      fm++
+      if (fm == 2 && !injected) {
+        print ""
+        print marker
+        injected = 1
+      }
+      next
+    }
+    /^\{\{> principles\}\}$/ {
+      while ((getline line < principles_file) > 0) print line
+      close(principles_file)
+      next
+    }
+    { print }
+  ' "$tmpl"
+}
+
+STALE=0
+RENDERED=0
+TOTAL=0
+
+for tmpl in "$PLUGIN_DIR"/skills/*/SKILL.tmpl; do
+  [ -f "$tmpl" ] || continue
+  TOTAL=$((TOTAL + 1))
+  out="$(dirname "$tmpl")/SKILL.md"
+  rendered=$(render_one "$tmpl")
+
+  if [ "$CHECK_ONLY" -eq 1 ]; then
+    if [ ! -f "$out" ] || ! diff -q <(printf '%s' "$rendered") "$out" >/dev/null 2>&1; then
+      echo "STALE: $out"
+      STALE=$((STALE + 1))
+    fi
+  else
+    printf '%s' "$rendered" > "$out"
+    RENDERED=$((RENDERED + 1))
+  fi
+done
+
+# Skills without a .tmpl are flagged so we know how migration is progressing.
+PENDING=0
+for d in "$PLUGIN_DIR"/skills/*/; do
+  [ -f "$d/SKILL.md" ] || continue
+  [ -f "$d/SKILL.tmpl" ] && continue
+  PENDING=$((PENDING + 1))
+done
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  echo "checked: $TOTAL skills with .tmpl, $STALE stale"
+  echo "pending migration (no .tmpl yet): $PENDING"
+  exit "$STALE"
+fi
+
+echo "rendered: $RENDERED of $TOTAL skills with .tmpl"
+echo "pending migration (no .tmpl yet): $PENDING"
