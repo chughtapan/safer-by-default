@@ -1,10 +1,33 @@
-# Changelog
+## 0.1.4 — 2026-05-08
 
-## Unreleased
+### Breaking: `safer:investigate` renamed to `safer:diagnose`
 
-### Changed
+The bug-triage modality is reshaped around the smallest possible reproduction.
 
-- `safer:investigate` renamed to `safer:diagnose`. The skill's iron rule shifts from "name the root cause" to "the smallest possible reproduction is the artifact"; root-cause naming moves to `/codex --mode diagnose --hold-scope` validation; orchestrate forks a second diagnose when codex returns `symptom` with multiple directions; three diagnose splits without convergence escalates to spec/architect (new runtime stop condition #6). The 8-phase workflow (Collect / Trace / Recent / Reproduce / Isolate / Name root cause / Recommend / Publish) collapses to a 4-phase one (Collect / Reproduce smallest / Codex validate / Publish). Cross-references updated in orchestrate, spec, verify, review-senior, stamina, AGENTS, README, PRINCIPLES, contract templates, and integration tests. The `/investigate` name-collision callout is dropped from README/AGENTS/PRINCIPLES — the rename eliminates the collision. Label `safer:investigate` becomes `safer:diagnose`; in-flight epics carrying the old label need re-labeling.
+- **New iron rule.** The skill's job shifts from "name the root cause" to "the smallest possible reproduction is the artifact." Root-cause naming moves to `/codex --mode diagnose --hold-scope` for cross-model validation.
+- **4-phase workflow** replaces the prior 8-phase one. Collect symptoms → reproduce in the smallest possible test → hand to codex → publish. Drops the standalone Isolate, Name-root-cause, and Recommend-fix-modality phases — those fold into "what codex's verdict says next."
+- **Codex returns one of three verdicts:** `logical-fallacy` (the repro doesn't demonstrate the symptom; re-run), `symptom` with N directions (1 → continue with that direction; N>1 → orchestrator forks one diagnose per direction), or `confirmed-root-cause` (hand off to fix modality).
+- **New orchestrate fork mechanism** in Phase 5c (Step 5c.5): when codex returns `symptom` with multiple directions, the orchestrator forks N siblings, one per direction. The parent epic's `## Diagnose splits` section tracks the count.
+- **New runtime stop condition (#6):** three diagnose splits without convergence escalates to spec/architect — the bug surface is wider than diagnose can map.
+- **Label rename.** `safer:investigate` becomes `safer:diagnose`. In-flight epics carrying the old label need re-labeling.
+- **Name collision with gstack `/investigate` is gone.** The `/investigate` name-collision callout drops from README, AGENTS, and PRINCIPLES.
+
+Cross-references updated in orchestrate, spec, verify, review-senior, stamina, AGENTS, README, PRINCIPLES, ARCHITECTURE, contract templates, and integration tests.
+
+### Implementers audit and strip narrative code comments before opening the PR
+
+Each `implement-*` skill now runs a mandatory comment audit between writing the code and moving to tests. The audit strips any inserted comment that:
+
+- describes the present (`// this is the X`, `// we now do Y`),
+- describes the future (`// the reviewer should check`, `// later we'll add`),
+- restates what the code does (`// loop over users`),
+- references the current task / fix / PR / plan line / caller.
+
+Identifiers carry the explanation; PR descriptions and traceability tables carry task and plan context. Per-tier scoping calls out plan-anchor cross-refs (senior) and spec/plan citations (staff) — those live in the PR body's tables, not in code comments. A matching checklist line lands in each skill's "Checklist before declaring DONE."
+
+### Implementer DONE checklists trimmed
+
+Strips meta-glosses and restated rationale from the "Checklist before declaring DONE" sections in implement-junior, implement-senior, and implement-staff. Each checkbox is now a single directive imperative. Drops the duplicated "/safer:review-senior is mandatory before merge (enforced by orchestrate Phase 5c)" line from senior and staff: it duplicated the orchestrate gate and wasn't a self-checkable item.
 
 ## 0.1.3 — 2026-05-07
 
