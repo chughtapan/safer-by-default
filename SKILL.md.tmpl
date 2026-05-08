@@ -1,0 +1,195 @@
+<!--
+  Template for a new safer-by-default skill.
+
+  Copy to skills/<modality>/SKILL.md and fill in. Anchor placeholders are
+  written as {{LIKE_THIS}}; replace each before shipping.
+
+  Conventions:
+  - YAML frontmatter `name:` matches the directory name (no `safer-` prefix on
+    the dir or in the name field; the plugin namespace adds `safer:` at load
+    time).
+  - The H1 is `# /safer:NAME` matching the YAML name.
+  - The preamble bash block carries the update gate verbatim. Skills dispatched
+    by /safer:orchestrate (SAFER_PARENT_ISSUE / SAFER_SUBISSUE set) skip the
+    gate; user-initiated runs halt with PRECONDITION_FAIL until upgrade.
+  - Every published artifact goes through safer-publish. No "trust me" outputs.
+  - PRINCIPLES.md is the authoritative doctrine; this skill projects it onto
+    one modality. Don't restate doctrine — name the principle and link.
+-->
+---
+name: {{NAME}}
+version: 0.1.0
+description: |
+  {{ONE-LINE HOOK — the first sentence routes the agent.}} Use when the user
+  asks {{TRIGGER PHRASES}}. Do NOT use when {{ANTI-TRIGGERS — route to
+  /safer:OTHER instead}}.
+triggers:
+  - {{trigger phrase 1}}
+  - {{trigger phrase 2}}
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Glob
+  - AskUserQuestion
+---
+
+# /safer:{{NAME}}
+
+## Read first
+
+Read [`PRINCIPLES.md`](../../PRINCIPLES.md) at the plugin root before invoking this skill. The projection onto this modality:
+
+- **Part {{N}} → {{principle name}}.** {{One sentence on how this skill embodies the principle.}}
+- **{{Cross-cutting principle, e.g. "Discipline over capability"}}.** {{One sentence on the scope discipline this skill enforces.}}
+
+## Iron rule
+
+{{The one non-negotiable invariant. Example: "No fixes without a named root cause." or "Every published recommendation has finding + evidence + goal-link."}}
+
+## Role
+
+This skill is {{role description — what it does and what it produces}}. It is **not** {{anti-role — common confusions or adjacent modalities that should route elsewhere}}.
+
+## Inputs required
+
+- {{Input 1 — typically a GitHub issue/PR URL or a path. State the format.}}
+- {{Input 2 — optional or always-required, with default behavior on absence.}}
+
+If the required input is not provided with the invocation, ask via `AskUserQuestion` before proceeding. {{Stronger statement if applicable, e.g. "No spec, no architect."}}
+
+### Preamble (run first)
+
+```bash
+gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated"; exit 1; }
+eval "$(safer-slug 2>/dev/null)" || true
+SESSION="$$-$(date +%s)"
+_TEL_START=$(date +%s)
+safer-telemetry-log --event-type safer.skill_run --modality {{NAME}} --session "$SESSION" 2>/dev/null || true
+_UPD=$(safer-update-check 2>/dev/null || true)
+[ -n "$_UPD" ] && echo "$_UPD"
+# Update gate: halt user-initiated work when an upgrade is available.
+# Dispatched runs (SAFER_PARENT_ISSUE / SAFER_SUBISSUE set by /safer:orchestrate)
+# skip the gate so pipelines don't stall mid-run.
+if [ -n "$_UPD" ] && [ -z "${SAFER_PARENT_ISSUE:-}" ] && [ -z "${SAFER_SUBISSUE:-}" ]; then
+  cat <<'MSG'
+PRECONDITION_FAIL: safer-by-default update available
+Run inside Claude Code:
+  /plugin marketplace update safer-by-default
+  /plugin install safer@safer-by-default
+Then re-run this skill.
+MSG
+fi
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "unknown/unknown")
+echo "REPO:    $REPO"
+echo "SESSION: $SESSION"
+```
+
+If `safer-slug`, `safer-telemetry-log`, or `safer-update-check` is missing, continue. Telemetry is plumbing; the modality stands on its own.
+
+## Scope
+
+**In scope:**
+- {{What this skill does, bulleted, present tense.}}
+
+**Out of scope:**
+- {{What this skill must not do — adjacent work that routes elsewhere. Name the target skill.}}
+
+## Scope budget
+
+| Constraint | Limit |
+|---|---|
+| Files touched | {{N — typical "one module" or "any number, contract-bound"}} |
+| Public-surface changes | {{yes / no — tied to modality tier}} |
+| New dependencies | {{yes / no — tied to modality tier}} |
+| Lines of code | {{soft cap — "shape, not volume"; cite Part 2 → Budget Gate if applicable}} |
+
+Out-of-budget work parks via `safer-escalate --to <higher-modality>` and stops.
+
+## Workflow
+
+### Phase 1 — {{Phase name}}
+
+{{What happens. Be concrete. Reference bash invocations, AskUserQuestion prompts, and gh queries by their actual command.}}
+
+### Phase 2 — {{Phase name}}
+
+{{...}}
+
+### Phase {{N}} — Publish
+
+Write the artifact to a temp file, then publish via `safer-publish`:
+
+```bash
+TMP=$(mktemp)
+cat > "$TMP" <<'ARTIFACT'
+{{Artifact body — markdown, with the canonical sections this modality emits.}}
+ARTIFACT
+
+if [ -n "${SAFER_PARENT_ISSUE:-}" ]; then
+  URL=$(safer-publish --kind comment --issue "$SAFER_PARENT_ISSUE" --repo "$REPO" --body-file "$TMP")
+else
+  URL=$(safer-publish --kind issue --repo "$REPO" --title "{{title template}}" --body-file "$TMP" --labels "safer:{{state-label}}")
+fi
+echo "Published: $URL"
+```
+
+### Phase {{N+1}} — Status
+
+Set the sub-issue label to the next state (`safer:reviewing`, `safer:verifying`, `safer:done`, etc.) via `safer-transition-label`. Update the parent epic's `## Status` block if running under orchestrate.
+
+## Stop rules
+
+Each rule names the trigger and the response. On fire: tear down any in-flight team via `TeamDelete`, produce the escalation artifact via `safer-escalate --from {{NAME}} --to <target> --cause <CAUSE>`, and stop. `REVISE` is a normal verdict, not a stop rule.
+
+| Rule | Trigger | Response |
+|---|---|---|
+| {{Stop rule 1}} | {{Condition}} | {{Action — usually escalate to a specific modality}} |
+| {{Stop rule 2}} | {{Condition}} | {{Action}} |
+| Out-of-budget | Workflow needs work outside `## Scope budget` | `safer-escalate --to <higher>`; park sub-issue |
+| Contract violation | A required input is missing or the contract's autonomy budget bars this work | Park; post `## Awaiting amendment` block; return `DONE_PARKED` |
+
+## Composition with gstack
+
+### Invokes
+
+- `/{{gstack-skill}}` — {{when and why this skill calls into gstack}}.
+
+### Invoked by
+
+- `/safer:{{upstream-modality}}` — {{when this skill is dispatched as a sub-task of another modality}}.
+
+User-prompting gstack skills run hold-scope autonomous from inside this skill body. Surface user-facing prompts via `AskUserQuestion` only when this skill is invoked at the top level (no `SAFER_PARENT_ISSUE`); under orchestrate, route prompts up via the parent epic.
+
+## Publication map
+
+| Artifact | Destination | When |
+|---|---|---|
+| {{Primary artifact}} | {{e.g. comment on parent epic, new sub-issue, PR review}} | {{Phase reference}} |
+| {{Escalation artifact}} | Comment on parent epic | On stop-rule fire |
+| Telemetry | `safer.skill_run` at preamble; `safer.skill_end` at close; modality `{{NAME}}` | Always |
+
+## Anti-patterns
+
+- {{Common drift 1 — what to avoid and why}}.
+- {{Common drift 2}}.
+- **Sideways fix.** Touching a sibling module to "make it pass." Escalate.
+- **Skip the artifact.** Summarizing in chat instead of publishing. The forge is the record.
+
+## Checklist before declaring `DONE`
+
+- [ ] All `## Inputs required` were present (or the skill parked).
+- [ ] Workflow phases ran in order; no phase skipped.
+- [ ] Artifact published via `safer-publish`; URL captured.
+- [ ] Sub-issue label transitioned via `safer-transition-label`.
+- [ ] Telemetry `safer.skill_end` event emitted.
+- [ ] Iron rule satisfied: {{restate iron rule}}.
+- [ ] No out-of-scope work performed.
+
+## Communication discipline
+
+- {{Tone / format conventions specific to this modality, e.g. "Write for the cold-start reader; the next agent has none of your context."}}
+- Cite by stable reference: PR number, issue number, file path + line, doctrine SHA. Never "the comment from earlier."
+- Status block on the parent epic gets rewritten on every state change so a cold reader sees current state at a glance.
