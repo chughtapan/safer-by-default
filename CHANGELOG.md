@@ -4,9 +4,22 @@
 
 Combined release. Subsumes the locally-numbered-but-unpublished `0.1.3` (WS3 framing) and `0.1.4` (composition cleanup) working sections, plus the prior `Unreleased` work (ux-audit, contracts, gates) and an install-path + manifest cleanup. Only `0.1.2` actually shipped to the marketplace; the in-flight numbering has been collapsed so the published version increments cleanly from there.
 
+### Plugin slug renamed: safer (from safer-by-default)
+
+Breaking rename of the plugin name within the marketplace. Skills now load as `safer:NAME` (matching the docs' shorthand) instead of `safer-by-default:NAME`. The marketplace name and repo name remain `safer-by-default`. Plugin install ID is now `safer@safer-by-default`.
+
+Anyone with the old install must migrate:
+
+```text
+/plugin uninstall safer-by-default@safer-by-default
+/plugin install safer@safer-by-default
+```
+
+`.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json` updated accordingly.
+
 ### New skill: /safer:docs-reader (renamed from /safer:safer-docs-reader)
 
-Breaking rename. The skill directory `skills/safer-docs-reader/` is now `skills/docs-reader/`; YAML `name` is `docs-reader`. Other 16 skills already drop the `safer-` prefix on directory and YAML name, and the in-doc H1 was already `# /safer:docs-reader`. Anyone calling `safer-by-default:safer-docs-reader` explicitly must update to `safer-by-default:docs-reader` (or the documented `/safer:docs-reader` shorthand).
+Breaking rename. The skill directory `skills/safer-docs-reader/` is now `skills/docs-reader/`; YAML `name` is `docs-reader`. Other 16 skills already drop the `safer-` prefix on directory and YAML name, and the in-doc H1 was already `# /safer:docs-reader`. Anyone calling `safer-by-default:safer-docs-reader` explicitly must update to `safer:docs-reader`.
 
 ### New skill: /safer:ux-audit
 
@@ -85,7 +98,7 @@ The plugin marketplace is now the canonical Claude Code install path; the manual
 
 ### Docs
 
-- `CLAUDE.md` rewritten (~30 lines): plugin overview, namespacing (CC marketplace `safer-by-default:NAME` vs Codex `safer:NAME`), runtime paths, source-resolution order, where contracts/scenarios live.
+- `CLAUDE.md` rewritten (~30 lines): plugin overview, namespacing (`safer:NAME` everywhere), runtime paths, source-resolution order, where contracts/scenarios live.
 
 ## 0.1.2 — safer-docs-reader skill
 

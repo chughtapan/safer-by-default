@@ -36,10 +36,10 @@ Inside a Claude Code session:
 
 ```text
 /plugin marketplace add chughtapan/safer-by-default
-/plugin install safer-by-default@safer-by-default
+/plugin install safer@safer-by-default
 ```
 
-Skills register under the `safer-by-default:<name>` namespace (`/safer-by-default:spec`, `/safer-by-default:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
+Skills register under the `safer:<name>` namespace (`/safer:spec`, `/safer:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
 
 ⚠️ **Integrity note:** Marketplace installs are fetched over HTTPS without signature verification. If you need pinned, signed installs, install from a tagged release tarball instead. See [Releases](https://github.com/chughtapan/safer-by-default/releases).
 

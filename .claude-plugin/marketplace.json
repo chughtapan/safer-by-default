@@ -8,7 +8,7 @@
   },
   "plugins": [
     {
-      "name": "safer-by-default",
+      "name": "safer",
       "source": "./",
       "version": "0.1.3",
       "description": "17 skills (architect, docs-reader, dogfood, implement-{junior,senior,staff}, investigate, orchestrate, research, review-senior, setup, spec, spike, stamina, typescript, ux-audit, verify) plus 13 bin/ utilities. Composes with eslint-plugin-agent-code-guard (lint floor) and zapbot (publish).",

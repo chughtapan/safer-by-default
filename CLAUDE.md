@@ -6,13 +6,11 @@ A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding ag
 
 ## Skill namespacing
 
-- Claude Code marketplace registers skills under `safer-by-default:NAME` — `/safer-by-default:spec`, `/safer-by-default:architect`, etc.
-- Codex setup-codex creates wrappers as `safer:NAME` — `/safer:spec`, `/safer:architect`, etc.
-- Docs use `/safer:NAME` shorthand. Read it as "the skill named NAME, prefixed by whatever your environment uses."
+Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:spec`, `/safer:architect`). The plugin slug inside the marketplace is `safer`; the marketplace itself is named `safer-by-default` (matching the repo). All in-repo docs use the `/safer:NAME` form literally.
 
 ## Where things live at runtime
 
-- **Claude Code**: install via `/plugin marketplace add chughtapan/safer-by-default` then `/plugin install safer-by-default@safer-by-default`. The plugin's `bin/` is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, etc. are available without extra setup. Skills load from the cache at `~/.claude/plugins/cache/safer-by-default/safer-by-default/<version>/`.
+- **Claude Code**: install via `/plugin marketplace add chughtapan/safer-by-default` then `/plugin install safer@safer-by-default`. The plugin's `bin/` is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, etc. are available without extra setup. Skills load from the cache at `~/.claude/plugins/cache/safer-by-default/safer/<version>/`.
 - **Codex**: run `./setup-codex` from a clone of this repo. It resolves source via (1) `$SAFER_SOURCE_DIR`, (2) the CC plugin cache, (3) `~/.local/share/safer-by-default/` (clones fresh if absent). Symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex wrappers to `~/.codex/skills/safer-NAME/`.
 - **Working from source**: `./setup` is a sanity check (deps, state dir, legacy-symlink cleanup). It is not an installer; the marketplace is.
 
