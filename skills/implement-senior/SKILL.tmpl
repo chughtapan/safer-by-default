@@ -411,7 +411,7 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 
 ## Checklist before declaring DONE
 
-- [ ] Every file change traces to a specific plan line (table in PR body).
+- [ ] Every file change traces to a specific plan line.
 - [ ] `safer-diff-scope --head HEAD` reports `tier: senior`.
 - [ ] No new module introduced.
 - [ ] No new public signature outside the plan.
@@ -422,10 +422,9 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 - [ ] Every comment inserted in the diff is a WHY-comment; no narrative present/future-tense comments, no restatements of what the code does, no plan-anchor cross-refs (those live in the PR body table).
 - [ ] Tests cover each cross-module path the plan names.
 - [ ] Lint, typecheck, and tests pass across touched packages.
-- [ ] Pre-PR `/simplify` pass run; findings applied or cited with skip reason in PR body.
-- [ ] Pre-PR `/review` pass run; findings applied or cited with skip reason in PR body.
-- [ ] Draft PR opened with title prefixed `[impl-senior]` and plan-anchor table in body.
-- [ ] `/safer:review-senior` is mandatory before this PR merges (noted in PR body or enforced by orchestrate Phase 5c).
+- [ ] Pre-PR `/simplify` pass run; findings applied or skips cited.
+- [ ] Pre-PR `/review` pass run; findings applied or skips cited.
+- [ ] Draft PR opened with title prefixed `[impl-senior]`.
 - [ ] Sub-issue label transitioned `implementing` → `review`.
 - [ ] `safer.skill_end` event emitted.
 - [ ] Status marker on the last line of your response.

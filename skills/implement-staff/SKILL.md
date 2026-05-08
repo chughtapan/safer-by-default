@@ -950,10 +950,10 @@ Post on the sub-issue; leave the branch in place with the anchored work committe
 ## Checklist before declaring DONE
 
 - [ ] Traceability table in PR body; every new artifact has an anchor.
-- [ ] `safer-diff-scope --head HEAD` reports `tier: staff` (or noted divergence with justification).
+- [ ] `safer-diff-scope --head HEAD` reports `tier: staff`.
 - [ ] Every new module named or described in spec or plan.
 - [ ] Every new public export named in spec or plan.
-- [ ] Every new dep pinned to an exact version; license and justification recorded.
+- [ ] Every new dep pinned to an exact version.
 - [ ] No spec revisions in this PR.
 - [ ] No unanchored refactors of pre-existing code.
 - [ ] Every public function declares its error channel (tagged error or discriminated result).
@@ -962,11 +962,11 @@ Post on the sub-issue; leave the branch in place with the anchored work committe
 - [ ] Every switch over a union ends in `absurd`.
 - [ ] Tests cover success, each error tag, and each named invariant.
 - [ ] Lint, typecheck, and tests pass across touched packages.
-- [ ] Pre-PR `/simplify` pass run; all findings applied or each skip cites the plan line in PR body.
+- [ ] Pre-PR `/simplify` pass run; findings applied or skips cited.
 - [ ] `/codex` diff review run; verdict posted on sub-issue.
-- [ ] Pre-PR `/review` pass run; all findings applied or each skip cites the plan line in PR body.
-- [ ] Draft PR opened with title prefixed `[impl-staff]` and tables in body; sub-issue label transitioned `implementing` → `review`.
-- [ ] `/safer:review-senior` is mandatory before this PR merges (noted in PR body or enforced by orchestrate Phase 5c).
+- [ ] Pre-PR `/review` pass run; findings applied or skips cited.
+- [ ] Draft PR opened with title prefixed `[impl-staff]`.
+- [ ] Sub-issue label transitioned `implementing` → `review`.
 - [ ] `safer.skill_end` event emitted.
 - [ ] Status marker on the last line of your response.
 

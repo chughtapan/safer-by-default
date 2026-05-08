@@ -394,7 +394,7 @@ Post on the sub-issue; leave the branch in place with no cross-module edits comm
 
 ## Checklist before declaring DONE
 
-- [ ] Exactly one module changed (plus at most one authorized barrel edit).
+- [ ] Exactly one module changed.
 - [ ] `safer-diff-scope --head HEAD` reports `tier: junior`.
 - [ ] No exported signature changed.
 - [ ] No new exported types.
@@ -402,7 +402,7 @@ Post on the sub-issue; leave the branch in place with no cross-module edits comm
 - [ ] Every switch over a union uses `absurd` on the default.
 - [ ] Every error path is tagged; no raw `throw new Error("bad")`.
 - [ ] Every boundary decode uses a schema.
-- [ ] Every `any`, `as T`, or `Record<string, unknown>` is either gone or documented in the PR body as a concern.
+- [ ] No `any`, `as T`, or `Record<string, unknown>` in the diff.
 - [ ] Every comment inserted in the diff is a WHY-comment; no narrative present/future-tense comments, no restatements of what the code does.
 - [ ] Tests cover the success branch and each named error tag.
 - [ ] Lint, typecheck, and tests pass locally.
