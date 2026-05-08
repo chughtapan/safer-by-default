@@ -15,6 +15,14 @@
     "principle_anchors": ["3", "4"],
     "rationale": "A silent catch hides both the error AND the branch; exhaustiveness cannot apply."
   },
+  "no-conditional-chaining": {
+    "principle_anchors": ["4"],
+    "rationale": "Conditional chains (`x?.y?.z`) hide the optionality the type system would have made exhaustive; lift the absence into a discriminant."
+  },
+  "no-unbounded-concurrency": {
+    "principle_anchors": ["5", "6"],
+    "rationale": "Unbounded `Promise.all` over a runtime-sized input has no concurrency budget; bound it explicitly."
+  },
   "record-cast": {
     "principle_anchors": ["2"],
     "rationale": "`as Record<string, unknown>` papers over a missing schema at the boundary; decode instead."
@@ -39,6 +47,14 @@
     "principle_anchors": ["3"],
     "rationale": "`throw new Error(\"bad\")` has no type, no handling contract, no receipt for the caller; tagged errors do."
   },
+  "as-unknown-as": {
+    "principle_anchors": ["2"],
+    "rationale": "`as unknown as T` is a double-cast that bypasses the type system at the boundary; decode through a schema."
+  },
+  "no-process-env-at-runtime": {
+    "principle_anchors": ["2"],
+    "rationale": "Reading `process.env.X` outside boot bypasses the env schema; environment is a boundary, validated at boot."
+  },
   "no-test-skip-only": {
     "principle_anchors": ["1"],
     "rationale": "Test-hygiene corollary of principle 1: a `.skip` or `.only` shipped to main is a test that does not test."
@@ -50,5 +66,145 @@
   "no-hardcoded-assertion-literals": {
     "principle_anchors": ["1"],
     "rationale": "Assertions hardcoding a literal (e.g., `expect(...).toBe(42)` where 42 is the implementation's output) compress the same information as a property; the property has higher coverage."
+  },
+  "no-example-only-tests": {
+    "principle_anchors": ["1"],
+    "rationale": "A test that asserts one hand-picked input is a compression of a property the type system or `fast-check` could verify; promote to property when one exists."
+  },
+  "effect-error-erasure": {
+    "principle_anchors": ["3"],
+    "rationale": "`Effect<T, never, R>` claims no error channel; if the effect can fail, name the error tag, don't erase it."
+  },
+  "effect-promise": {
+    "principle_anchors": ["3"],
+    "rationale": "`Promise<T>` inside an `Effect` re-introduces the erased error channel; convert at the boundary."
+  },
+  "either-discriminant": {
+    "principle_anchors": ["4"],
+    "rationale": "`Either<L, R>` matches must discriminate on the tag, never on truthiness; truthy-checking conflates error with falsy data."
+  },
+  "no-effect-error-coalescing": {
+    "principle_anchors": ["3"],
+    "rationale": "Coalescing distinct effect errors into one tag erases the diagnostic; downstream needs the tag set the upstream produced."
+  },
+  "tag-discriminant": {
+    "principle_anchors": ["4"],
+    "rationale": "Discriminated unions match on the named tag, not on shape; shape-matching breaks when tags overlap."
+  },
+  "manual-brand": {
+    "principle_anchors": ["1"],
+    "rationale": "A hand-rolled brand without a smart constructor enforces nothing; use the project's `Brand` helper so the constructor is the only path in."
+  },
+  "manual-option": {
+    "principle_anchors": ["4"],
+    "rationale": "Hand-rolled `Option`-shaped types don't compose with the rest of the algebra; use the project's `Option` so `match` works uniformly."
+  },
+  "manual-result": {
+    "principle_anchors": ["3", "4"],
+    "rationale": "Hand-rolled `Result`-shaped types miss the discriminant guarantees; use the project's `Result` so error tags stay structural."
+  },
+  "manual-tagged-error": {
+    "principle_anchors": ["3"],
+    "rationale": "Hand-rolled tagged errors miss the constructor pattern that makes the tag set extensible; use the project's helper."
+  },
+  "no-exported-brand-constructor": {
+    "principle_anchors": ["1"],
+    "rationale": "Exporting a brand's smart constructor breaks the encapsulation that makes the brand load-bearing; the constructor stays private to the module that owns the validation."
+  },
+  "no-manual-brand-constructor": {
+    "principle_anchors": ["1"],
+    "rationale": "Manually constructing a branded value bypasses the validation that earned the brand; use the smart constructor."
+  },
+  "file-implicit-boundary-module": {
+    "principle_anchors": ["5"],
+    "rationale": "Single-file modules must declare boundary intent; the architect's design surface is explicit, not inferred."
+  },
+  "folder-explicit-api-required": {
+    "principle_anchors": ["5"],
+    "rationale": "Folders with two or more consumers must expose a curated `index.ts` (Facade pattern); implicit APIs let consumers reach past the boundary."
+  },
+  "folder-readme-required": {
+    "principle_anchors": ["5"],
+    "rationale": "Each folder of structural significance carries a README naming its intent; the architect's design lives next to the code."
+  },
+  "no-cross-domain-sibling-import": {
+    "principle_anchors": ["5", "8"],
+    "rationale": "Sibling-folder imports across domains pierce the architect's boundaries; cross-domain code routes through a declared shared kernel, not a sideways import."
+  },
+  "no-distant-folder-import": {
+    "principle_anchors": ["5"],
+    "rationale": "Long import paths reverse the cohesion the folder structure declared; locality of import = locality of concern."
+  },
+  "no-export-star-boundary": {
+    "principle_anchors": ["5"],
+    "rationale": "`export *` at a public boundary inventories instead of curating; the architect's facade is intentional, not exhaustive."
+  },
+  "no-folder-cycle": {
+    "principle_anchors": ["5", "8"],
+    "rationale": "Folder dependency cycles invert the architect's design intent; cycles signal a missing kernel module or a misplaced concern."
+  },
+  "no-implementation-file-public-entry": {
+    "principle_anchors": ["5"],
+    "rationale": "Public entrypoints belong in `index.ts`, not arbitrary implementation files; the package's public surface is one named door."
+  },
+  "no-internal-subpath-export": {
+    "principle_anchors": ["5"],
+    "rationale": "`package.json` exports must not expose `src/`, `internal/`, or test helpers; internal paths are not contracts."
+  },
+  "no-inventory-barrel": {
+    "principle_anchors": ["5"],
+    "rationale": "Index files curate exports rather than inventory all siblings; bulk re-export defeats encapsulation."
+  },
+  "no-large-folder": {
+    "principle_anchors": ["6"],
+    "rationale": "Folders past a configurable file-count threshold are doing two jobs and need to split; cohesion has a budget."
+  },
+  "no-large-public-surface": {
+    "principle_anchors": ["6"],
+    "rationale": "Public re-export fanout has a budget; over-budget facades signal an over-scoped package."
+  },
+  "no-package-mesh": {
+    "principle_anchors": ["5"],
+    "rationale": "Package dependencies form a DAG, never a mesh; mesh dependencies kill independent reasoning."
+  },
+  "no-public-infra-type-leak": {
+    "principle_anchors": ["2", "5"],
+    "rationale": "Infrastructure package names in public boundaries leak the dependency through the API; adapt at the boundary."
+  },
+  "no-public-test-helper-leak": {
+    "principle_anchors": ["5"],
+    "rationale": "Test fixtures and helpers stay private to the package; leaking them publicly conflates test contract with runtime contract."
+  },
+  "no-public-vendor-type-leak": {
+    "principle_anchors": ["2", "5"],
+    "rationale": "Public types referencing vendor packages (Kysely, Pino, OpenAI) leak the dependency through the API; the Adapter pattern owns this seam."
+  },
+  "no-root-internal-cycle": {
+    "principle_anchors": ["5"],
+    "rationale": "Public exports must not import private internals; the public/internal split is one-way."
+  },
+  "no-upward-layer-import": {
+    "principle_anchors": ["5"],
+    "rationale": "Layered architecture forbids upward imports; the lower layer cannot depend on the upper, ever."
+  },
+  "require-boundary-owned-types": {
+    "principle_anchors": ["2", "5"],
+    "rationale": "Public exports use package-owned type names, not imported foreign names; boundaries own their own vocabulary."
+  },
+  "require-curated-public-facade": {
+    "principle_anchors": ["5"],
+    "rationale": "Public exports come from an explicit re-export strategy; the facade is designed, not auto-generated."
+  },
+  "shared-kernel-cohesion": {
+    "principle_anchors": ["5"],
+    "rationale": "Shared folders must not depend on consuming domain folders; the kernel sits below its consumers, never alongside."
+  },
+  "architecture-directive-parse-error": {
+    "principle_anchors": ["7"],
+    "rationale": "An `@agent-code-guard/architecture-exception:` directive without a `reason:` line is a silent override; exceptions to architectural rules must carry their reasoning."
+  },
+  "require-knip-in-lint": {
+    "principle_anchors": ["5"],
+    "rationale": "Dead-code detection (`knip`) running in lint catches drifted exports before they accumulate; the linter checks structure, not just syntax."
   }
 }

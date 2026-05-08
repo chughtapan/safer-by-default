@@ -743,10 +743,10 @@ Empty output from `$PM ls` means neither is installed. Install both.
 ### Step 2: Install the plugin and parser
 
 ```bash
-$PM add -D eslint-plugin-agent-code-guard@^0.0.2 @typescript-eslint/parser
+$PM add -D eslint-plugin-agent-code-guard@^0.0.8 @typescript-eslint/parser
 ```
 
-The parser lets ESLint understand TypeScript syntax. The plugin itself has no runtime dependencies beyond `@typescript-eslint/utils`.
+The parser lets ESLint understand TypeScript syntax.
 
 ### Step 3: Ask where integration tests live
 

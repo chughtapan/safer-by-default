@@ -668,6 +668,14 @@ The design doc has exactly these sections, in this order:
 
 Every section is required. Empty sections are a signal that the design is incomplete; fill them or escalate.
 
+## Design-tradition framing
+
+An architect's job is to translate a spec into a structure that future readers — agents and humans — can navigate without explanation. The classical software-design vocabulary names the moves: **encapsulation** (every module's interior is private; the public surface is the contract), **cohesion** (each module does one thing thoroughly; the things in a folder belong together), **coupling** (modules touch each other through narrow, named interfaces; not through shared mutable state, not through reaching past the facade), **separation of concerns** (cross-cutting responsibilities like logging, persistence, and auth are factored into kernel modules, not duplicated across siblings), and **design patterns** (Adapter at vendor boundaries, Strategy for swappable algorithms, Repository for storage, Facade for public exports — these are *vocabulary*, not goals; reach for them when they describe a real shape).
+
+Two heuristics that disagree are usually a signal that one of these principles is being violated. *"This module should know how that module stores its data" → coupling.* *"This folder has files that touch wildly different responsibilities" → cohesion.* *"Adding a feature here means changing six unrelated callers" → encapsulation broke.* The lint floor (`eslint-plugin-agent-code-guard` Architecture rules) catches the worst of these mechanically — folder cycles, public-surface bleed, vendor types in boundaries, package mesh — but the architect's job is to design so the lint never fires. The agent doesn't optimize for satisfying the linter; the agent designs the system, and the linter agrees.
+
+Concretely: as you decompose, name the design pattern (if one fits), declare the cohesion grouping (which modules belong in this folder and why), and check the coupling shape (does this dependency arrow point in one direction, or does it pass through a shared kernel?). Every folder of structural significance should be obvious in its intent within ten seconds of opening it — that's the cohesion test.
+
 ## Workflow
 
 ### Phase 1 — Load context
@@ -702,6 +710,10 @@ Rules for module naming:
 - One clear responsibility per module. If you write "module X does A and B," split unless A and B are the same responsibility under two names.
 - New modules only when an existing module does not cover the responsibility. Reuse over invention.
 - Boundaries are drawn by *data ownership*: who decodes, who validates, who stores, who emits. A module that shares ownership with another is the wrong boundary.
+
+### Phase 3b — Folder shape
+
+Before drafting interfaces, decide each folder's shape. **Layer-shaped** folders stack: `transport/` → `network/` → `application/`, where each child reads in one direction (upper imports lower per the chosen convention; the lower never imports the upper). Layering encodes coupling discipline structurally. **Tree-shaped** folders compose independent concerns: an orchestrator depends on N peer modules, peers don't depend on each other. Trees encode cohesion structurally — each peer is one bounded responsibility; the orchestrator is the composition root. The two shapes are not interchangeable. Don't mix them at the same level — sibling folders that look like peers but are actually layers (or vice versa) confuse every reader and every linter. Pick one shape per level, declare the layer order if layered, and create folders so the shape is visible from the directory listing alone.
 
 ### Phase 4 — Draft interfaces
 
@@ -896,6 +908,9 @@ Nothing architect produces lives outside GitHub. No local-only design files. No 
 
 ## Anti-patterns
 
+- **Mixed shape at the same level.** A folder containing both layer-style children (`transport/`, `network/`) and tree-style children (`auth/`, `billing/`) at the same nesting level is the single most common architectural smell. Pick one or split.
+- **Vendor type in a public export.** `export function getUser(): KyselyResult<User>` leaks the vendor through the public boundary. The Adapter pattern exists for exactly this; the public type is package-owned.
+- **"While I'm here, this module should also know about X."** Coupling creep. If module A needs to know about module B's internals, either A and B belong in the same module, or B's interface is wrong. Don't widen the contract to scratch the immediate itch.
 - **"I'll include a sketch of the happy path so the implementer sees what I mean."** (Iron rule violation. The stub is the interface. The sketch becomes a ghost implementation.)
 - **"I'll pick the algorithm; the module is tiny."** (Scope creep into `implement-*`. Name the algorithm in one sentence; do not implement it.)
 - **"I'll skip the error channel; the implementer can add tags later."** (Principle 3 violation. The error channel is part of the interface. `Promise<T>` leaks errors.)

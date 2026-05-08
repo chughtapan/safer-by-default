@@ -1,30 +1,37 @@
 #!/usr/bin/env bash
-# safer-acg-sync — regenerate the ACG rule table in skills/typescript/SKILL.md.
+# safer-acg-sync — regenerate the ACG rule table in skills/typescript/SKILL.tmpl.
 #
 # Reads:
-#   skills/setup/SKILL.md — for the install line `eslint-plugin-agent-code-guard@<spec>`.
+#   skills/setup/SKILL.tmpl — for the install line `eslint-plugin-agent-code-guard@<spec>`.
 #   The resolved ACG source — local node_modules (preferred, decoded via node -e)
 #     or GitHub at the matching tag (TS source, parsed via awk).
 #   skills/typescript/acg-rationale.json — hand-curated rule rationale + principle anchors.
 #
 # Writes:
-#   skills/typescript/SKILL.md — between `<!-- BEGIN: acg-mapping -->` and
+#   skills/typescript/SKILL.tmpl — between `<!-- BEGIN: acg-mapping -->` and
 #   `<!-- END: acg-mapping -->` markers, the rendered table.
+#
+# After this script runs, run `bin/safer-gen-skills` to render SKILL.md from
+# the updated SKILL.tmpl. Writing into the .tmpl (the human-edited source)
+# rather than the .md (the codegen artifact) means the table survives every
+# `safer-gen-skills` invocation; the alternative writes get destroyed on the
+# next codegen pass.
 #
 # Fails (exit 1) if ACG ships a rule that the rationale-map doesn't cover.
 # Warns (stderr) if rationale-map entries exist with no matching ACG rule.
 #
-# Usage: ./bin/safer-acg-sync   (run from the safer-by-default repo root)
+# Usage: ./bin/safer-acg-sync && ./bin/safer-gen-skills
+#   (run from the safer-by-default repo root)
 #
-# Trigger: when skills/setup/SKILL.md's install line for eslint-plugin-agent-code-guard
+# Trigger: when skills/setup/SKILL.tmpl's install line for eslint-plugin-agent-code-guard
 # changes. PRINCIPLES.md heading rename/renumber requires updating the principle_slug
 # function below to match the new GitHub anchor.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SETUP_SKILL="$REPO_ROOT/skills/setup/SKILL.md"
-TS_SKILL="$REPO_ROOT/skills/typescript/SKILL.md"
+SETUP_SKILL="$REPO_ROOT/skills/setup/SKILL.tmpl"
+TS_SKILL="$REPO_ROOT/skills/typescript/SKILL.tmpl"
 RATIONALE="$REPO_ROOT/skills/typescript/acg-rationale.json"
 
 # ---- Preflight ----
@@ -87,15 +94,24 @@ if [ -d "$LOCAL_PKG_DIR" ] && node -e "require.resolve('eslint-plugin-agent-code
 elif command -v gh >/dev/null 2>&1; then
   SOURCE_KIND="github-source"
   echo "source:            chughtapan/agent-code-guard@$TAG (GitHub TS source)"
-  gh api "repos/chughtapan/agent-code-guard/contents/src/index.ts?ref=$TAG" \
-    --jq '.content' 2>/dev/null | base64 -d > "$ACG_SRC" 2>/dev/null
-  [ -s "$ACG_SRC" ] || { echo "ERROR: failed to fetch chughtapan/agent-code-guard@$TAG src/index.ts" >&2; exit 2; }
+  # v0.0.8+ moved rule registrations across files. Fetch all the candidate
+  # files; concatenate; awk over the union. Each file may contribute one
+  # preset block (recommendedSyntaxRuleEntries, integrationTestRuleEntries,
+  # recommendedArchitectureRuleEntries, architecturePresetRuleEntries).
+  ACG_SOURCES="$TMP_DIR/acg-sources.ts"
+  : > "$ACG_SOURCES"
+  for path in src/rules/registry.ts src/rules/architecture/plugin-rules.ts src/index.ts; do
+    gh api "repos/chughtapan/agent-code-guard/contents/$path?ref=$TAG" \
+      --jq '.content' 2>/dev/null | base64 -d >> "$ACG_SOURCES" 2>/dev/null || true
+  done
+  [ -s "$ACG_SOURCES" ] || { echo "ERROR: failed to fetch any source from chughtapan/agent-code-guard@$TAG" >&2; exit 2; }
   awk '
-    /recommended: *\{/        { preset = "recommended" }
-    /integrationTests: *\{/   { preset = "integrationTests" }
-    /rules: *\{/              { in_rules = 1; next }
-    in_rules && /^[[:space:]]*\},/ { in_rules = 0; next }
-    in_rules && match($0, /"agent-code-guard\/[a-z-]+":[[:space:]]*"(error|warn)"/) {
+    /recommendedSyntaxRuleEntries[^{]*\{/      { preset = "recommended"; next }
+    /integrationTestRuleEntries[^{]*\{/        { preset = "integrationTests"; next }
+    /recommendedArchitectureRuleEntries[^{]*\{/{ preset = "recommended"; next }
+    /architecturePresetRuleEntries[^{]*\{/     { preset = "architecture"; next }
+    /^[[:space:]]*\};?[[:space:]]*$/           { preset = "" }
+    preset != "" && match($0, /"agent-code-guard\/[a-z-]+":[[:space:]]*"(error|warn)"/) {
       chunk = substr($0, RSTART, RLENGTH)
       n = index(chunk, "/")
       rest = substr(chunk, n + 1)
@@ -104,7 +120,7 @@ elif command -v gh >/dev/null 2>&1; then
       sev = (chunk ~ /"warn"/) ? "warn" : "error"
       printf "%s\t%s\t%s\n", preset, rule, sev
     }
-  ' "$ACG_SRC" > "$RULES_TSV"
+  ' "$ACG_SOURCES" | sort -u > "$RULES_TSV"
 else
   echo "ERROR: no local node_modules and gh CLI not on PATH; cannot fetch ACG source" >&2
   exit 2
@@ -115,10 +131,12 @@ echo "rule count:        $RULE_COUNT"
 [ "$RULE_COUNT" -gt 0 ] || { echo "ERROR: parsed zero rules from ACG source ($SOURCE_KIND)" >&2; exit 2; }
 
 # ---- Step 3: check rationale-map coverage ----
+# Dedup rules across presets — the same rule can appear in recommended AND
+# architecture presets; we only need one rationale entry per rule.
 UNMAPPED=()
-while IFS=$'\t' read -r preset rule severity; do
+while IFS= read -r rule; do
   jq -e --arg r "$rule" '.[$r]' "$RATIONALE" >/dev/null 2>&1 || UNMAPPED+=("$rule")
-done < "$RULES_TSV"
+done < <(cut -f2 "$RULES_TSV" | sort -u)
 
 if [ "${#UNMAPPED[@]}" -gt 0 ]; then
   echo "ERROR: rules in ACG@$TAG with no entry in $RATIONALE:" >&2
@@ -192,35 +210,82 @@ render_anchors() {
 }
 
 # ---- Step 5: render the table ----
-# Canonical doc location depends on which source path we used.
-# Local install: node_modules path is real and useful.
-# GitHub fallback: that path doesn't exist on disk; show only the GitHub URL.
-cat > "$TABLE" <<EOF
-**Resolved version:** \`eslint-plugin-agent-code-guard@$SPEC\` (from \`skills/setup/SKILL.md\`) → ACG \`$TAG\` ships **$RULE_COUNT rules**.
+# Group rules by category. Category derived from docs/rules/<category>/<rule>.md.
+# A rule may appear in multiple presets (recommended + architecture); collapse
+# preset values into a comma list, take the strictest severity (error > warn).
+CATEGORIES_TSV="$TMP_DIR/categories.tsv"   # rule \t category
+: > "$CATEGORIES_TSV"
+for cat in architecture async-flow effect manual-algebra safety testing tooling; do
+  gh api "repos/chughtapan/agent-code-guard/contents/docs/rules/$cat?ref=$TAG" \
+    --jq '.[].name' 2>/dev/null \
+    | sed -n 's/\.md$//p' \
+    | awk -v c="$cat" '{ printf "%s\t%s\n", $0, c }' >> "$CATEGORIES_TSV" || true
+done
 
-| Rule | Preset | Severity | Principle anchor(s) | Rationale | Doc |
-|---|---|---|---|---|---|
+# Collapse rules across presets: rule \t presets-csv \t severity (error wins)
+COLLAPSED_TSV="$TMP_DIR/collapsed.tsv"
+awk -F'\t' '
+  {
+    rule = $2
+    if (seen[rule]) {
+      presets[rule] = presets[rule] "," $1
+      if ($3 == "error") sev[rule] = "error"
+    } else {
+      seen[rule] = 1
+      presets[rule] = $1
+      sev[rule] = $3
+    }
+  }
+  END { for (r in presets) printf "%s\t%s\t%s\n", r, presets[r], sev[r] }
+' "$RULES_TSV" | sort > "$COLLAPSED_TSV"
+
+# Count rules that have BOTH a registry entry and a docs page; that's what
+# the table actually renders. Source-only rules (e.g. internal validators
+# without a docs/rules/<cat>/<rule>.md page) are dropped silently.
+RENDERED_COUNT=$(comm -12 <(cut -f1 "$CATEGORIES_TSV" | sort -u) <(cut -f1 "$COLLAPSED_TSV" | sort -u) | wc -l | tr -d ' ')
+
+cat > "$TABLE" <<EOF
+**Resolved version:** \`eslint-plugin-agent-code-guard@$SPEC\` (from \`skills/setup/SKILL.tmpl\`) → ACG \`$TAG\` ships **$RENDERED_COUNT documented rules** across 7 categories.
+
 EOF
 
-while IFS=$'\t' read -r preset rule severity; do
-  raw_anchors=$(jq -r --arg r "$rule" '.[$r].principle_anchors | map(tostring) | join(",")' "$RATIONALE")
-  anchors=$(render_anchors "$raw_anchors")
-  rationale=$(jq -r --arg r "$rule" '.[$r].rationale' "$RATIONALE")
-  github_url="https://github.com/chughtapan/agent-code-guard/blob/$TAG/docs/rules/$rule.md"
-  if [ "$SOURCE_KIND" = "local-api" ]; then
-    doc_cell="\`node_modules/eslint-plugin-agent-code-guard/docs/rules/$rule.md\` / [github]($github_url)"
-  else
-    doc_cell="[github]($github_url)"
-  fi
-  echo "| \`$rule\` | \`$preset\` | $severity | $anchors | $rationale | $doc_cell |" >> "$TABLE"
-done < <(sort "$RULES_TSV")
+# Render one table per category in this order (architecture first, largest):
+for cat in architecture async-flow effect manual-algebra safety testing tooling; do
+  cat_rules=$(grep -F "	$cat" "$CATEGORIES_TSV" | cut -f1 | sort)
+  [ -z "$cat_rules" ] && continue
+  cat_label=$(echo "$cat" | sed 's/-/ /g' | awk '{ for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2) } 1')
+  cat_count=$(echo "$cat_rules" | wc -l | tr -d ' ')
+  cat >> "$TABLE" <<EOF
+### $cat_label ($cat_count)
+
+| Rule | Preset(s) | Severity | Principle anchor(s) | Rationale | Doc |
+|---|---|---|---|---|---|
+EOF
+  for rule in $cat_rules; do
+    row=$(grep -F "$rule"$'\t' "$COLLAPSED_TSV" | head -1)
+    [ -z "$row" ] && continue
+    presets=$(echo "$row" | cut -f2)
+    severity=$(echo "$row" | cut -f3)
+    raw_anchors=$(jq -r --arg r "$rule" '.[$r].principle_anchors | map(tostring) | join(",")' "$RATIONALE")
+    anchors=$(render_anchors "$raw_anchors")
+    rationale=$(jq -r --arg r "$rule" '.[$r].rationale' "$RATIONALE")
+    github_url="https://github.com/chughtapan/agent-code-guard/blob/$TAG/docs/rules/$cat/$rule.md"
+    if [ "$SOURCE_KIND" = "local-api" ]; then
+      doc_cell="\`node_modules/eslint-plugin-agent-code-guard/docs/rules/$cat/$rule.md\` / [github]($github_url)"
+    else
+      doc_cell="[github]($github_url)"
+    fi
+    echo "| \`$rule\` | \`$presets\` | $severity | $anchors | $rationale | $doc_cell |" >> "$TABLE"
+  done
+  echo "" >> "$TABLE"
+done
 
 cat >> "$TABLE" <<EOF
 
-*Maintenance:* hand-maintained rationale-map in \`skills/typescript/acg-rationale.json\`. Updated by \`bin/safer-acg-sync\` when \`skills/setup/SKILL.md\`'s ACG install line changes. Principle anchors link to \`PRINCIPLES.md\` headings; if a heading is renamed, update the slug map in \`bin/safer-acg-sync\`.
+*Maintenance:* hand-maintained rationale-map in \`skills/typescript/acg-rationale.json\`. Updated by \`bin/safer-acg-sync\` when \`skills/setup/SKILL.tmpl\`'s ACG install line changes. After running the sync, run \`bin/safer-gen-skills\` to regenerate SKILL.md. Principle anchors link to \`PRINCIPLES.md\` headings; if a heading is renamed, update the slug map in \`bin/safer-acg-sync\`.
 EOF
 
-# ---- Step 6: splice into skills/typescript/SKILL.md between markers ----
+# ---- Step 6: splice into skills/typescript/SKILL.tmpl between markers ----
 grep -q '<!-- BEGIN: acg-mapping -->' "$TS_SKILL" \
   || { echo "ERROR: $TS_SKILL missing <!-- BEGIN: acg-mapping --> marker" >&2; exit 2; }
 
