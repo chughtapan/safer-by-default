@@ -221,6 +221,19 @@ Is the spec architect-ready? Check each:
 
 If the spec fails any check, stop. Escalate to `/safer:spec` via `safer-escalate --from architect --to spec --cause <CAUSE>`. Do not fill the gap yourself.
 
+**User-authored carve-out (invariants only).** If the spec lacks invariants AND no `/safer:spec` sub-issue exists in the parent epic (i.e., the user authored the plan directly without dispatching `/safer:spec`), waive the invariants gate but record the absence as a `DONE_WITH_CONCERNS` line in the design doc's "Process notes" section. The reasoning: the user took authorship responsibility; the architect proceeds but flags. Detection:
+
+```bash
+[ -z "$SAFER_PARENT_ISSUE" ] || \
+  HAS_SPEC_SUBISSUE=$(gh issue list --label safer:spec --state all \
+    --search "in:body Parent: #$SAFER_PARENT_ISSUE" \
+    --json number -q '.[0].number' 2>/dev/null || echo "")
+# If HAS_SPEC_SUBISSUE is empty, the user authored; lenient gate.
+# Otherwise spec produced (or escalated) and the strict gate applies.
+```
+
+This carve-out applies to invariants only — goals, non-goals, and acceptance criteria remain strict regardless of authorship. A user-authored plan without goals or acceptance criteria is not architect-ready.
+
 ### Phase 3 — Decompose into modules
 
 For each acceptance criterion, name the module that will satisfy it. One acceptance criterion can map to one module or several; one module can satisfy several criteria. Every mapping is recorded in the traceability table.
