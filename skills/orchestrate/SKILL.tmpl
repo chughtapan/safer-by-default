@@ -280,13 +280,14 @@ Emit `safer.skill_run` with `modality=orchestrate` only if you proceed.
 
 Once you've decided to orchestrate, draft the contract before any decomposition or sub-issue creation. The contract is the load-bearing artifact; everything downstream reads it.
 
-A contract has exactly four sections: **Goal**, **Acceptance**, **Autonomy budget**, **Always-park**. Autonomy is granted, not assumed; ratchet-up always parks; stop-the-line conditions fire regardless of contract.
+A contract has exactly five fields: **Mode**, **Goal**, **Acceptance**, **Autonomy budget**, **Always-park**. Autonomy is granted, not assumed; ratchet-up always parks; stop-the-line conditions fire regardless of contract.
 
 **Parse the user's instruction into a draft.** Map intent to:
 
+- **Mode** — one of `feature-ship`, `refactor`, `burndown` (see `PRINCIPLES.md` → Contracts → Goal modes). The mode bounds the orchestrator's defaults: whether to defer adjacent findings, whether to open new sub-issues, default stamina N. If the user's instruction names the mode (verbs like "ship", "refactor", "burn down the backlog", "clean up X"), use it. Otherwise ask once via `AskUserQuestion`. Do not guess — the wrong mode silently re-shapes the entire pipeline.
 - **Goal** — restate the user's intent in one paragraph. Use their words where possible.
 - **Acceptance** — convert "done" signals from the instruction into a checklist. If the instruction names a deliverable (PR merged, dogfood green, spec published), that's an item. If acceptance is implicit, ask once before drafting; do not invent criteria.
-- **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes investigate + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction.
+- **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes investigate + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction. The mode shifts the default: `feature-ship` includes "open follow-up sub-issues for adjacent findings" by default; `refactor` does not (findings are addressed inline); `burndown` excludes new-sub-issue creation entirely.
 - **Always-park** — start from the Recommended defaults below. Add ratchet-up as a default park reason. Add any irreversible action the instruction implies the user cares about.
 
 **Recommended Always-park defaults.** Every contract should include these unless the contract explicitly opts out (sandbox repos may opt out of force-push restrictions, etc.):
@@ -309,6 +310,8 @@ These exist because the asymmetric-cost framing applies: a wrong autonomous acti
 
 ```markdown
 ## Contract (draft)
+
+**Mode.** <feature-ship | refactor | burndown> — <one-line justification from instruction>
 
 **Goal.** <draft>
 
@@ -973,7 +976,18 @@ Filter the queue in-process. The first two filters are body-only and cheap; the 
 
 A sub-issue labeled `safer:deferred` carries a structured comment that records why it is held and until when. The filter drops deferred sub-issues whose `until` condition has not been satisfied.
 
-Marker format (in an HTML comment on the sub-issue):
+**Writing markers: use `safer-defer`.** Never add the `safer:deferred` label by hand; the only sanctioned way to defer a sub-issue is the `safer-defer` binary, which writes the marker comment AND adds the label in one operation. Self-validates against the marker grammar before publishing — refuses to ship a malformed marker. This makes broken-marker silent-failure unrepresentable by construction (Principle 1: types beat tests; the broken state is impossible to write rather than detected after the fact):
+
+```bash
+safer-defer --issue 142 --reason "awaiting upstream API spec" \
+            --until "2026-05-15T00:00:00Z"
+safer-defer --issue 142 --reason "blocked by ENG-1234" \
+            --until "condition:linear-ticket-ENG-1234-closed"
+safer-defer --issue 142 --clear              # remove the deferral
+safer-defer --issue 142 --check              # validate marker(s) on issue
+```
+
+Marker format (in an HTML comment on the sub-issue, written by `safer-defer`):
 
 ```
 <!-- safer:deferred reason="<free-form string, quote-escaped>" until="<ISO8601|condition:...>" added-by="<team-member-name>" at="<ISO8601>" -->
@@ -984,7 +998,7 @@ Marker format (in an HTML comment on the sub-issue):
 | Shape | Semantics | Example |
 |---|---|---|
 | ISO8601 UTC | Filter drops sub-issue until wall-clock time ≥ `until` | `2026-04-20T00:00:00Z` |
-| `condition:<freeform>` | Filter drops unconditionally; unblock requires human label removal | `condition:upstream-pr-merged:chughtapan/cc-judge#14` |
+| `condition:<freeform>` | Filter drops unconditionally; unblock requires `safer-defer --clear` (or human label removal) | `condition:upstream-pr-merged:chughtapan/cc-judge#14` |
 
 Regex (ECMA/PCRE compatible; `until` field must be ISO8601 or `condition:*`):
 
@@ -992,7 +1006,7 @@ Regex (ECMA/PCRE compatible; `until` field must be ISO8601 or `condition:*`):
 <!-- safer:deferred reason="(?<reason>(?:[^"\\]|\\.)*)" until="((?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)|(?:condition:[^"]+))" added-by="(?<by>[^"]+)" at="(?<at>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)" -->
 ```
 
-Filter logic (fail-closed): Drop any sub-issue labeled `safer:deferred` unless its marker's `until` condition has passed. If the label is present but no marker comment is found, log `deferred_marker_missing: issue=#N` and skip (fail-closed). If the marker is malformed, log `deferred_marker_malformed: issue=#N` and skip.
+Filter logic (fail-closed): Drop any sub-issue labeled `safer:deferred` unless its marker's `until` condition has passed. If the label is present but no marker comment is found, log `deferred_marker_missing: issue=#N` and surface in the next wake-up digest as a repair item — the user runs `safer-defer --check --issue N` to inspect, then either re-defers via `safer-defer` or clears via `safer-defer --clear`. Never silently re-park beyond one tick. If the marker is malformed (legacy hand-written marker that doesn't match the grammar), the same surface-and-repair path applies. With `safer-defer` as the canonical writer, both failure modes only occur on legacy state — not on new deferrals.
 
 Pseudocode:
 

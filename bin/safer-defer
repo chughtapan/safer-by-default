@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# safer-defer — defer a safer sub-issue with a structured marker, atomically.
+#
+# Adds a deferral-marker comment AND the safer:deferred label in one operation.
+# Refuses to do one without the other. The marker grammar is consumed by
+# orchestrate's Phase 5d auto-monitor; broken-marker silent-failure is
+# eliminated by construction — every safer:deferred labeled issue carries
+# a valid marker because the only sanctioned way to add the label is this
+# binary.
+#
+# Usage:
+#   safer-defer --issue N --reason "..." --until "<ISO8601|condition:...>"
+#                [--repo OWNER/REPO] [--by NAME]
+#   safer-defer --issue N --clear [--repo OWNER/REPO]
+#   safer-defer --issue N --check [--repo OWNER/REPO]   # validate marker(s)
+#
+# Examples:
+#   safer-defer --issue 142 --reason "awaiting upstream API spec" \
+#               --until "2026-05-15T00:00:00Z"
+#   safer-defer --issue 142 --reason "blocked by ENG-1234" \
+#               --until "condition:linear ticket ENG-1234 closed"
+#   safer-defer --issue 142 --clear
+#
+# Exit codes:
+#   0  success
+#   1  invalid arguments / missing required fields
+#   2  marker grammar validation failed
+#   3  gh CLI failure
+set -euo pipefail
+
+PROG=$(basename "$0")
+ISSUE=""
+REASON=""
+UNTIL=""
+REPO=""
+BY=""
+MODE="defer"
+
+usage() {
+  sed -n '2,/^set/p' "$0" | sed 's/^# *//;s/^#//' | head -n -1
+  exit "${1:-0}"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --issue)  ISSUE="$2"; shift 2 ;;
+    --reason) REASON="$2"; shift 2 ;;
+    --until)  UNTIL="$2"; shift 2 ;;
+    --repo)   REPO="$2"; shift 2 ;;
+    --by)     BY="$2"; shift 2 ;;
+    --clear)  MODE="clear"; shift ;;
+    --check)  MODE="check"; shift ;;
+    -h|--help) usage 0 ;;
+    *) echo "$PROG: unknown flag: $1" >&2; usage 1 ;;
+  esac
+done
+
+[ -n "$ISSUE" ] || { echo "$PROG: --issue is required" >&2; exit 1; }
+case "$ISSUE" in *[!0-9]*) echo "$PROG: --issue must be numeric, got: $ISSUE" >&2; exit 1;; esac
+
+if [ -z "$REPO" ]; then
+  REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null) \
+    || { echo "$PROG: --repo not given and gh repo view failed (are you in a git repo with a remote?)" >&2; exit 3; }
+fi
+
+[ -n "$BY" ] || BY=$(gh api user --jq .login 2>/dev/null) \
+  || { echo "$PROG: --by not given and gh api user failed" >&2; exit 3; }
+
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Marker grammar — must match orchestrate's Phase 5d filter regex exactly.
+MARKER_RE='^<!-- safer:deferred reason="(([^"\\]|\\.)*)" until="(([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)|(condition:[^"]+))" added-by="[^"]+" at="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z" -->$'
+
+validate_until() {
+  local u="$1"
+  case "$u" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) return 0 ;;
+    condition:*) [ "${#u}" -gt 10 ] && return 0 ;;
+  esac
+  return 1
+}
+
+escape_quotes() {
+  # Backslash-escape " and \ so the marker grammar parses cleanly.
+  sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+build_marker() {
+  local reason_esc until_val
+  reason_esc=$(printf '%s' "$REASON" | escape_quotes)
+  until_val="$UNTIL"
+  printf '<!-- safer:deferred reason="%s" until="%s" added-by="%s" at="%s" -->\n' \
+    "$reason_esc" "$until_val" "$BY" "$NOW"
+}
+
+case "$MODE" in
+  defer)
+    [ -n "$REASON" ] || { echo "$PROG: --reason is required for defer" >&2; exit 1; }
+    [ -n "$UNTIL" ]  || { echo "$PROG: --until is required for defer" >&2; exit 1; }
+    validate_until "$UNTIL" \
+      || { echo "$PROG: --until must be ISO8601 (YYYY-MM-DDTHH:MM:SSZ) or 'condition:...'; got: $UNTIL" >&2; exit 1; }
+
+    MARKER=$(build_marker)
+    # Self-validate against the grammar that orchestrate consumes.
+    if ! printf '%s' "$MARKER" | grep -Eq "$MARKER_RE"; then
+      echo "$PROG: built marker failed self-validation; refusing to publish a malformed marker" >&2
+      echo "marker: $MARKER" >&2
+      exit 2
+    fi
+
+    # Order matters: comment FIRST (orphan markers are harmless), label SECOND.
+    # If labeling fails, the orphan marker stays — but the auto-monitor never
+    # treats unlabeled issues as deferred, so the failure mode is benign.
+    BODY=$(printf '%s\n\n_Deferred via safer-defer. The auto-monitor will re-evaluate when the until condition is met._\n' "$MARKER")
+    gh issue comment "$ISSUE" --repo "$REPO" --body "$BODY" >/dev/null \
+      || { echo "$PROG: gh issue comment failed" >&2; exit 3; }
+    gh issue edit "$ISSUE" --repo "$REPO" --add-label safer:deferred >/dev/null \
+      || { echo "$PROG: comment posted but label add failed; manually add safer:deferred to issue #$ISSUE/$REPO" >&2; exit 3; }
+    echo "deferred: $REPO#$ISSUE until $UNTIL"
+    ;;
+
+  clear)
+    # Atomic-ish clear: remove the label first (so the auto-monitor stops
+    # treating it as deferred even if the marker comment lingers), then post
+    # a clearing comment for the audit trail.
+    gh issue edit "$ISSUE" --repo "$REPO" --remove-label safer:deferred >/dev/null 2>&1 || true
+    gh issue comment "$ISSUE" --repo "$REPO" --body "_Deferral cleared via safer-defer at $NOW by $BY. Prior markers preserved above for audit._" >/dev/null \
+      || { echo "$PROG: gh issue comment failed" >&2; exit 3; }
+    echo "cleared: $REPO#$ISSUE"
+    ;;
+
+  check)
+    # Validate every deferral marker on the issue against the grammar.
+    # Used by orchestrate to surface broken-state issues left over from
+    # pre-safer-defer manual deferrals.
+    BAD=0
+    GOOD=0
+    while IFS= read -r line; do
+      [ -z "$line" ] && continue
+      if printf '%s' "$line" | grep -Eq "$MARKER_RE"; then
+        GOOD=$((GOOD + 1))
+      else
+        BAD=$((BAD + 1))
+        echo "malformed: $line"
+      fi
+    done < <(gh issue view "$ISSUE" --repo "$REPO" --json comments --jq '.comments[].body' \
+             | grep -E '^<!-- safer:deferred' || true)
+    echo "summary: $REPO#$ISSUE good=$GOOD bad=$BAD"
+    [ "$BAD" -eq 0 ]
+    ;;
+
+  *) echo "$PROG: unknown mode: $MODE" >&2; exit 1 ;;
+esac

@@ -309,6 +309,24 @@ Two rules apply to every contract regardless of content:
 1. **Ratchet-up always parks.** When a downstream modality must escalate to a higher modality (Principle 8 Ratchet), the original autonomy scope no longer applies. The escalation parks for re-authorization, even if the higher modality is technically inside the granted budget.
 2. **Stop-the-line conditions fire regardless of contract.** Three-strikes mis-scoping, confusion protocol, peer-review disagreement, stamina BLOCK, LOW-confidence on non-junior recommendations — each parks even within budget.
 
+### Goal modes
+
+Every contract declares one **goal mode**. The orchestrator's defaults differ in each. Mode is a single line in the `## Contract` block of the parent epic, named back to the user during Phase 1a draft:
+
+```
+Mode: feature-ship | refactor | burndown
+```
+
+**`feature-ship`** — ship a new feature quickly. Open the GitHub epic + sub-issues for the named work and proceed. The orchestrator is permitted to defer adjacent tech-debt findings to follow-up issues rather than addressing them inline. Default stamina N is at the low end of the table. Don't over-audit; the goal is to land the feature.
+
+**`refactor`** — clean up an area; debt is the work. The orchestrator does not defer findings — every simplification, dead-code removal, or technical-debt fix the modalities surface gets addressed in the same orchestration. Leaving debt is a contract violation, not a deferred issue. Default stamina N is at the high end. Be pedantic; that is what was authorized.
+
+**`burndown`** — close existing open work; new issues are out of scope. The orchestrator does not create new sub-issues for adjacent findings (the way `feature-ship` would defer them). Instead, the orchestrator reads the existing open issue list, prioritizes by labels/age/blast-radius, and dispatches modalities only against pre-existing issues. Findings outside the burndown scope are surfaced as one-line items in the wake-up digest and held for the user to triage — they do not become new sub-issues.
+
+The mode bounds the orchestrator's defaults; individual sub-issues can override (e.g., a `refactor`-mode pipeline may include a `feature-ship`-style sub-issue if the contract names it). Mismatch — invoking `feature-ship` defaults inside a `refactor` contract — is a contract violation that parks for amendment.
+
+When the user does not name a mode, the orchestrator asks once via `AskUserQuestion` during Phase 1a. It does not guess.
+
 ---
 
 ## Durable records
@@ -379,7 +397,7 @@ Every artifact a modality produces declares four pieces of metadata. Each is req
 **1. Status marker.** Exactly one of:
 
 - **`DONE`** — acceptance met; evidence attached.
-- **`DONE_WITH_CONCERNS`** — completed; each concern named; downstream decides whether to proceed.
+- **`DONE_WITH_CONCERNS`** — completed AND each concern is named AND **each named concern must be resolved before downstream considers the work landed.** Concerns are blockers, not advisories. If the next phase cannot proceed without the concerns being resolved, the receipt says `DONE_WITH_CONCERNS`; if the next phase genuinely doesn't care, the receipt is just `DONE`. Downstream may not "proceed and ignore the concerns" — that route is `DONE` with the concerns documented as future-work issues, or `ESCALATED` if the concerns are out of scope. The same semantics apply to a `SHIP_WITH_CONCERNS` verdict from review or stamina: the work does not land until the named concerns are addressed.
 - **`ESCALATED`** — stop rule fired; escalation artifact produced; handed back upstream.
 - **`BLOCKED`** — cannot proceed; external dependency or missing information; state exactly what is needed.
 - **`NEEDS_CONTEXT`** — ambiguity only the user can resolve; state the question.

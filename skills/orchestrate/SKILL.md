@@ -312,6 +312,24 @@ Two rules apply to every contract regardless of content:
 1. **Ratchet-up always parks.** When a downstream modality must escalate to a higher modality (Principle 8 Ratchet), the original autonomy scope no longer applies. The escalation parks for re-authorization, even if the higher modality is technically inside the granted budget.
 2. **Stop-the-line conditions fire regardless of contract.** Three-strikes mis-scoping, confusion protocol, peer-review disagreement, stamina BLOCK, LOW-confidence on non-junior recommendations — each parks even within budget.
 
+### Goal modes
+
+Every contract declares one **goal mode**. The orchestrator's defaults differ in each. Mode is a single line in the `## Contract` block of the parent epic, named back to the user during Phase 1a draft:
+
+```
+Mode: feature-ship | refactor | burndown
+```
+
+**`feature-ship`** — ship a new feature quickly. Open the GitHub epic + sub-issues for the named work and proceed. The orchestrator is permitted to defer adjacent tech-debt findings to follow-up issues rather than addressing them inline. Default stamina N is at the low end of the table. Don't over-audit; the goal is to land the feature.
+
+**`refactor`** — clean up an area; debt is the work. The orchestrator does not defer findings — every simplification, dead-code removal, or technical-debt fix the modalities surface gets addressed in the same orchestration. Leaving debt is a contract violation, not a deferred issue. Default stamina N is at the high end. Be pedantic; that is what was authorized.
+
+**`burndown`** — close existing open work; new issues are out of scope. The orchestrator does not create new sub-issues for adjacent findings (the way `feature-ship` would defer them). Instead, the orchestrator reads the existing open issue list, prioritizes by labels/age/blast-radius, and dispatches modalities only against pre-existing issues. Findings outside the burndown scope are surfaced as one-line items in the wake-up digest and held for the user to triage — they do not become new sub-issues.
+
+The mode bounds the orchestrator's defaults; individual sub-issues can override (e.g., a `refactor`-mode pipeline may include a `feature-ship`-style sub-issue if the contract names it). Mismatch — invoking `feature-ship` defaults inside a `refactor` contract — is a contract violation that parks for amendment.
+
+When the user does not name a mode, the orchestrator asks once via `AskUserQuestion` during Phase 1a. It does not guess.
+
 ---
 
 ## Durable records
@@ -382,7 +400,7 @@ Every artifact a modality produces declares four pieces of metadata. Each is req
 **1. Status marker.** Exactly one of:
 
 - **`DONE`** — acceptance met; evidence attached.
-- **`DONE_WITH_CONCERNS`** — completed; each concern named; downstream decides whether to proceed.
+- **`DONE_WITH_CONCERNS`** — completed AND each concern is named AND **each named concern must be resolved before downstream considers the work landed.** Concerns are blockers, not advisories. If the next phase cannot proceed without the concerns being resolved, the receipt says `DONE_WITH_CONCERNS`; if the next phase genuinely doesn't care, the receipt is just `DONE`. Downstream may not "proceed and ignore the concerns" — that route is `DONE` with the concerns documented as future-work issues, or `ESCALATED` if the concerns are out of scope. The same semantics apply to a `SHIP_WITH_CONCERNS` verdict from review or stamina: the work does not land until the named concerns are addressed.
 - **`ESCALATED`** — stop rule fired; escalation artifact produced; handed back upstream.
 - **`BLOCKED`** — cannot proceed; external dependency or missing information; state exactly what is needed.
 - **`NEEDS_CONTEXT`** — ambiguity only the user can resolve; state the question.
@@ -722,13 +740,14 @@ Emit `safer.skill_run` with `modality=orchestrate` only if you proceed.
 
 Once you've decided to orchestrate, draft the contract before any decomposition or sub-issue creation. The contract is the load-bearing artifact; everything downstream reads it.
 
-A contract has exactly four sections: **Goal**, **Acceptance**, **Autonomy budget**, **Always-park**. Autonomy is granted, not assumed; ratchet-up always parks; stop-the-line conditions fire regardless of contract.
+A contract has exactly five fields: **Mode**, **Goal**, **Acceptance**, **Autonomy budget**, **Always-park**. Autonomy is granted, not assumed; ratchet-up always parks; stop-the-line conditions fire regardless of contract.
 
 **Parse the user's instruction into a draft.** Map intent to:
 
+- **Mode** — one of `feature-ship`, `refactor`, `burndown` (see `PRINCIPLES.md` → Contracts → Goal modes). The mode bounds the orchestrator's defaults: whether to defer adjacent findings, whether to open new sub-issues, default stamina N. If the user's instruction names the mode (verbs like "ship", "refactor", "burn down the backlog", "clean up X"), use it. Otherwise ask once via `AskUserQuestion`. Do not guess — the wrong mode silently re-shapes the entire pipeline.
 - **Goal** — restate the user's intent in one paragraph. Use their words where possible.
 - **Acceptance** — convert "done" signals from the instruction into a checklist. If the instruction names a deliverable (PR merged, dogfood green, spec published), that's an item. If acceptance is implicit, ask once before drafting; do not invent criteria.
-- **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes investigate + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction.
+- **Autonomy budget** — list the modality dispatches, label transitions, and merge/deploy permissions the instruction authorizes. Default to the most-conservative reading. "Fix this bug" with no other qualifier authorizes investigate + implement-junior + review-senior + verify; merge requires explicit authorization in the instruction. The mode shifts the default: `feature-ship` includes "open follow-up sub-issues for adjacent findings" by default; `refactor` does not (findings are addressed inline); `burndown` excludes new-sub-issue creation entirely.
 - **Always-park** — start from the Recommended defaults below. Add ratchet-up as a default park reason. Add any irreversible action the instruction implies the user cares about.
 
 **Recommended Always-park defaults.** Every contract should include these unless the contract explicitly opts out (sandbox repos may opt out of force-push restrictions, etc.):
@@ -751,6 +770,8 @@ These exist because the asymmetric-cost framing applies: a wrong autonomous acti
 
 ```markdown
 ## Contract (draft)
+
+**Mode.** <feature-ship | refactor | burndown> — <one-line justification from instruction>
 
 **Goal.** <draft>
 
@@ -1415,7 +1436,18 @@ Filter the queue in-process. The first two filters are body-only and cheap; the 
 
 A sub-issue labeled `safer:deferred` carries a structured comment that records why it is held and until when. The filter drops deferred sub-issues whose `until` condition has not been satisfied.
 
-Marker format (in an HTML comment on the sub-issue):
+**Writing markers: use `safer-defer`.** Never add the `safer:deferred` label by hand; the only sanctioned way to defer a sub-issue is the `safer-defer` binary, which writes the marker comment AND adds the label in one operation. Self-validates against the marker grammar before publishing — refuses to ship a malformed marker. This makes broken-marker silent-failure unrepresentable by construction (Principle 1: types beat tests; the broken state is impossible to write rather than detected after the fact):
+
+```bash
+safer-defer --issue 142 --reason "awaiting upstream API spec" \
+            --until "2026-05-15T00:00:00Z"
+safer-defer --issue 142 --reason "blocked by ENG-1234" \
+            --until "condition:linear-ticket-ENG-1234-closed"
+safer-defer --issue 142 --clear              # remove the deferral
+safer-defer --issue 142 --check              # validate marker(s) on issue
+```
+
+Marker format (in an HTML comment on the sub-issue, written by `safer-defer`):
 
 ```
 <!-- safer:deferred reason="<free-form string, quote-escaped>" until="<ISO8601|condition:...>" added-by="<team-member-name>" at="<ISO8601>" -->
@@ -1426,7 +1458,7 @@ Marker format (in an HTML comment on the sub-issue):
 | Shape | Semantics | Example |
 |---|---|---|
 | ISO8601 UTC | Filter drops sub-issue until wall-clock time ≥ `until` | `2026-04-20T00:00:00Z` |
-| `condition:<freeform>` | Filter drops unconditionally; unblock requires human label removal | `condition:upstream-pr-merged:chughtapan/cc-judge#14` |
+| `condition:<freeform>` | Filter drops unconditionally; unblock requires `safer-defer --clear` (or human label removal) | `condition:upstream-pr-merged:chughtapan/cc-judge#14` |
 
 Regex (ECMA/PCRE compatible; `until` field must be ISO8601 or `condition:*`):
 
@@ -1434,7 +1466,7 @@ Regex (ECMA/PCRE compatible; `until` field must be ISO8601 or `condition:*`):
 <!-- safer:deferred reason="(?<reason>(?:[^"\\]|\\.)*)" until="((?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)|(?:condition:[^"]+))" added-by="(?<by>[^"]+)" at="(?<at>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)" -->
 ```
 
-Filter logic (fail-closed): Drop any sub-issue labeled `safer:deferred` unless its marker's `until` condition has passed. If the label is present but no marker comment is found, log `deferred_marker_missing: issue=#N` and skip (fail-closed). If the marker is malformed, log `deferred_marker_malformed: issue=#N` and skip.
+Filter logic (fail-closed): Drop any sub-issue labeled `safer:deferred` unless its marker's `until` condition has passed. If the label is present but no marker comment is found, log `deferred_marker_missing: issue=#N` and surface in the next wake-up digest as a repair item — the user runs `safer-defer --check --issue N` to inspect, then either re-defers via `safer-defer` or clears via `safer-defer --clear`. Never silently re-park beyond one tick. If the marker is malformed (legacy hand-written marker that doesn't match the grammar), the same surface-and-repair path applies. With `safer-defer` as the canonical writer, both failure modes only occur on legacy state — not on new deferrals.
 
 Pseudocode:
 
