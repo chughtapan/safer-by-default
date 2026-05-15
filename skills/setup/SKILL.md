@@ -523,12 +523,13 @@ Concretely, you:
 1. Detect the repo state: package manager, existing eslint config, strict flags, whether the plugin is already installed.
 2. Branch on existing state: verify, reconfigure, update, walk away, or proceed clean.
 3. Install peer dependencies if missing, install the plugin and parser, install the companion rules.
-4. Ask the user two small questions about the stack, one question about where integration tests live.
+4. Ask about the stack (Effect, typed query builder, integration-tests glob) and resolve the precise identifiers (schema library, DB tool, env-var-access pattern) that the managed `CLAUDE.md` section records.
 5. Plan the three-block `eslint.config.js` in your head, then write it once.
 6. Flip the five tsconfig strict flags; measure the TypeScript error delta.
 7. Probe that the lint actually fires on a file that should violate it.
 8. Run the full lint, tabulate by rule, ask the user how to handle the baseline.
-9. Print a bordered completion summary.
+9. Write the managed `## Project structural choices` section to the project's `CLAUDE.md` so every future Claude Code session in this repo loads the repo-local structural contract.
+10. Print a bordered completion summary.
 
 This skill does not escalate. It asks via `AskUserQuestion` when ambiguous. It does not commit files on the user's behalf.
 
@@ -596,6 +597,7 @@ If `safer-update-check` or `safer-telemetry-log` is missing, continue. Telemetry
 - Running a probe lint and a full lint.
 - Offering the user a choice on how to handle the baseline.
 - Writing `.safer-baseline.json` if the user picks the freeze option.
+- Writing a managed `## Project structural choices` section to the project's `CLAUDE.md` (idempotent; sentinel-bounded so reruns replace only that section).
 - Printing a completion summary.
 
 **Forbidden:**
@@ -763,7 +765,7 @@ Remember the answer. If D, Block 2 of the config is omitted entirely.
 
 ### Step 4: Ask about the stack
 
-Two questions, one after the other via `AskUserQuestion`.
+The first two questions configure lint rules; the third resolves precise identifiers for the managed `CLAUDE.md` section that Step 10b writes. Ask sequentially via `AskUserQuestion`.
 
 First, about Effect:
 
@@ -780,6 +782,38 @@ Second, about the database layer:
 > - C) No database in this project. Leave the rule on; it will never fire.
 
 Regardless of the answers, these four rules stay on: `bare-catch`, `record-cast`, `no-manual-enum-cast`, `no-hardcoded-secrets`.
+
+Third, resolve the precise identifiers for the managed `CLAUDE.md` section. Effect-on (A or C) determines three of them; only Effect-off (B) requires follow-up prompts. The typed-query-builder answer (Step 4 "Second") determines the DB tool.
+
+Resolution table, keyed off the Effect answer:
+
+| Variable | Effect = A or C | Effect = B |
+|---|---|---|
+| `EFFECT_RUNTIME` | `"yes"` | `"no"` |
+| `SCHEMA_LIB` | `"Effect Schema"` | ask (see prompt 1 below) |
+| `ENV_VAR_ACCESS` | `"Config.string in an Effect Layer"` | ask (see prompt 2 below) |
+
+`DB_TOOL` is keyed off the typed-query-builder answer: B or C → `"none"`; A → ask prompt 3 below.
+
+Prompts (issued only when the row above resolves to "ask"):
+
+> Prompt 1. Which schema library does this project use at boundaries?
+> - A) Zod → `SCHEMA_LIB="Zod"`
+> - B) Valibot → `SCHEMA_LIB="Valibot"`
+> - C) Other / none yet → `SCHEMA_LIB="Other / TBD"`
+
+> Prompt 2. How does this project read environment variables?
+> - A) Zod boot-time schema (decode `process.env` once at startup) → `ENV_VAR_ACCESS="Zod boot-time schema"`
+> - B) Plain `process.env` reads → `ENV_VAR_ACCESS="Plain process.env reads"`
+> - C) Other → `ENV_VAR_ACCESS="Other"`
+
+> Prompt 3. Which typed query builder does this project use?
+> - A) Kysely → `DB_TOOL="Kysely"`
+> - B) Drizzle → `DB_TOOL="Drizzle"`
+> - C) Prisma typed client → `DB_TOOL="Prisma typed client"`
+> - D) Other → `DB_TOOL="Other"`
+
+Carry `SCHEMA_LIB`, `DB_TOOL`, `ENV_VAR_ACCESS`, `EFFECT_RUNTIME`, and the Step 3 glob (`INTEGRATION_GLOB`) into Step 10b.
 
 ### Step 4b: Ask about testing dependencies
 
@@ -1040,6 +1074,93 @@ If B: write `.safer-baseline.json` at the repo root with the per-rule counts. Do
 
 Some fixes change runtime behavior as well as type shape; rewriting `async` into `Effect.gen` is not a mechanical transform. Never mass-fix silently. The four options exist so the user opts into the grade of change they want.
 
+### Step 10b: Write the managed `CLAUDE.md` section
+
+Write a sentinel-bounded `## Project structural choices` block into the project's `CLAUDE.md`. Claude Code loads `CLAUDE.md` automatically at session start, so this block is the per-repo structural contract that complements `PRINCIPLES.md`. Reruns of `/safer:setup` replace the block in place; every other line of `CLAUDE.md` is untouched.
+
+Resolve the installed plugin version. Read the installed `package.json` directly (the plugin was installed in Step 2, so the path resolves); fall back to `$PM ls` only if the read fails:
+
+```bash
+PLUGIN_VERSION=$(node -p "require('eslint-plugin-agent-code-guard/package.json').version" 2>/dev/null)
+if [ -z "$PLUGIN_VERSION" ]; then
+  PLUGIN_VERSION=$($PM ls eslint-plugin-agent-code-guard --depth=0 --json 2>/dev/null \
+    | grep -oE '"version": *"[^"]+"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+fi
+[ -z "$PLUGIN_VERSION" ] && PLUGIN_VERSION="unknown"
+```
+
+Build the section in a temp file (avoids shell-quoting hazards in `awk`). Trap cleanup so a Ctrl-C between `mktemp` and the final `rm` does not leak:
+
+```bash
+SECTION_FILE=$(mktemp)
+trap 'rm -f "$SECTION_FILE"' EXIT INT TERM
+cat > "$SECTION_FILE" <<EOF
+## Project structural choices (managed by /safer:setup — do not edit manually; rerun the skill to change)
+
+- Schema library: ${SCHEMA_LIB}
+- Database access: ${DB_TOOL}
+- Integration tests: ${INTEGRATION_GLOB:-not set}
+- ESLint floor: eslint-plugin-agent-code-guard@${PLUGIN_VERSION}
+- Effect runtime: ${EFFECT_RUNTIME}
+- Env var access: ${ENV_VAR_ACCESS}
+EOF
+```
+
+Apply the section. If `CLAUDE.md` does not exist, the section IS the file. Otherwise, hand the file to `awk`, which replaces only the sentinel-bounded region:
+
+```bash
+TARGET="CLAUDE.md"
+if [ ! -e "$TARGET" ]; then
+  cp "$SECTION_FILE" "$TARGET"
+  echo "CLAUDE.md: created"
+else
+  awk -v section_file="$SECTION_FILE" '
+    BEGIN {
+      while ((getline line < section_file) > 0) {
+        section = section sep line
+        sep = "\n"
+      }
+      close(section_file)
+      printed = 0
+      in_managed = 0
+    }
+    /^## Project structural choices \(managed by \/safer:setup/ {
+      print section
+      printed = 1
+      in_managed = 1
+      next
+    }
+    in_managed && /^## / {
+      in_managed = 0
+      print ""
+      print
+      next
+    }
+    in_managed { next }
+    { print }
+    END {
+      if (!printed) {
+        if (NR > 0) print ""
+        print section
+      }
+    }
+  ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
+  echo "CLAUDE.md: updated"
+fi
+```
+
+(The `trap` set after `mktemp` removes `$SECTION_FILE` on EXIT, INT, or TERM; no explicit `rm` is needed.)
+
+Idempotency contract:
+
+- No `CLAUDE.md` → file created containing only the managed section.
+- Existing `CLAUDE.md` with no sentinel heading → section appended at EOF; one blank line separates it from prior content.
+- Existing `CLAUDE.md` with the sentinel heading anywhere → content from the sentinel up to (but not including) the next `## ` heading or EOF is replaced; one blank line separates the new section from any following `## ` heading.
+
+The `awk` pattern matches the prefix `## Project structural choices (managed by /safer:setup` so the disclaimer wording can be revised in future versions without breaking idempotency on already-installed repos.
+
+This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
+
 ### Step 11: Print the completion summary
 
 End with a bordered block naming every decision and outcome. This is the user's receipt:
@@ -1064,6 +1185,10 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Lint baseline:          V violations across R rules
   Baseline decision:      A | B | C | D  (per Step 10)
   Baseline file:          .safer-baseline.json | not written
+  CLAUDE.md:              created | updated  (managed section written)
+  Schema library:         <SCHEMA_LIB>
+  Database access:        <DB_TOOL>
+  Env var access:         <ENV_VAR_ACCESS>
 ============================================================
 ```
 
@@ -1108,6 +1233,7 @@ One marker on the last line of the reply.
 | `tsconfig.json` edits | In place | User decides |
 | `package.json` dependency changes | In place via `<pm> add -D` | User decides (the lockfile changes too) |
 | `.safer-baseline.json` | Repo root (only if baseline option B chosen) | User decides |
+| `CLAUDE.md` managed `## Project structural choices` section | Repo root | User decides |
 | Completion summary | Terminal output only | not applicable |
 
 This skill never commits. `git add` and `git commit` are the user's decision.
@@ -1137,6 +1263,7 @@ This skill never commits. `git add` and `git commit` are the user's decision.
 - [ ] Probe passed.
 - [ ] Full lint ran; per-rule table shown to user.
 - [ ] Baseline decision (A / B / C / D) is recorded; any resulting `.safer-baseline.json` is on disk.
+- [ ] Managed `## Project structural choices` section written to `CLAUDE.md` (created or in-place replaced).
 - [ ] Completion summary block is printed.
 - [ ] `safer.skill_end` event emitted.
 - [ ] Status marker on the last line of the reply.
