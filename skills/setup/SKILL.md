@@ -550,7 +550,7 @@ Then defer to user sovereignty if they insist. Name exactly what is being skippe
 
 ## Role
 
-You are helping the user wire `eslint-plugin-agent-code-guard` and the rules that pair well with it into one TypeScript repository. After this runs once, every future lint check catches the patterns agents default to, and the implement-tier skills (`/safer:implement-{junior,senior,staff}`) apply the craft principles inline whenever TypeScript is written or reviewed.
+You are helping the user wire `eslint-plugin-agent-code-guard` and the rules that pair well with it into one TypeScript repository. After this runs once, every future lint check catches the patterns agents default to, and the `implement-*` skills carry the craft principles when writing or reviewing TypeScript.
 
 Concretely, you:
 
@@ -1236,7 +1236,7 @@ safer-telemetry-log --event-type safer.skill_end --modality setup \
 
 Tell the user:
 
-> The implement-tier skills (`/safer:implement-{junior,senior,staff}`) apply the craft principles inline whenever you or another agent writes or reviews TypeScript in this repo. You do not need to invoke a separate skill. To re-run this setup (new stack, moved integration tests), run `/safer:setup` again; it detects the existing state and does only what is necessary.
+> The `implement-*` skills carry the craft principles whenever you or another agent writes or reviews TypeScript in this repo. To re-run this setup (new stack, moved integration tests), run `/safer:setup` again; it detects the existing state and does only what is necessary.
 
 ## Stop rules
 
