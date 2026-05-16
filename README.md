@@ -76,7 +76,7 @@ Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `S
 
 ## Skill catalog
 
-Seventeen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
+Sixteen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
 
 Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:spec` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
 
@@ -110,11 +110,10 @@ Each skill is invoked as a **Claude slash-command** within a Claude Code session
 | `/safer:dogfood` | cold-start read of any artifact; portability check before handoff |
 | `/safer:docs-reader` | multi-persona docs review (4 ephemeral opus personas) |
 
-### Floor + bootstrap
+### Bootstrap
 
 | Skill | Role |
 |---|---|
-| `/safer:typescript` | TS craft floor; invoked by `implement-*` on TS repos |
 | `/safer:setup` | one-time: install `eslint-plugin-agent-code-guard`, flip strict flags, probe; gstack hard-dep precondition check |
 
 ## How work flows

@@ -23,7 +23,7 @@ safer-by-default/
 ├── .claude-plugin/
 │   ├── marketplace.json       ← Claude Code marketplace registration
 │   └── plugin.json            ← plugin metadata
-├── skills/                    ← 17 modality skills, one folder each
+├── skills/                    ← 16 modality skills, one folder each
 │   ├── orchestrate/
 │   ├── spec/
 │   ├── architect/
@@ -37,9 +37,8 @@ safer-by-default/
 │   ├── dogfood/
 │   ├── docs-reader/
 │   ├── ux-audit/
-│   ├── typescript/
 │   └── setup/
-├── bin/                       ← 15 CLI helpers; auto-PATH at session start (see "CLI helpers" below)
+├── bin/                       ← 14 CLI helpers; auto-PATH at session start (see "CLI helpers" below)
 ├── lib/                       ← shell modules sourced by bin/ scripts
 ├── docs/contracts/            ← worked-example contract templates
 ├── scenarios/                 ← cc-judge calibration suite
@@ -86,7 +85,6 @@ Each helper is a standalone bash script. The plugin marketplace install auto-pre
 | `safer-setup-labels` | Create the `safer:*` issue labels on a repo (idempotent) | `[--quiet]` |
 | `safer-vp` | VP-level dashboard (funnel + throughput + calibration + in-flight) | `[7d\|30d\|all] [--repo]` |
 | `safer-calibration` | Per-modality health dashboard from events.jsonl | `[7d\|30d\|all]` |
-| `safer-acg-sync` | Regenerate ACG rule table in `skills/typescript/SKILL.md` | (no args) |
 | `safer-gen-skills` | Render `skills/<name>/SKILL.md` from `SKILL.tmpl + PRINCIPLES.md` | `[--check]` |
 
 Conventions: helpers exit non-zero on missing required args; skills wrap calls with `2>/dev/null || true` only when the helper is optional plumbing (telemetry, update-check), never when it's load-bearing. `safer-publish` routes through zapbot's bot-token broker when zapbot is detected on the host; absent zapbot, falls back to the user's `gh auth`.
