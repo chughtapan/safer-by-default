@@ -1,0 +1,37 @@
+name: version-sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "VERSION"
+      - ".claude-plugin/plugin.json"
+      - ".claude-plugin/marketplace.json"
+      - ".github/workflows/version-sync.yml"
+  pull_request:
+    paths:
+      - "VERSION"
+      - ".claude-plugin/plugin.json"
+      - ".claude-plugin/marketplace.json"
+      - ".github/workflows/version-sync.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versions agree across VERSION, plugin.json, marketplace.json
+        # `/plugin update` reads marketplace.json; if it lags plugin.json,
+        # consumers silently stay on the prior version.
+        run: |
+          set -euo pipefail
+          file_version=$(tr -d '[:space:]' < VERSION)
+          plugin_version=$(jq -r '.version' .claude-plugin/plugin.json)
+          marketplace_version=$(jq -r '.plugins[] | select(.name == "safer") | .version' .claude-plugin/marketplace.json)
+          echo "VERSION:                                $file_version"
+          echo ".claude-plugin/plugin.json .version:    $plugin_version"
+          echo ".claude-plugin/marketplace.json safer:  $marketplace_version"
+          if [ "$file_version" != "$plugin_version" ] || [ "$file_version" != "$marketplace_version" ]; then
+            echo "::error::version drift; bump all three files together"
+            exit 1
+          fi
