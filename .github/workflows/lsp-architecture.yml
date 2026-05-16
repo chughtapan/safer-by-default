@@ -75,32 +75,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
-      # The dogfood test asserts `codeDescription.href` populated. Syntax
-      # rule URLs come from `meta.docs.url` in
-      # eslint-plugin-agent-code-guard. acg Phase 2 added the URLs on
-      # main but the latest npm release predates them; pin the SHA and
-      # build the tarball locally. Drop this whole job step (and revert
-      # the fixture `package.json` to `eslint-plugin-agent-code-guard:
-      # ^<next>`) once acg republishes.
-      - name: Build agent-code-guard at pinned SHA
-        env:
-          ACG_SHA: d11973a50425e0285e6c066769cbc10921f9a9fd
-        run: |
-          set -euxo pipefail
-          git clone https://github.com/chughtapan/agent-code-guard.git /tmp/acg
-          cd /tmp/acg
-          git checkout "$ACG_SHA"
-          pnpm install --frozen-lockfile
-          pnpm build
-          npm pack --silent
-          cp eslint-plugin-agent-code-guard-*.tgz \
-            "${GITHUB_WORKSPACE}/lsp/architecture/dogfood-fixtures/two-lsp/acg.tgz"
-      - name: Install fixture deps (with acg tarball)
+      - name: Install fixture deps
         working-directory: lsp/architecture/dogfood-fixtures/two-lsp
-        run: |
-          set -euxo pipefail
-          node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.devDependencies['eslint-plugin-agent-code-guard']='file:./acg.tgz';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
-          pnpm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
       - name: Install architecture LSP deps
         working-directory: lsp/architecture
         run: pnpm install --frozen-lockfile
