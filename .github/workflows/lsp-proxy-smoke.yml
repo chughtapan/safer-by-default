@@ -79,30 +79,37 @@ jobs:
                   proc.stdin.write(payload)
                   await proc.stdin.drain()
 
-                  # Read response with timeout. Headers, then body.
-                  header = b""
-                  while not header.endswith(b"\r\n\r\n"):
-                      chunk = await asyncio.wait_for(proc.stdout.read(1), timeout=TIMEOUT_S)
-                      if not chunk:
-                          err = await proc.stderr.read()
-                          print(f"proxy stdout closed before response. stderr:\n{err.decode(errors='replace')}", file=sys.stderr)
+                  # Loop reading framed LSP messages until we find the response to id=1.
+                  # Children commonly emit window/logMessage notifications before the
+                  # initialize reply lands; skip those.
+                  async def read_frame():
+                      header = b""
+                      while not header.endswith(b"\r\n\r\n"):
+                          chunk = await asyncio.wait_for(proc.stdout.read(1), timeout=TIMEOUT_S)
+                          if not chunk:
+                              err = await proc.stderr.read()
+                              print(f"proxy stdout closed before response. stderr:\n{err.decode(errors='replace')}", file=sys.stderr)
+                              sys.exit(1)
+                          header += chunk
+                      length = None
+                      for line in header.decode().split("\r\n"):
+                          if line.lower().startswith("content-length:"):
+                              length = int(line.split(":", 1)[1].strip())
+                      if length is None:
+                          print("no Content-Length header in response", file=sys.stderr)
                           sys.exit(1)
-                      header += chunk
+                      body = await asyncio.wait_for(proc.stdout.readexactly(length), timeout=TIMEOUT_S)
+                      return json.loads(body.decode())
 
-                  length = None
-                  for line in header.decode().split("\r\n"):
-                      if line.lower().startswith("content-length:"):
-                          length = int(line.split(":", 1)[1].strip())
-                  if length is None:
-                      print("no Content-Length header in response", file=sys.stderr)
-                      sys.exit(1)
-
-                  body = await asyncio.wait_for(proc.stdout.readexactly(length), timeout=TIMEOUT_S)
-                  resp = json.loads(body.decode())
-                  if "result" not in resp or "capabilities" not in resp["result"]:
-                      print(f"initialize response missing capabilities: {resp}", file=sys.stderr)
-                      sys.exit(1)
-                  print(f"initialize OK — server reported {len(resp['result']['capabilities'])} capability keys")
+                  while True:
+                      msg = await read_frame()
+                      if msg.get("id") == 1:
+                          if "result" in msg and "capabilities" in msg["result"]:
+                              print(f"initialize OK — server reported {len(msg['result']['capabilities'])} capability keys")
+                              break
+                          print(f"initialize response missing capabilities: {msg}", file=sys.stderr)
+                          sys.exit(1)
+                      # Notification (no id) or unrelated response; keep reading.
               finally:
                   try:
                       proc.send_signal(signal.SIGTERM)
