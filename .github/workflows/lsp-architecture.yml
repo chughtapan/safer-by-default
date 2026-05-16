@@ -33,6 +33,35 @@ jobs:
       - run: pnpm build
       - run: pnpm test
 
+  bun-runtime-smoke:
+    # Guard against future commits that add a Node-only dep bun can't run.
+    # Faster signal than two-lsp-dogfood (which spawns both LSPs end-to-end);
+    # this one just confirms bun can parse + resolve the architecture server
+    # entry. If this fails, the architecture LSP fails at install time for
+    # every plugin consumer.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lsp/architecture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: lsp/architecture/pnpm-lock.yaml
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+      - run: pnpm install --frozen-lockfile
+      - name: bun resolves architecture server entry
+        # --no-output suppresses file writes but still streams to stdout; pipe
+        # to /dev/null so the CI log stays clean. We only care about exit code.
+        run: bun build server/index.ts --target=bun --no-output >/dev/null
+
   two-lsp-dogfood:
     runs-on: ubuntu-latest
     steps:
