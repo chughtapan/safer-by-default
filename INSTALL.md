@@ -92,9 +92,19 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
 
 ## Requirements
 
-- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (for the template generator).
+- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator + the architecture LSP runtime).
 - [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
+- `vscode-eslint-language-server` (from `vscode-langservers-extracted`) on `PATH` for the syntax LSP. `/safer:setup` installs it in the target repo as part of the standard ESLint setup.
 - **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
+
+## LSP behavior at install time
+
+The plugin manifest declares two `lspServers` (see `ARCHITECTURE.md` → LSP integration). When Claude Code (or an LSP-aware editor wired to this plugin) opens a TypeScript file, both servers auto-start:
+
+- `agent-code-guard-syntax` → `node lsp/syntax/launch.js` (spawns upstream `vscode-eslint-language-server`).
+- `agent-code-guard-architecture` → `bun lsp/architecture/server/index.ts` (runs TypeScript source directly; no build step).
+
+If `bun` isn't on `PATH`, the architecture LSP fails to start with a visible `bun: command not found`. If `vscode-eslint-language-server` isn't on `PATH`, the syntax LSP prints a friendly pointer at `/safer:setup`. Either way, the rest of the plugin (skills, bins) keeps working.
 
 ## Troubleshooting
 
