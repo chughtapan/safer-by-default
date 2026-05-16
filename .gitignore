@@ -15,3 +15,7 @@
 # Skill-creator workspaces (run artifacts; reproducible from evals.json)
 skills/*-workspace/
 skills/*/evals/iteration-*/
+
+# Per-package node modules and build output for nested LSP packages.
+lsp/*/node_modules/
+lsp/*/dist/

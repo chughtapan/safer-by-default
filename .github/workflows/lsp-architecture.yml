@@ -1,0 +1,32 @@
+name: lsp-architecture
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lsp/architecture/**"
+      - ".github/workflows/lsp-architecture.yml"
+  pull_request:
+    paths:
+      - "lsp/architecture/**"
+      - ".github/workflows/lsp-architecture.yml"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lsp/architecture
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: lsp/architecture/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
