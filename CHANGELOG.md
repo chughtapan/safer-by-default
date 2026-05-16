@@ -1,3 +1,27 @@
+## 0.1.6 — 2026-05-16
+
+### Breaking: LSP path consolidates behind a single proxy entry
+
+`.claude-plugin/plugin.json` `lspServers` collapses from two entries to one: `safer-merged`, pointing at `lsp/proxy/run.sh`. The wrapper templates `${CLAUDE_PLUGIN_ROOT}` into a generated config and execs the upstream [techee/lsp-proxy](https://github.com/techee/lsp-proxy) Python script. The proxy spawns two children — `typescript-language-server` (primary, for code intelligence) and the existing `bun`-hosted architecture LSP (sidecar, for architecture diagnostics) — and merges their notifications onto Claude Code's single LSP connection.
+
+Reason: Claude Code's LSP dispatcher returns opaque "internal error" on every operation when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while doing the multiplexing internally. Empirically confirmed with three different manifest shapes during the spike (3 servers → error; 1 server → works; 1 server-via-proxy with 2 children → all queries and diagnostics flow).
+
+**User impact: re-run `/safer:setup` and `/reload-plugins` after upgrade.** Setup now installs LSP-side prerequisites (`typescript-language-server`, `python3`, `bun`) and fetches `lsp-proxy.py` at a pinned upstream commit (`9b5a2a5`) into `~/.cache/safer-by-default/lsp-proxy.py`. The fetch is idempotent and fail-closed: a network failure halts setup with a retry instruction rather than leaving the LSP path half-installed. Distribution stays MIT — the GPL v2 `lsp-proxy.py` lives in the user's local cache, never the plugin source tree.
+
+### Removed: `lsp/syntax/` and `vscode-eslint-language-server` from the LSP path
+
+The thin Node wrapper at `lsp/syntax/launch.js` and the `vscode-eslint-language-server` LSP integration are gone. ESLint syntax enforcement now flows through the CLI surface that `/safer:setup` already wires into each project: `eslint.config.js` loads `eslint-plugin-agent-code-guard`'s rules, and `/safer:verify`'s Phase 3 runs `eslint .` as a ring-1 gate. Pre-commit / CI integration the project already has continues to fire the same ruleset.
+
+Trade-off: lose real-time syntax diagnostics surfaced inline as you type; keep them at well-defined checkpoints (`/safer:verify`, pre-commit, CI). The architecture LSP keeps its real-time diagnostic surface. The exchange buys TypeScript code intelligence (`documentSymbol`, `goToDefinition`, `findReferences`, `hover`) through Claude Code's `LSP` tool, which the prior two-server shape blocked.
+
+### Added: `manifest-schema` CI guard
+
+`.github/workflows/manifest-schema.yml` validates `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` against the canonical SchemaStore schemas (`https://json.schemastore.org/claude-code-plugin-manifest.json` and `claude-code-marketplace.json`) on every push to main and every PR touching those files. Catches schema drift when Claude Code's manifest shape changes underneath us — exactly the bug class that started this ship. Uses `check-jsonschema` against the network schema; CI failure means SchemaStore moved and our manifest needs to follow.
+
+### Added: `lsp-proxy-smoke` CI guard
+
+A new workflow boots `lsp/proxy/run.sh` against a minimal config in CI, sends a synthetic `initialize` request, and asserts the proxy completes the lifecycle without crashing. Runs only on PRs touching `lsp/`, `.claude-plugin/plugin.json`, or `skills/setup/SKILL.md` to keep cost down.
+
 ## 0.1.5 — 2026-05-16
 
 ### Added: two LSP servers ship with the plugin

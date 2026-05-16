@@ -1195,6 +1195,62 @@ The `awk` pattern matches the prefix `## Project structural choices (managed by 
 
 This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
 
+### Step 10c: Install LSP host prerequisites
+
+The safer plugin's LSP entry is one wrapper at `lsp/proxy/run.sh`; the wrapper spawns `typescript-language-server` (TS code intelligence) and the `bun`-hosted architecture LSP behind a Python proxy. Setup installs the prerequisites on the user's machine and fetches the proxy.
+
+Detect what is already present:
+
+```bash
+have_ts_lsp=$(command -v typescript-language-server >/dev/null 2>&1 && echo yes || echo no)
+have_python3=$(command -v python3 >/dev/null 2>&1 && echo yes || echo no)
+have_bun=$(command -v bun >/dev/null 2>&1 && echo yes || echo no)
+```
+
+For each missing prerequisite, print the exact install command and ask via `AskUserQuestion` whether to run it:
+
+- `typescript-language-server`: `npm install -g typescript-language-server typescript`
+- `bun`: `curl -fsSL https://bun.sh/install | bash` (or the platform package manager)
+- `python3`: not installable from this skill. If missing, stop and tell the user to install Python 3 via their OS package manager, then re-run setup.
+
+These tools are global developer tooling, not project-local deps. Setup never modifies the project's `package.json` to add them.
+
+Fetch the LSP proxy script at the pinned upstream commit. The pin is recorded as the constant below; bumping the pin is a deliberate plugin PR (CHANGELOG entry) so users get reproducible behavior across installs:
+
+```bash
+LSP_PROXY_SHA="9b5a2a55aa90c96409fa18f0f7488cdb7d8c2d0b"
+LSP_PROXY_URL="https://raw.githubusercontent.com/techee/lsp-proxy/${LSP_PROXY_SHA}/lsp-proxy.py"
+LSP_PROXY_DIR="${HOME}/.cache/safer-by-default"
+LSP_PROXY_FILE="${LSP_PROXY_DIR}/lsp-proxy.py"
+
+mkdir -p "$LSP_PROXY_DIR"
+
+if [ -f "$LSP_PROXY_FILE" ]; then
+  echo "lsp-proxy.py: already present at $LSP_PROXY_FILE (skip)"
+else
+  if curl -fsSL --max-time 30 -o "${LSP_PROXY_FILE}.tmp" "$LSP_PROXY_URL"; then
+    mv "${LSP_PROXY_FILE}.tmp" "$LSP_PROXY_FILE"
+    echo "lsp-proxy.py: fetched pinned commit ${LSP_PROXY_SHA:0:7} to $LSP_PROXY_FILE"
+  else
+    rm -f "${LSP_PROXY_FILE}.tmp"
+    cat >&2 <<MSG
+ERROR: failed to fetch lsp-proxy.py.
+  URL:    $LSP_PROXY_URL
+  Target: $LSP_PROXY_FILE
+
+The plugin's LSP path is unavailable until this fetch succeeds. Retry with:
+  /safer:setup
+once network access is restored.
+MSG
+    exit 1
+  fi
+fi
+```
+
+Fail-closed is intentional: a partial install where the LSP entry in the plugin manifest points at a missing script produces "internal error" responses from CC's LSP tool with no diagnostic surface. Better to refuse to complete setup than to leave the plugin in a half-installed state.
+
+Re-runs are idempotent: the `[ -f $LSP_PROXY_FILE ]` check short-circuits the fetch when the file exists. To pull a new pinned commit after a plugin version bump, delete the file and re-run setup.
+
 ### Step 11: Print the completion summary
 
 End with a bordered block naming every decision and outcome. This is the user's receipt:
@@ -1223,6 +1279,10 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Schema library:         <SCHEMA_LIB>
   Database access:        <DB_TOOL>
   Env var access:         <ENV_VAR_ACCESS>
+  LSP host (TS):          installed | already present | user-deferred
+  LSP host (bun):         installed | already present | user-deferred
+  LSP host (python3):     present | missing (setup halted)
+  lsp-proxy.py:           fetched <sha7> | already present
 ============================================================
 ```
 

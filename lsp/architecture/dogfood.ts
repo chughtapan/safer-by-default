@@ -1,19 +1,20 @@
 /**
- * @file Two-LSP programmatic dogfood. Spawns both servers declared in
- * `.claude-plugin/plugin.json` (`agent-code-guard-syntax` and
- * `agent-code-guard-architecture`) using the manifest's `command` +
- * `args`, sends `initialize` then `textDocument/didOpen` for a fixture
- * file carrying both a syntax violation
- * (`(await r.json()) as Record<string, unknown>`) and an architecture
- * violation (cross-domain sibling import), and asserts:
+ * @file Architecture-LSP + ESLint-CLI dogfood. Spawns the architecture
+ * LSP (the same binary the production lsp-proxy invokes as a sidecar)
+ * against a fixture carrying a `no-cross-domain-sibling-import`
+ * violation, AND shells out to `eslint` against the same fixture to
+ * prove `agent-code-guard/record-cast` fires via the CLI surface. Asserts:
  *
- *   1. The syntax LSP publishes a diagnostic with
- *      `code === "agent-code-guard/record-cast"` and a populated
- *      `codeDescription.href` pointing at PRINCIPLES.md.
- *   2. The architecture LSP publishes a diagnostic with
+ *   1. The architecture LSP publishes a diagnostic with
  *      `code === "no-cross-domain-sibling-import"` and a populated
  *      `codeDescription.href` pointing at PRINCIPLES.md.
- *   3. Both servers shut down cleanly via `shutdown` + `exit`.
+ *   2. The architecture LSP shuts down cleanly via `shutdown` + `exit`.
+ *   3. ESLint CLI exits non-zero on the fixture with at least one
+ *      `agent-code-guard/record-cast` violation surfaced.
+ *
+ * The proxy layer (typescript-language-server + lsp-proxy.py) has its
+ * own end-to-end smoke test at .github/workflows/lsp-proxy-smoke.yml;
+ * this dogfood targets the two diagnostic surfaces themselves.
  *
  * Run: `pnpm dogfood` from `lsp/architecture/`. Exits non-zero on
  * failure.
@@ -41,7 +42,6 @@ function findPluginRoot(start: string): string {
   throw new Error(`plugin root (containing .claude-plugin/plugin.json) not found above ${start}`);
 }
 const PLUGIN_ROOT = findPluginRoot(SCRIPT_DIR);
-const PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json");
 const FIXTURE_ROOT = path.join(PLUGIN_ROOT, "lsp", "architecture", "dogfood-fixtures", "two-lsp");
 const FIXTURE_FILE = path.join(FIXTURE_ROOT, "src", "auth", "client.ts");
 const FIXTURE_TEXT = fs.readFileSync(FIXTURE_FILE, "utf8");
@@ -62,10 +62,6 @@ interface LspServerEntry {
   readonly name: string;
   readonly command: string;
   readonly args: readonly string[];
-}
-
-interface PluginManifest {
-  readonly lspServers?: readonly LspServerEntry[];
 }
 
 interface Diagnostic {
@@ -109,9 +105,16 @@ interface JsonRpcMessage {
 
 type ServerRequestHandler = (method: string, params: unknown) => unknown;
 
-function readManifest(): PluginManifest {
-  const raw = fs.readFileSync(PLUGIN_MANIFEST, "utf8");
-  return JSON.parse(raw) as PluginManifest;
+// Hardcoded architecture-LSP entry. Bypasses the proxy layer; the proxy
+// has its own smoke test (.github/workflows/lsp-proxy-smoke.yml). The
+// command + args must match what `lsp/proxy/run.sh` writes into the
+// generated config so this test exercises the same binary that ships.
+function architectureLspEntry(): LspServerEntry {
+  return {
+    name: "agent-code-guard-architecture",
+    command: "bun",
+    args: [path.join(PLUGIN_ROOT, "lsp", "architecture", "server", "index.ts")],
+  };
 }
 
 function substituteRoot(arg: string): string {
@@ -516,48 +519,40 @@ async function collectFromServer(
   return null;
 }
 
+async function runEslintCli(): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  // Runs the fixture's own eslint binary (installed at `dogfood-fixtures/two-lsp/node_modules/.bin/eslint`)
+  // against the violating fixture file. PATH carries the local node_modules/.bin so subprocesses can find it.
+  return new Promise((resolve) => {
+    const child = spawn("eslint", [FIXTURE_FILE], {
+      cwd: FIXTURE_ROOT,
+      env: { ...process.env, PATH: lspPath() },
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (b: Buffer) => { stdout += b.toString("utf8"); });
+    child.stderr.on("data", (b: Buffer) => { stderr += b.toString("utf8"); });
+    child.on("exit", (code) => resolve({ exitCode: code ?? -1, stdout, stderr }));
+  });
+}
+
 async function main(): Promise<void> {
-  const manifest = readManifest();
-  const servers = manifest.lspServers ?? [];
-  assert.equal(
-    servers.length,
-    2,
-    `expected 2 lspServers in plugin.json; got ${servers.length}`,
-  );
-  const syntaxEntry = servers.find((s) => s.name === "agent-code-guard-syntax");
-  const archEntry = servers.find((s) => s.name === "agent-code-guard-architecture");
-  assert.ok(syntaxEntry, "plugin.json missing agent-code-guard-syntax server");
-  assert.ok(archEntry, "plugin.json missing agent-code-guard-architecture server");
   assert.ok(fs.existsSync(FIXTURE_FILE), `fixture file not found: ${FIXTURE_FILE}`);
 
-  const [syntax, architecture] = await Promise.all([
-    exerciseServer(syntaxEntry),
-    exerciseServer(archEntry),
-  ]);
+  // 1. Architecture LSP — diagnostic surface that ships behind the proxy.
+  const architecture = await exerciseServer(architectureLspEntry());
 
-  // 30 s covers fresh-CI cold-start: ts.Program plus an eslint flat
-  // config load can each run several seconds on first call.
+  // 30 s covers fresh-CI cold-start: ts.Program load can run several seconds on first call.
   const deadline = Date.now() + 30_000;
-  const [syntaxHit, archHit] = await Promise.all([
-    collectFromServer(syntax, "agent-code-guard/record-cast", deadline),
-    collectFromServer(architecture, "no-cross-domain-sibling-import", deadline),
-  ]);
+  const archHit = await collectFromServer(
+    architecture,
+    "no-cross-domain-sibling-import",
+    deadline,
+  );
 
-  reportDiagnostics(syntax.client);
   reportDiagnostics(architecture.client);
 
   let exitCode = 0;
   try {
-    assert.ok(
-      syntaxHit !== null,
-      "syntax LSP did not return a record-cast diagnostic within 30s",
-    );
-    assertPrinciplesUrl(
-      "syntax",
-      "agent-code-guard/record-cast",
-      syntaxHit.codeDescription?.href,
-    );
-
     assert.ok(
       archHit !== null,
       "architecture LSP did not publish a no-cross-domain-sibling-import diagnostic within 30s",
@@ -567,36 +562,40 @@ async function main(): Promise<void> {
       "no-cross-domain-sibling-import",
       archHit.codeDescription?.href,
     );
-
-    process.stdout.write("\n[dogfood] both LSPs published the expected diagnostics ✓\n");
+    process.stdout.write("\n[dogfood] architecture LSP published the expected diagnostic ✓\n");
   } catch (err) {
-    process.stderr.write(`\n[dogfood] FAIL: ${(err as Error).message}\n`);
+    process.stderr.write(`\n[dogfood] FAIL (architecture LSP): ${(err as Error).message}\n`);
     exitCode = 1;
   }
 
-  await shutdown(syntax.client);
   await shutdown(architecture.client);
-
-  const [syntaxCode, archCode] = await Promise.all([
-    syntax.client.awaitExit(5_000),
-    architecture.client.awaitExit(5_000),
-  ]);
-
-  if (syntaxCode !== 0) {
-    process.stderr.write(
-      `[dogfood] syntax LSP did not exit cleanly (code=${String(syntaxCode)})\n`,
-    );
-    exitCode = 1;
-  }
+  const archCode = await architecture.client.awaitExit(5_000);
   if (archCode !== 0) {
     process.stderr.write(
       `[dogfood] architecture LSP did not exit cleanly (code=${String(archCode)})\n`,
     );
     exitCode = 1;
   }
-
-  syntax.client.killHard();
   architecture.client.killHard();
+
+  // 2. ESLint CLI — syntax-floor surface that ships via /safer:verify and
+  // any pre-commit/CI integration the project has.
+  const eslintResult = await runEslintCli();
+  try {
+    assert.ok(
+      eslintResult.exitCode !== 0,
+      `eslint exited 0 on a fixture with a known violation; stdout:\n${eslintResult.stdout}\nstderr:\n${eslintResult.stderr}`,
+    );
+    assert.ok(
+      eslintResult.stdout.includes("agent-code-guard/record-cast"),
+      `eslint output missing record-cast rule; stdout:\n${eslintResult.stdout}`,
+    );
+    process.stdout.write("[dogfood] eslint CLI surfaced agent-code-guard/record-cast ✓\n");
+  } catch (err) {
+    process.stderr.write(`[dogfood] FAIL (eslint CLI): ${(err as Error).message}\n`);
+    exitCode = 1;
+  }
+
   process.exit(exitCode);
 }
 

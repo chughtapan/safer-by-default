@@ -94,17 +94,21 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
 
 - `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator + the architecture LSP runtime).
 - [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
-- `vscode-eslint-language-server` (from `vscode-langservers-extracted`) on `PATH` for the syntax LSP. `/safer:setup` installs it in the target repo as part of the standard ESLint setup.
+- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path. `/safer:setup` Step 10c detects each one and prints the exact install command for any that are missing, then fetches `lsp-proxy.py` at a pinned upstream commit into `~/.cache/safer-by-default/lsp-proxy.py`. The fetch is fail-closed: a network failure halts setup with a retry instruction rather than leaving the LSP path half-installed.
 - **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
 
 ## LSP behavior at install time
 
-The plugin manifest declares two `lspServers` (see `ARCHITECTURE.md` → LSP integration). When Claude Code (or an LSP-aware editor wired to this plugin) opens a TypeScript file, both servers auto-start:
+The plugin manifest declares one `lspServers` entry pointing at `lsp/proxy/run.sh` (see `ARCHITECTURE.md` → LSP integration). When Claude Code opens a TypeScript file, the wrapper templates `${CLAUDE_PLUGIN_ROOT}` into a generated config and execs `python3 ~/.cache/safer-by-default/lsp-proxy.py`. The proxy spawns two children and multiplexes them onto Claude Code's single LSP connection:
 
-- `agent-code-guard-syntax` → `node lsp/syntax/launch.js` (spawns upstream `vscode-eslint-language-server`).
-- `agent-code-guard-architecture` → `bun lsp/architecture/server/index.ts` (runs TypeScript source directly; no build step).
+- `typescript-language-server --stdio` (primary) — handles `documentSymbol`, `goToDefinition`, `findReferences`, `hover`, and the other code-intelligence operations Claude Code's `LSP` tool exposes. Also emits TS semantic diagnostics.
+- `bun lsp/architecture/server/index.ts` (sidecar) — the custom Effect-shaped architecture analyzer, runs TypeScript source directly, diagnostic-only.
 
-If `bun` isn't on `PATH`, the architecture LSP fails to start with a visible `bun: command not found`. If `vscode-eslint-language-server` isn't on `PATH`, the syntax LSP prints a friendly pointer at `/safer:setup`. Either way, the rest of the plugin (skills, bins) keeps working.
+Why the proxy: Claude Code's LSP dispatcher returns opaque "internal error" on every operation when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while internally fanning notifications to both children and merging their `publishDiagnostics` upward.
+
+If `bun`, `typescript-language-server`, or `python3` is missing, `lsp/proxy/run.sh` exits non-zero with a pointer to `/safer:setup`. If `~/.cache/safer-by-default/lsp-proxy.py` is missing, the wrapper exits with the same pointer. Either way, the rest of the plugin (skills, bins) keeps working.
+
+ESLint syntax rules from `eslint-plugin-agent-code-guard` are NOT on the LSP path; they ship via the CLI surface that `/safer:setup` writes into each project's `eslint.config.js`, and `/safer:verify` runs `eslint` as a ring-1 gate when the project has an eslint config but no `lint` script.
 
 ## Troubleshooting
 

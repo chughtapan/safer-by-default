@@ -10,7 +10,7 @@
     {
       "name": "safer",
       "source": "./",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "description": "16 skills (architect, diagnose, docs-reader, dogfood, implement-{junior,senior,staff}, orchestrate, research, review-senior, setup, spec, spike, stamina, ux-audit, verify) plus 14 bin/ utilities. Composes with eslint-plugin-agent-code-guard (lint floor) and zapbot (publish).",
       "author": {
         "name": "Tapan Chugh"
