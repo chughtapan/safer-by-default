@@ -25,16 +25,6 @@ it("surfaces architecture diagnostics through the analyzer API", () => {
   expect(findings[0]?.message).toContain("This exports inventory");
 });
 
-it("infers the nearest package root when projectRoot is omitted", () => {
-  const root = makeInventoryProject();
-  const findings = analyzeWorkspace({ projectRoot: root }).diagnostics.filter(
-    (d) => d.ruleId === "no-inventory-barrel",
-  );
-
-  expect(findings).toHaveLength(1);
-  expect(findings[0]?.message).toContain("This exports inventory");
-});
-
 it("rule id registry covers every architecture diagnostic family", () => {
   // Spot-check that the registry exposes the rule ids the LSP server
   // wires into `code` and `codeDescription.href` per diagnostic.

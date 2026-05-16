@@ -12,6 +12,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "pnpm clean && tsc",
+    "pretest": "pnpm build",
     "test": "vitest run",
     "dogfood": "pnpm build && node dist/dogfood.js"
   },
