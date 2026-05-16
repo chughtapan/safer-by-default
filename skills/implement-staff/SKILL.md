@@ -545,6 +545,24 @@ Then defer to user sovereignty if they insist. Name exactly what is being skippe
 - **Principle 6 (Budget Gate)** — shape is "new modules and new surface traceable to spec lines." No LOC ceiling. Every line traces.
 - **Principle 8 (The Ratchet)** — if the spec needs revision, ratchet up to spec. Never invent scope the spec did not authorize.
 
+The decision table below names the cross-service contract and CI / mutation-gating forks staff owns. Single-module Principle 1–4 forks live in `/safer:implement-junior`; Effect-runtime and testing-strategy forks at the module seam live in `/safer:implement-senior`.
+
+## Decision table
+
+Every row below is a new-surface fork where the agent feels pulled toward the human-era shortcut. Pick the agent-era full version. Each row corresponds to a cross-service contract decision or a CI gate that lives at a new package boundary — the surface staff introduces.
+
+| Scenario | Human-era shortcut | Agent-era full version |
+|---|---|---|
+| Two services in the same repo cross a shape boundary | Hand-written DTO types duplicated on both sides | Generate JSON Schema from the Zod/Effect schema; gate CI on `json-schema-diff` against the last-published schema |
+| Cross-service boundary where a consumer is external or under SLA | Best-effort schema doc in a README | `@pact-foundation/pact` (Pact V4) contract test published to the broker |
+| Critical UI flow (auth, checkout, primary CRUD) | "Unit test the React component" | Playwright E2E scoped to that flow; retry policy; screenshot diff off by default |
+| Non-critical UI surface | Broad Playwright coverage "to be safe" | Component-level tests; skip E2E (Principle 6: scope the ladder to <N critical flows) |
+| Repo has a `test/**/*.test.ts` suite | `"lint"` job in CI, run tests locally | CI runs a `test` job that executes the full suite on every PR. A lint-only CI with tests on disk is Principle 1 corollary item 4 violation: tests that do not run are decoration. |
+| Mutation testing on a critical module (auth, billing, parsing, crypto, webhook signing) | Skip, or run it everywhere | `@stryker-mutator/core` + `@stryker-mutator/typescript-checker`, **required CI gate**; scope the mutate glob to the critical module(s). Thresholds: `{ high: 80, low: 60, break: 50 }` as a starting point. |
+| Mutation testing repo-wide | Run Stryker over every file | Scope the mutate glob to named critical modules. When no critical module is named, the fallback is `src/**` with `ignoreStatic: true` and incremental mode on; compute budget (Principle 6) still caps full-sweep to nightly. PR runs use incremental. |
+
+The compression math: each full version costs hours-to-days to set up. Each one removes one class of contract-drift bug or one class of regression that ships unobserved. The shortcut's savings compound into a service rewrite later; the full version's savings compound into stable contracts that scale across consumers.
+
 ## Iron rule
 
 > **If your work is not traceable to the spec, your stop rule has already fired. Escalate, do not invent scope.**
