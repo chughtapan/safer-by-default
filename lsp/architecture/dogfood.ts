@@ -26,11 +26,23 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCRIPT_DIR = import.meta.dirname;
-// `import.meta.dirname` is `dist/` after `pnpm build`; the plugin
-// root (used to substitute `${CLAUDE_PLUGIN_ROOT}`) is three levels up.
-const PLUGIN_ROOT = path.resolve(SCRIPT_DIR, "..", "..", "..");
+// Walk up from SCRIPT_DIR until we find `.claude-plugin/plugin.json`.
+// Works whether this file runs from source (bun dogfood.ts) or from
+// the compiled dist/ tree (legacy `node dist/dogfood.js`).
+function findPluginRoot(start: string): string {
+  let cur = start;
+  const root = path.parse(cur).root;
+  while (cur !== root) {
+    if (fs.existsSync(path.join(cur, ".claude-plugin", "plugin.json"))) {
+      return cur;
+    }
+    cur = path.dirname(cur);
+  }
+  throw new Error(`plugin root (containing .claude-plugin/plugin.json) not found above ${start}`);
+}
+const PLUGIN_ROOT = findPluginRoot(SCRIPT_DIR);
 const PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin", "plugin.json");
-const FIXTURE_ROOT = path.resolve(SCRIPT_DIR, "..", "dogfood-fixtures", "two-lsp");
+const FIXTURE_ROOT = path.join(PLUGIN_ROOT, "lsp", "architecture", "dogfood-fixtures", "two-lsp");
 const FIXTURE_FILE = path.join(FIXTURE_ROOT, "src", "auth", "client.ts");
 const FIXTURE_TEXT = fs.readFileSync(FIXTURE_FILE, "utf8");
 const FIXTURE_URI = pathToFileURL(FIXTURE_FILE).toString();
