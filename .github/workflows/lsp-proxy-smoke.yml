@@ -1,0 +1,117 @@
+name: lsp-proxy-smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lsp/**"
+      - ".claude-plugin/plugin.json"
+      - "skills/setup/SKILL.md"
+      - ".github/workflows/lsp-proxy-smoke.yml"
+  pull_request:
+    paths:
+      - "lsp/**"
+      - ".claude-plugin/plugin.json"
+      - "skills/setup/SKILL.md"
+      - ".github/workflows/lsp-proxy-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install typescript-language-server
+        run: npm install -g typescript-language-server typescript
+
+      - name: Fetch lsp-proxy.py at pinned commit
+        # Mirrors the inline fetch in skills/setup/SKILL.md Step 10c.
+        # The pinned SHA here MUST match the constant in the skill; the
+        # manifest-schema workflow runs on every push but does not catch
+        # drift between the two pins — this job is the one that catches it.
+        run: |
+          set -euo pipefail
+          SHA="9b5a2a55aa90c96409fa18f0f7488cdb7d8c2d0b"
+          DIR="${HOME}/.cache/safer-by-default"
+          mkdir -p "$DIR"
+          curl -fsSL --max-time 30 -o "$DIR/lsp-proxy.py" \
+            "https://raw.githubusercontent.com/techee/lsp-proxy/${SHA}/lsp-proxy.py"
+          python3 -c "import ast; ast.parse(open('$DIR/lsp-proxy.py').read())"
+
+      - name: Boot proxy and exchange initialize
+        # Sends LSP initialize over stdio; expects a result with capabilities
+        # within 30s. Anything else (timeout, crash, malformed response) fails
+        # the job. The wrapper resolves ${CLAUDE_PLUGIN_ROOT} from $GITHUB_WORKSPACE.
+        env:
+          CLAUDE_PLUGIN_ROOT: ${{ github.workspace }}
+        run: |
+          python3 <<'PY'
+          import asyncio, json, os, sys, signal
+
+          WRAPPER = os.path.join(os.environ["CLAUDE_PLUGIN_ROOT"], "lsp", "proxy", "run.sh")
+          TIMEOUT_S = 30
+
+          async def smoke():
+              proc = await asyncio.create_subprocess_exec(
+                  WRAPPER,
+                  stdin=asyncio.subprocess.PIPE,
+                  stdout=asyncio.subprocess.PIPE,
+                  stderr=asyncio.subprocess.PIPE,
+              )
+              try:
+                  req = json.dumps({
+                      "jsonrpc": "2.0",
+                      "id": 1,
+                      "method": "initialize",
+                      "params": {
+                          "processId": None,
+                          "rootUri": "file://" + os.environ["CLAUDE_PLUGIN_ROOT"],
+                          "capabilities": {},
+                      },
+                  })
+                  payload = f"Content-Length: {len(req)}\r\n\r\n{req}".encode()
+                  proc.stdin.write(payload)
+                  await proc.stdin.drain()
+
+                  # Read response with timeout. Headers, then body.
+                  header = b""
+                  while not header.endswith(b"\r\n\r\n"):
+                      chunk = await asyncio.wait_for(proc.stdout.read(1), timeout=TIMEOUT_S)
+                      if not chunk:
+                          err = await proc.stderr.read()
+                          print(f"proxy stdout closed before response. stderr:\n{err.decode(errors='replace')}", file=sys.stderr)
+                          sys.exit(1)
+                      header += chunk
+
+                  length = None
+                  for line in header.decode().split("\r\n"):
+                      if line.lower().startswith("content-length:"):
+                          length = int(line.split(":", 1)[1].strip())
+                  if length is None:
+                      print("no Content-Length header in response", file=sys.stderr)
+                      sys.exit(1)
+
+                  body = await asyncio.wait_for(proc.stdout.readexactly(length), timeout=TIMEOUT_S)
+                  resp = json.loads(body.decode())
+                  if "result" not in resp or "capabilities" not in resp["result"]:
+                      print(f"initialize response missing capabilities: {resp}", file=sys.stderr)
+                      sys.exit(1)
+                  print(f"initialize OK — server reported {len(resp['result']['capabilities'])} capability keys")
+              finally:
+                  try:
+                      proc.send_signal(signal.SIGTERM)
+                      await asyncio.wait_for(proc.wait(), timeout=5)
+                  except (asyncio.TimeoutError, ProcessLookupError):
+                      try:
+                          proc.kill()
+                      except ProcessLookupError:
+                          pass
+
+          asyncio.run(smoke())
+          PY

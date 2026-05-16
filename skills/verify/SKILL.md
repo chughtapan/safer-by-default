@@ -653,6 +653,12 @@ Common patterns:
 - Rust: `cargo fmt --check && cargo clippy && cargo test`.
 - Go: `go vet ./... && go test ./...`.
 
+**ESLint as the safer-plugin syntax floor.** When the project has been configured by `/safer:setup`, the project's eslint config carries `eslint-plugin-agent-code-guard` rules; these rules are the syntax floor that previously surfaced via an LSP path and now surface via this CLI. The detection order for the lint command is:
+
+1. `package.json` `scripts.lint` if present.
+2. Else, if `eslint.config.{js,mjs,ts,cjs}` exists, treat `$PM exec eslint .` as the lint command.
+3. Else, no lint command — record absence; do not invent one.
+
 If multiple test targets exist (unit, integration, e2e), run all of them unless a sub-issue criterion explicitly scopes verify to a subset. Record which you ran.
 
 If you cannot detect any command, `BLOCKED`; ask the user which commands to run. Do not guess.

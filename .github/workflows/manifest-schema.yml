@@ -1,0 +1,32 @@
+name: manifest-schema
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".claude-plugin/plugin.json"
+      - ".claude-plugin/marketplace.json"
+      - ".github/workflows/manifest-schema.yml"
+  pull_request:
+    paths:
+      - ".claude-plugin/plugin.json"
+      - ".claude-plugin/marketplace.json"
+      - ".github/workflows/manifest-schema.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate manifest against SchemaStore
+        # Catches manifest drift when Claude Code's schema changes underneath us
+        # (e.g. lspServers shape change between 0.1.x and 0.2.x).
+        run: |
+          set -euo pipefail
+          pip install --quiet check-jsonschema
+          check-jsonschema \
+            --schemafile https://json.schemastore.org/claude-code-plugin-manifest.json \
+            .claude-plugin/plugin.json
+          check-jsonschema \
+            --schemafile https://json.schemastore.org/claude-code-marketplace.json \
+            .claude-plugin/marketplace.json

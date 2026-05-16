@@ -40,14 +40,16 @@ Creates the GitHub issue labels skills publish under. Idempotent.
 
 For dependency requirements, source-resolution detail, working from source, and troubleshooting, see [INSTALL.md](./INSTALL.md).
 
-## Editor diagnostics (two LSPs)
+## Editor diagnostics
 
-The plugin manifest auto-registers two language servers that fire diagnostics in editor and in agent context. Every diagnostic carries a one-line rationale plus a `codeDescription.href` link to the relevant `PRINCIPLES.md` heading, so reading the error reads the doctrine.
+The plugin manifest registers one LSP entry that fans out to multiple upstream servers behind a Python proxy. Claude Code's LSP dispatch can't multiplex multiple servers claiming the same file extensions, so safer presents a single server and does the multiplexing internally.
 
-- **`agent-code-guard-syntax`** wraps upstream `vscode-eslint-language-server`. It surfaces every `eslint-plugin-agent-code-guard` rule violation: bare casts, `throw new Error`, `Promise<T>` that erases the error channel, raw SQL, manual enums, mocks in integration tests, the lot.
-- **`agent-code-guard-architecture`** runs a custom architecture analyzer: folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, cycles. File-header directives (`// @agent-code-guard/architecture-exception: <rule>`) provide per-file suppressions when needed.
+- **TypeScript code intelligence** (`typescript-language-server`) — `documentSymbol`, `goToDefinition`, `findReferences`, `hover`, and other LSP queries available via Claude Code's `LSP` tool against any `.ts`/`.tsx` file.
+- **Architecture diagnostics** — a custom Effect-shaped analyzer (folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, cycles) runs as a diagnostic-only sidecar behind the proxy. File-header directives (`// @agent-code-guard/architecture-exception: <rule>`) provide per-file suppressions. Diagnostics fire in real time as files open and change, with `codeDescription.href` linking each finding to a `PRINCIPLES.md` heading.
 
-Both servers run via `bun` (architecture) or `node` (the thin syntax launcher); no build step at install time. Dependencies: `vscode-eslint-language-server` for the syntax LSP (installed by `/safer:setup`) and `bun` for the architecture LSP (already a gstack dependency).
+**ESLint syntax floor** is delivered via CLI, not LSP. `/safer:setup` writes an `eslint.config.js` that loads `eslint-plugin-agent-code-guard`'s rules; `/safer:verify` runs `eslint` against the project as part of the pre-merge acceptance loop, and any pre-commit / CI integration the project already has continues to fire the same ruleset.
+
+Dependencies installed by `/safer:setup`: `typescript-language-server`, `python3`, `bun`, and the upstream `lsp-proxy.py` fetched at a pinned commit into `~/.cache/safer-by-default/`.
 
 ## Four parts
 

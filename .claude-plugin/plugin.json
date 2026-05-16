@@ -1,6 +1,6 @@
 {
   "name": "safer",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Claude Code plugin: modality-based skills that recalibrate agents toward compiler-grade craft and scope discipline. Sixteen skills across spec, architect, implement (junior/senior/staff), diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit. Composes with eslint-plugin-agent-code-guard (lint floor) and zapbot (GitHub publish).",
   "author": {
     "name": "Tapan Chugh"
@@ -24,18 +24,13 @@
     "kysely",
     "zapbot"
   ],
-  "lspServers": [
-    {
-      "name": "agent-code-guard-syntax",
-      "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/lsp/syntax/launch.js"],
-      "fileTypes": ["typescript", "typescriptreact"]
-    },
-    {
-      "name": "agent-code-guard-architecture",
-      "command": "bun",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/lsp/architecture/server/index.ts"],
-      "fileTypes": ["typescript", "typescriptreact"]
+  "lspServers": {
+    "safer-merged": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/lsp/proxy/run.sh",
+      "extensionToLanguage": {
+        ".ts": "typescript",
+        ".tsx": "typescriptreact"
+      }
     }
-  ]
+  }
 }
