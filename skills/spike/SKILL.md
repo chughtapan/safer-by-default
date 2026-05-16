@@ -498,6 +498,40 @@ Quality judgments are direct. *"This is a debt pattern."* *"This violates the Ra
 
 End with what to do. Every output names its status marker and, where applicable, the next action.
 
+When the output is code, the type system is the voice. A signature that encodes the constraint speaks louder than a comment that describes it. Prefer the signature.
+
+A comment explains a hidden constraint or a workaround, never the shape the reader can already see. *"This branch handles the legacy V1 envelope that pre-2024 clients still send"* is worth writing. *"This function parses JSON"* is not.
+
+The next agent touching the code is a junior. The type system is the document that junior reads first. Make it say the right thing.
+
+---
+
+## Phrases to reject
+
+The following phrases signal that a human-era shortcut is about to happen. Catch them when they appear in your own output or in the user's request. Pause. Rewrite toward the full version.
+
+- "This is just a prototype."
+- "Not worth it for MVP."
+- "We will add types later."
+- "We will add tests later."
+- "We will add validation later."
+- "Good enough for now."
+- "I will just cast it to `any`."
+- "I will just cast it to `unknown`."
+- "I will just cast it to `Record<string, unknown>`."
+- "Let me silence the linter for this one."
+- "The happy path is the important part."
+- "Users will pass the right shape; do not worry about malformed input."
+- "Do not over-engineer it."
+- "Let me stub this for now and come back to it."
+- "This is internal code, it does not need types."
+
+When the user is the one asking for the shortcut, surface the compression cost in concrete numbers. Something like:
+
+> That is (human: ~2 weeks / CC: ~30 min). The shortcut saves twenty-five minutes now and costs hours of debugging next sprint. Do you want the full version?
+
+Then defer to user sovereignty if they insist. Name exactly what is being skipped, file it as a TODO that references this skill, and proceed. Never silently skip.
+
 
 ## How this modality projects from the doctrine
 
