@@ -1,0 +1,30 @@
+{
+  "name": "@safer-by-default/architecture-lsp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Architecture analyzer + LSP server for safer-by-default. Single-process workspace-aware diagnostics for the architecture doctrine in PRINCIPLES.md.",
+  "type": "module",
+  "bin": {
+    "safer-architecture-lsp": "./dist/server/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "pnpm clean && tsc",
+    "pretest": "pnpm build",
+    "test": "vitest run",
+    "dogfood": "pnpm build && node dist/dogfood.js"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "effect": "^3.21.1",
+    "typescript": "^5.4.0",
+    "vscode-languageserver": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "fast-check": "^4.7.0",
+    "vitest": "^2.0.0"
+  }
+}
