@@ -1,14 +1,8 @@
 /**
- * @file Per-rule PRINCIPLES.md anchors. Each architecture rule
- * projects from one or two principles; the diagnostic-converter
- * surfaces this as `codeDescription.href` so the editor's "Learn
- * more" UI links to the canonical doctrine entry.
- *
- * URLs pin to `main` so anchors auto-resolve as PRINCIPLES.md
- * evolves. The anchor slugs follow GitHub's heading-to-anchor
- * algorithm: lowercase, spaces and dots become hyphens, all other
- * non-alphanumeric characters are stripped. Verified against the
- * current PRINCIPLES.md headings.
+ * @file Per-rule PRINCIPLES.md anchors. URLs pin to `main` so the
+ * anchor resolves against the current heading text; the slug follows
+ * GitHub's heading-to-anchor algorithm (lowercase, spaces and dots
+ * to hyphens, drop other non-alphanumeric).
  */
 
 import type { ArchitectureRuleId } from "../analyzer/rule-ids.js";
@@ -16,58 +10,69 @@ import type { ArchitectureRuleId } from "../analyzer/rule-ids.js";
 const PRINCIPLES_BASE =
   "https://github.com/chughtapan/safer-by-default/blob/main/PRINCIPLES.md";
 
-// PRINCIPLES.md heading anchors. Names match the principle numbers
-// 1-8 plus auxiliary sections used by the architecture taxonomy.
-const ANCHOR_VALIDATE_BOUNDARY = "#2-validate-at-every-boundary--schemas-where-data-enters-types-inside";
-const ANCHOR_DISCIPLINE = "#5-discipline-over-capability";
-const ANCHOR_BUDGET_GATE = "#6-the-budget-gate--scope-is-a-hard-budget";
-const ANCHOR_RATCHET = "#8-the-ratchet--escalate-up-not-around";
-
-/**
- * Map every architecture rule id to the PRINCIPLES.md anchor that
- * names the doctrine it enforces. Architecture rules are mostly
- * projections of the discipline section (Principles 5-8) plus the
- * boundary-validation principle (2) for vendor-type leak rules.
- *
- * The directive-parse pseudo-rule points at the discipline anchor
- * because malformed directives are a discipline failure (an unanchored
- * suppression bypassing the architecture contract).
- */
+/** PRINCIPLES.md anchor for each architecture rule. */
 const ARCHITECTURE_RULE_ANCHORS: Readonly<Record<ArchitectureRuleId, string>> = {
-  "no-inventory-barrel": ANCHOR_DISCIPLINE,
-  "no-internal-subpath-export": ANCHOR_DISCIPLINE,
-  "no-public-vendor-type-leak": ANCHOR_VALIDATE_BOUNDARY,
-  "no-export-star-boundary": ANCHOR_DISCIPLINE,
-  "no-folder-cycle": ANCHOR_RATCHET,
-  "no-root-internal-cycle": ANCHOR_RATCHET,
-  "no-large-public-surface": ANCHOR_BUDGET_GATE,
-  "no-cross-domain-sibling-import": ANCHOR_RATCHET,
-  "no-upward-layer-import": ANCHOR_RATCHET,
-  "no-public-test-helper-leak": ANCHOR_DISCIPLINE,
-  "no-implementation-file-public-entry": ANCHOR_DISCIPLINE,
-  "no-public-infra-type-leak": ANCHOR_VALIDATE_BOUNDARY,
-  "no-package-mesh": ANCHOR_RATCHET,
-  "no-large-folder": ANCHOR_BUDGET_GATE,
-  "folder-readme-required": ANCHOR_DISCIPLINE,
-  "no-distant-folder-import": ANCHOR_RATCHET,
-  "require-curated-public-facade": ANCHOR_DISCIPLINE,
-  "require-boundary-owned-types": ANCHOR_VALIDATE_BOUNDARY,
-  "folder-explicit-api-required": ANCHOR_BUDGET_GATE,
-  "file-implicit-boundary-module": ANCHOR_BUDGET_GATE,
-  "shared-kernel-cohesion": ANCHOR_DISCIPLINE,
-  "no-trivial-sink-file": ANCHOR_DISCIPLINE,
-  "no-fat-orchestrator": ANCHOR_DISCIPLINE,
-  "architecture-directive-parse-error": ANCHOR_DISCIPLINE,
+  "no-inventory-barrel": "#5-discipline-over-capability",
+  "no-internal-subpath-export": "#5-discipline-over-capability",
+  "no-public-vendor-type-leak": "#2-validate-at-every-boundary--schemas-where-data-enters-types-inside",
+  "no-export-star-boundary": "#5-discipline-over-capability",
+  "no-folder-cycle": "#8-the-ratchet--escalate-up-not-around",
+  "no-root-internal-cycle": "#8-the-ratchet--escalate-up-not-around",
+  "no-large-public-surface": "#6-the-budget-gate--scope-is-a-hard-budget",
+  "no-cross-domain-sibling-import": "#8-the-ratchet--escalate-up-not-around",
+  "no-upward-layer-import": "#8-the-ratchet--escalate-up-not-around",
+  "no-public-test-helper-leak": "#5-discipline-over-capability",
+  "no-implementation-file-public-entry": "#5-discipline-over-capability",
+  "no-public-infra-type-leak": "#2-validate-at-every-boundary--schemas-where-data-enters-types-inside",
+  "no-package-mesh": "#8-the-ratchet--escalate-up-not-around",
+  "no-large-folder": "#6-the-budget-gate--scope-is-a-hard-budget",
+  "folder-readme-required": "#5-discipline-over-capability",
+  "no-distant-folder-import": "#8-the-ratchet--escalate-up-not-around",
+  "require-curated-public-facade": "#5-discipline-over-capability",
+  "require-boundary-owned-types": "#2-validate-at-every-boundary--schemas-where-data-enters-types-inside",
+  "folder-explicit-api-required": "#6-the-budget-gate--scope-is-a-hard-budget",
+  "file-implicit-boundary-module": "#6-the-budget-gate--scope-is-a-hard-budget",
+  "shared-kernel-cohesion": "#5-discipline-over-capability",
+  "no-trivial-sink-file": "#5-discipline-over-capability",
+  "no-fat-orchestrator": "#5-discipline-over-capability",
+  "architecture-directive-parse-error": "#5-discipline-over-capability",
 };
 
+const FALLBACK_CODE_DESCRIPTION: { readonly href: string } = Object.freeze({
+  href: PRINCIPLES_BASE,
+});
+
+/** Pre-built frozen `codeDescription` per rule id. */
+const ARCHITECTURE_RULE_CODE_DESCRIPTIONS: Readonly<
+  Record<ArchitectureRuleId, { readonly href: string }>
+> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(ARCHITECTURE_RULE_ANCHORS).map(([id, anchor]) => [
+      id,
+      Object.freeze({ href: `${PRINCIPLES_BASE}${anchor}` }),
+    ]),
+  ) as Record<ArchitectureRuleId, { readonly href: string }>,
+);
+
 /**
- * Build the PRINCIPLES.md URL for the doctrine entry a given
- * architecture rule enforces. Unknown rule ids fall back to the
- * PRINCIPLES.md root — every architecture finding carries an
- * actionable link.
+ * PRINCIPLES.md URL for the doctrine entry a given architecture rule
+ * enforces. Unknown rule ids fall back to the PRINCIPLES.md root.
+ * The parameter is `string` because the analyzer's
+ * `ArchitectureDiagnostic.ruleId` is `string`; exhaustiveness is
+ * enforced by `ARCHITECTURE_RULE_ANCHORS`' `Record<ArchitectureRuleId,
+ * …>` type, which fails compilation if a rule id added to
+ * `rule-ids.ts` is missing an anchor.
  */
 export function ruleDocUrl(ruleId: string): string {
-  const anchor = ARCHITECTURE_RULE_ANCHORS[ruleId as ArchitectureRuleId];
-  if (anchor === undefined) return PRINCIPLES_BASE;
-  return `${PRINCIPLES_BASE}${anchor}`;
+  return ruleCodeDescription(ruleId).href;
+}
+
+/** `codeDescription` for `ruleId`. Returns a shared frozen object. */
+export function ruleCodeDescription(
+  ruleId: string,
+): { readonly href: string } {
+  return (
+    ARCHITECTURE_RULE_CODE_DESCRIPTIONS[ruleId as ArchitectureRuleId] ??
+    FALLBACK_CODE_DESCRIPTION
+  );
 }

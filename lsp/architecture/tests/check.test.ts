@@ -14,12 +14,6 @@ afterEach(() => {
   clearArchitectureCache();
 });
 
-// The check.ts CI shim is the project-level "is this codebase clean"
-// surface: it must exit 0 against a healthy fixture and non-zero
-// against a fixture that fires any error-severity diagnostic. Both
-// behaviors are gated through `analyzeWorkspace`; the script is a thin
-// process boundary on top.
-
 const CHECK_SCRIPT = path.resolve(import.meta.dirname, "..", "dist", "check.js");
 
 it("check: exits 0 on a project with no error-severity findings", () => {

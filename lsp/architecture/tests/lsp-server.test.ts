@@ -62,23 +62,27 @@ it("diagnostic-converter: maps single finding to LSP diagnostic at file head", (
   expect(lsp.message).toBe("cycle detected");
 });
 
-it("diagnostic-converter: every diagnostic carries a codeDescription.href to PRINCIPLES.md", () => {
-  const ruleIds = [
-    "no-inventory-barrel",
-    "no-public-vendor-type-leak",
-    "no-folder-cycle",
-    "no-large-public-surface",
-    "shared-kernel-cohesion",
-    "architecture-directive-parse-error",
-  ] as const;
-  for (const ruleId of ruleIds) {
+it("diagnostic-converter: every architecture rule id carries a codeDescription.href to PRINCIPLES.md", async () => {
+  // Iterate every rule id the analyzer can emit, including the
+  // directive-parse pseudo-rule. The `Record<ArchitectureRuleId, …>`
+  // type on `ARCHITECTURE_RULE_ANCHORS` forces every new rule id in
+  // `rule-ids.ts` to land with an anchor — this test guards the
+  // runtime side: every anchor resolves to a real principle, not to
+  // the fallback PRINCIPLES.md root.
+  const { ARCHITECTURE_DIAGNOSTIC_RULE_IDS, ARCHITECTURE_DIRECTIVE_PARSE_ERROR_RULE_ID } =
+    await import("../analyzer/rule-ids.js");
+  const allRuleIds = [
+    ...ARCHITECTURE_DIAGNOSTIC_RULE_IDS,
+    ARCHITECTURE_DIRECTIVE_PARSE_ERROR_RULE_ID,
+  ];
+  for (const ruleId of allRuleIds) {
     const lsp = toLspDiagnostic({
       ruleId,
       file: "/proj/x.ts",
       severity: "error",
       message: "msg",
     });
-    expect(lsp.codeDescription?.href).toMatch(/^https:\/\/github\.com\/.*PRINCIPLES\.md#/);
+    expect(lsp.codeDescription?.href).toMatch(/^https:\/\/github\.com\/.*PRINCIPLES\.md#./);
   }
 });
 

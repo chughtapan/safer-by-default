@@ -1,9 +1,5 @@
 /**
- * @file Top-level barrel for the architecture LSP package. Exposes
- * the analyzer entry (`analyzeWorkspace`) for non-LSP callers (CI
- * shim, tests) and re-exports the diagnostic types so consumers
- * can type-check against the analyzer's output without reaching
- * into nested paths.
+ * @file Public entry for the architecture LSP package.
  */
 
 export { analyzeWorkspace } from "./analyzer/index.js";

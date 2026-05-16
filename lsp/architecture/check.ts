@@ -1,13 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * @file CI shim. Reads `tsconfig.json` from cwd, runs the
- * architecture analyzer once, prints each finding, and exits
- * non-zero when any error-severity diagnostic is present.
- *
- * Invocation: `node lsp/architecture/check.js` from the consuming
- * repo. No flags, no argparse — CI users wire this into their job
- * script directly.
+ * @file CI shim. Runs the architecture analyzer against the cwd's
+ * project, prints each finding, and exits non-zero on any
+ * error-severity diagnostic. Invocation: `node lsp/architecture/check.js`.
  */
 
 import process from "node:process";

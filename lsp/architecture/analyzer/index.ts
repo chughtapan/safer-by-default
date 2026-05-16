@@ -49,16 +49,16 @@ interface DirectiveAnalysis {
  * Run every architecture analysis pass (package exports, inventory
  * barrels, public vendor type leaks, public surface, folder graph,
  * folder shape, module shape) against pre-resolved options and return
- * the merged report with directive-based suppressions applied. Used by
- * the cache layer so options are not re-decoded on every rule.
+ * the merged report with directive-based suppressions applied. The
+ * cache layer calls this with pre-resolved options so options are not
+ * re-decoded on every analyzer hit.
  * @param options Pre-resolved architecture options (already
  * schema-decoded and path-resolved).
  * @param programProvider Lazy provider for the `ts.Program`. The
  * default builds one from the project tsconfig via `createProgram`.
- * The rule path passes a provider that returns
- * `parserServices.program` so the analyzer reuses the program
- * typescript-eslint already maintains instead of parsing every project
- * file a second time.
+ * The LSP workspace engine supplies a provider that returns its
+ * cached `ts.Program` so the analyzer does not parse every project
+ * file on each diagnostic refresh.
  * @returns The combined architecture report with deduplicated
  * diagnostics, after directive suppressions are applied.
  */

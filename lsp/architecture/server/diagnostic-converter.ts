@@ -12,7 +12,7 @@ import {
   DiagnosticSeverity,
 } from "vscode-languageserver";
 import type { ArchitectureDiagnostic } from "../analyzer/project/api/index.js";
-import { ruleDocUrl } from "./rule-docs.js";
+import { ruleCodeDescription } from "./rule-docs.js";
 
 const FILE_HEAD_RANGE = {
   start: { line: 0, character: 0 },
@@ -34,28 +34,32 @@ export function toLspDiagnostic(finding: ArchitectureDiagnostic): Diagnostic {
         ? DiagnosticSeverity.Error
         : DiagnosticSeverity.Warning,
     code: finding.ruleId,
-    codeDescription: { href: ruleDocUrl(finding.ruleId) },
+    codeDescription: ruleCodeDescription(finding.ruleId),
     source: "agent-code-guard",
     message: finding.message,
   };
 }
 
-function fileToUri(filePath: string): string {
-  return pathToFileURL(filePath).toString();
-}
-
 /**
  * Group analyzer diagnostics by file URI. The LSP server publishes
- * one `publishDiagnostics` per URI, so we batch findings here.
+ * one `publishDiagnostics` per URI, so findings are batched here.
+ * Per-file URI conversion is memoized within the batch — architecture
+ * findings are file-level and the same file commonly carries
+ * findings from several rules.
  * @param findings Findings from one or more files.
  * @returns Map of URI to LSP diagnostics for that URI.
  */
 export function groupByUri(
   findings: readonly ArchitectureDiagnostic[],
 ): ReadonlyMap<string, readonly Diagnostic[]> {
+  const uriByFile = new Map<string, string>();
   const groups = new Map<string, Diagnostic[]>();
   for (const finding of findings) {
-    const uri = fileToUri(finding.file);
+    let uri = uriByFile.get(finding.file);
+    if (uri === undefined) {
+      uri = pathToFileURL(finding.file).toString();
+      uriByFile.set(finding.file, uri);
+    }
     let bucket = groups.get(uri);
     if (bucket === undefined) {
       bucket = [];

@@ -9,7 +9,7 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // `import.meta.dirname` resolves to `dist/` after `pnpm build`. The
 // LSP binary lives next to this script inside `dist/server/`; the
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
 
     console.log(`\n==> received ${client.diagnostics.length} publishDiagnostics events:\n`);
     for (const pub of client.diagnostics) {
-      const rel = path.relative(PACKAGE_ROOT, pub.uri.replace("file://", ""));
+      const rel = path.relative(PACKAGE_ROOT, fileURLToPath(pub.uri));
       console.log(`  ${rel}: ${pub.diagnostics.length} diagnostics`);
       for (const d of pub.diagnostics) {
         const { code, message, severity } = d as { code: string; message: string; severity: number };
