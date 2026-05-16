@@ -40,6 +40,15 @@ Creates the GitHub issue labels skills publish under. Idempotent.
 
 For dependency requirements, source-resolution detail, working from source, and troubleshooting, see [INSTALL.md](./INSTALL.md).
 
+## Editor diagnostics (two LSPs)
+
+The plugin manifest auto-registers two language servers that fire diagnostics in editor and in agent context. Every diagnostic carries a one-line rationale plus a `codeDescription.href` link to the relevant `PRINCIPLES.md` heading, so reading the error reads the doctrine.
+
+- **`agent-code-guard-syntax`** wraps upstream `vscode-eslint-language-server`. It surfaces every `eslint-plugin-agent-code-guard` rule violation: bare casts, `throw new Error`, `Promise<T>` that erases the error channel, raw SQL, manual enums, mocks in integration tests, the lot.
+- **`agent-code-guard-architecture`** runs a custom architecture analyzer: folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, cycles. File-header directives (`// @agent-code-guard/architecture-exception: <rule>`) provide per-file suppressions when needed.
+
+Both servers run via `bun` (architecture) or `node` (the thin syntax launcher); no build step at install time. Dependencies: `vscode-eslint-language-server` for the syntax LSP (installed by `/safer:setup`) and `bun` for the architecture LSP (already a gstack dependency).
+
 ## Four parts
 
 The doctrine factors into four orthogonal axes. The first two govern *what code looks like*; the third governs *when it earns done*; the fourth governs *how work hands off*. Each safer skill projects from these four into one modality. The full text lives in [PRINCIPLES.md](./PRINCIPLES.md); the catalog of bullet points below is the operational summary.

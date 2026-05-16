@@ -21,6 +21,7 @@ Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:spec`, `
 - `scenarios/` — cc-judge calibration suite for evaluating doctrine adherence; see `scenarios/README.md`.
 - `bin/` — 14 standalone helpers (publish, telemetry, escalate, etc.). All are on `PATH` in any session that has the plugin enabled. See `ARCHITECTURE.md` → CLI helpers for the full list.
 - `lib/` — helper shell modules sourced by `bin/` scripts.
+- `lsp/` — two LSP servers declared in `.claude-plugin/plugin.json`'s `lspServers`. `lsp/syntax/launch.js` wraps upstream `vscode-eslint-language-server` for the ACG syntax rules; `lsp/architecture/` is the custom Effect-shaped architecture analyzer + server (runs via `bun` directly on TypeScript source). Both fire diagnostics with `codeDescription.href` links to `PRINCIPLES.md` anchors. See `ARCHITECTURE.md` → LSP integration.
 
 ## Skill routing
 

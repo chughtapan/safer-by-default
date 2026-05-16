@@ -40,6 +40,9 @@ safer-by-default/
 │   └── setup/
 ├── bin/                       ← 14 CLI helpers; auto-PATH at session start (see "CLI helpers" below)
 ├── lib/                       ← shell modules sourced by bin/ scripts
+├── lsp/                       ← two LSP servers declared in plugin.json (see "LSP integration" below)
+│   ├── syntax/                ← thin launcher around upstream vscode-eslint-language-server
+│   └── architecture/          ← custom architecture analyzer + LSP server, runs via bun
 ├── docs/contracts/            ← worked-example contract templates
 ├── scenarios/                 ← cc-judge calibration suite
 ├── tests/                     ← test-bin/, test-integration/
@@ -88,6 +91,21 @@ Each helper is a standalone bash script. The plugin marketplace install auto-pre
 | `safer-gen-skills` | Render `skills/<name>/SKILL.md` from `SKILL.tmpl + PRINCIPLES.md` | `[--check]` |
 
 Conventions: helpers exit non-zero on missing required args; skills wrap calls with `2>/dev/null || true` only when the helper is optional plumbing (telemetry, update-check), never when it's load-bearing. `safer-publish` routes through zapbot's bot-token broker when zapbot is detected on the host; absent zapbot, falls back to the user's `gh auth`.
+
+## LSP integration
+
+The plugin manifest (`.claude-plugin/plugin.json`) declares two `lspServers`. Both auto-start when Claude Code (or any LSP-aware editor wired to this plugin) opens a TypeScript file:
+
+| Server | What it does | Runtime |
+|---|---|---|
+| `agent-code-guard-syntax` | Wraps upstream `vscode-eslint-language-server`. Surfaces every `eslint-plugin-agent-code-guard` rule violation with a one-line rationale and a link to the relevant `PRINCIPLES.md` heading via `codeDescription.href`. | `node lsp/syntax/launch.js` (thin wrapper) |
+| `agent-code-guard-architecture` | Custom Effect-shaped server backed by the architecture analyzer (folder graph, public surface, vendor type leaks, cycle detection). Reads file-header `// @agent-code-guard/architecture-exception: <rule>` directives for per-file suppressions. Same rationale + `PRINCIPLES.md` link per diagnostic. | `bun lsp/architecture/server/index.ts` (runs TypeScript source directly) |
+
+Both servers populate `codeDescription.href` on every diagnostic so editor tooltips link directly to the doctrine. The architecture analyzer also exports a thin shim at `lsp/architecture/check.ts` that CI can invoke (`node lsp/architecture/check.js` post-build, or `bun lsp/architecture/check.ts` from source) to exit non-zero on error-severity findings without needing the full LSP protocol.
+
+Dependencies: the syntax LSP needs `vscode-eslint-language-server` on `PATH` (installed by `/safer:setup`). The architecture LSP needs `bun` on `PATH` (already a gstack dependency).
+
+A two-LSP programmatic integration test ships at `lsp/architecture/dogfood.ts` and runs in CI; it spawns both LSPs via the manifest's `command + args`, sends `didOpen` on a fixture file with syntax + architecture violations, and asserts both diagnostics arrive with `codeDescription.href` populated and the servers shut down cleanly.
 
 ## Install paths
 
