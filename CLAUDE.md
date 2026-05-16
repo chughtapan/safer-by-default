@@ -2,7 +2,7 @@
 
 ## What this is
 
-A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding agent for compiler-grade craft and scope discipline. Doctrine lives in `PRINCIPLES.md`. Every skill in `skills/` is one projection of those principles onto one kind of work (spec, architect, implement-{junior,senior,staff}, diagnose, spike, research, review-senior, verify, orchestrate, typescript, setup, dogfood, docs-reader, stamina, ux-audit).
+A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding agent for compiler-grade craft and scope discipline. Doctrine lives in `PRINCIPLES.md`. Every skill in `skills/` is one projection of those principles onto one kind of work (spec, architect, implement-{junior,senior,staff}, diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit).
 
 ## Skill namespacing
 
@@ -19,7 +19,7 @@ Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:spec`, `
 - `PRINCIPLES.md` — the 4-part doctrine (craft, discipline, stamina, communication). Every skill projects from these principles.
 - `docs/contracts/` — four worked-example contract templates (invitation, bug-fix-end-to-end, scrum-master-backlog, architect-and-stop) plus a README explaining when to reach for each.
 - `scenarios/` — cc-judge calibration suite for evaluating doctrine adherence; see `scenarios/README.md`.
-- `bin/` — 15 standalone helpers (publish, telemetry, escalate, etc.). All are on `PATH` in any session that has the plugin enabled. See `ARCHITECTURE.md` → CLI helpers for the full list.
+- `bin/` — 14 standalone helpers (publish, telemetry, escalate, etc.). All are on `PATH` in any session that has the plugin enabled. See `ARCHITECTURE.md` → CLI helpers for the full list.
 - `lib/` — helper shell modules sourced by `bin/` scripts.
 
 ## Skill routing

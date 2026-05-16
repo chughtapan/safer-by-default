@@ -27,7 +27,6 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 | | `/safer:docs-reader` | Multi-persona docs review |
 | | `/safer:stamina` | Fan-out review for high-blast artifacts |
 | **Bootstrap** | `/safer:setup` | One-time TypeScript repo bootstrap |
-| | `/safer:typescript` | TS craft floor (auto-applied by `implement-*`) |
 | **Orchestration** | `/safer:orchestrate` | Multi-modality intent → GitHub epic + sub-issues |
 
 ## Conventions
