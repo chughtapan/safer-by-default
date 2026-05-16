@@ -42,6 +42,31 @@ allowed-tools:
 - **Principle 6 (Budget Gate)** — shape is "multi-module refactor inside one feature area per the plan." New modules and new public contracts are out of scope.
 - **Principle 8 (The Ratchet)** — if the plan needs revision, ratchet back to architect. Never sideways: no boolean flags to patch a plan gap, no workarounds to avoid re-opening the architect step.
 
+The decision table below names the Effect-runtime and testing-strategy forks senior owns. Single-module Principle 1–4 forks live in `/safer:implement-junior`; cross-service contract and CI/mutation gating live in `/safer:implement-staff`.
+
+## Decision table
+
+Every row below is a cross-module fork where the agent feels pulled toward the human-era shortcut. Pick the agent-era full version. Each row corresponds to a runtime-wiring or testing-strategy decision that lives at the seam between modules — the wiring senior coordinates.
+
+| Scenario | Human-era shortcut | Agent-era full version |
+|---|---|---|
+| `Effect.tryPromise` catch | `catch: (err) => err` | `catch: (cause) => new TaggedError({ cause })` |
+| `fetch` inside `Effect.tryPromise` | `try: () => fetch(url, { ... })` | `try: (signal) => fetch(url, { signal, ... })` |
+| Resource in a class | `private ref = Effect.runSync(Ref.make(0))` | Build in `Layer.effect`; inject via constructor |
+| Module-load env read | `const FOO = process.env.FOO!` at top level | `Config.string("FOO")` inside a Layer |
+| Happy-path test | One test asserting success | Happy path, each error path, property-based where applicable |
+| Test double for an external service | `vi.mock("./stripe")` in integration test | Real stripe test mode, or a contract test against a recorded cassette |
+| Positive integer | `function (n: number)` with runtime check | `function (n: PositiveInt)` where `PositiveInt` is branded |
+| Non-empty array | `arr: T[]` with `if (arr.length === 0)` guard | `arr: NonEmptyArray<T>` |
+| Pure function with a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement) | One example-based happy-path test | Happy path + `fast-check` property encoding the invariant |
+| Pure function with no nameable algebraic property | "Write a property test; think of something" | Example tests covering boundary and each error path; skip property-based |
+| Parser or handler accepting untrusted external input | Example tests for three known-bad inputs | Example tests + `fast-check` property + `Jazzer.js` via `@jazzer.js/jest-runner` when the threat model includes adversarial input |
+| Parser with no adversarial threat model | Reach for `Jazzer.js` anyway | Example tests + `fast-check`; skip the fuzzer (Principle 6: compute is budget) |
+| Test for code that reads a real database | `vi.mock("pg")` or an in-memory stand-in | `testcontainers-node` + `@testcontainers/postgresql`, shared-per-suite lifecycle, dynamic ports |
+| Test for code that reads a real cache or queue | In-memory fake for redis/kafka/rabbitmq | `testcontainers-node` + `@testcontainers/redis` (or matching module); fake only behind a schema-checked contract |
+
+The compression math: each full version costs seconds more to wire at the seam. Each one removes one class of cross-module coordination defect or one class of false-confidence test that mocks the very boundary under test. The shortcut's savings compound into the next refactor finding two modules quietly disagreeing about the same shape; the full version's savings compound into seams the compiler keeps honest.
+
 ## Iron rule
 
 > **If you need to revise the plan, your stop rule has already fired. Escalate, do not revise.**

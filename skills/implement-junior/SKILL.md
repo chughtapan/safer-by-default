@@ -538,18 +538,102 @@ Then defer to user sovereignty if they insist. Name exactly what is being skippe
 
 ## How this modality projects from the doctrine
 
-- **Principle 1 (Types beat tests)** — you are not shipping a unit test when a branded type or discriminated union would make the bug unrepresentable. Check each constraint: does it belong in the type system?
+- **Principle 1 (Types beat tests)** — you are not shipping a unit test when a branded type or discriminated union would make the bug unrepresentable. Check each constraint: does it belong in the type system? The decision table below names the most common forks.
 - **Principle 2 (Validate at every boundary)** — inside the module, trust your types. At the boundary (disk, env, network, another package), decode with a schema.
 - **Principle 3 (Errors are typed, not thrown)** — tagged errors or discriminated results. No raw `throw new Error("bad")`. No `catch {}`. `Promise<T>` on a failing path is a bug by you.
 - **Principle 4 (Exhaustiveness over optionality)** — every switch ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches.
 - **Principle 5 (Discipline over capability)** — you do one module. The instinct "while I'm here" is the stop rule.
 - **Principle 6 (Budget Gate)** — shape of change is the budget, not volume. 500 LOC in one module is fine. 2 LOC across two modules is not.
 
+## Decision table
+
+Every row below is a one-module fork where the agent feels pulled toward the human-era shortcut. Pick the agent-era full version. Each row corresponds to a Principle 1–4 decision that lives inside the module body junior owns.
+
+| Scenario | Human-era shortcut | Agent-era full version |
+|---|---|---|
+| Parsing an API response | `(await r.json()) as Record<string, unknown>` | `Schema.decodeUnknown(Body)(await r.json())` |
+| Parsing a JSON string | `JSON.parse(raw) as Payload` | `Schema.decodeUnknown(Payload)(JSON.parse(raw))` |
+| Function that can fail | `throw new Error("bad")` | `return yield* Effect.fail(new BadError({ cause }))` |
+| String union type | `row.status as "a" \| "b" \| "c"` | Import the generated `Status` union |
+| Error in try/catch | `try { op() } catch {}` | `Effect.try({ try: op, catch: e => new OpError({ cause: e }) })` |
+| Env var access | `process.env.FOO!` | Env schema parsed once at boot |
+| Async return type | `async f(): Promise<T>` | `(): Effect.Effect<T, E, R> => Effect.gen(...)` |
+| Identifier type | `string` | `UserId = string & { __brand: "UserId" }` |
+| Switch over union | `case "a": ... case "b": ...` | Final case returns `absurd(x)` where `absurd(x: never): never` |
+| Match chain | `Match.value(x).pipe(Match.when(...))` | Close with `Match.exhaustive` or `Match.orElse(...)` |
+| Throw in Effect code | `throw new Error("bad")` inside `Effect.gen` | `yield* Effect.fail(new TaggedError({ ... }))` |
+| Callback signature | `(x) => Promise<void> \| void` | `(x) => Effect.Effect<void, E>` |
+| Database query | `db.query("SELECT * FROM users WHERE id=?", [id])` | `kysely.selectFrom("users").where("id", "=", id).selectAll().execute()` |
+
+The compression math: each full version costs seconds more to type inside the module body. Each one removes one class of in-module runtime bug. The shortcut's savings compound into next-session debt the module owner has to walk back; the full version's savings compound into no-bug-ever.
+
 ## Iron rule
 
 > **If your diff touches a 2nd module, your stop rule has already fired. Do not "just touch one more file."**
 
 The second file is always the first warning. The instinct "it is one line, it is basically the same module, the test lives here anyway" is exactly the debt pattern Principle 6 exists to stop. Cross-module reach is a shape change. Escalate; do not rationalize.
+
+## Before and after examples
+
+Two Principle 1–4 forks from the decision table expanded to full before/after.
+
+**Parsing an HTTP response.**
+
+Before:
+```ts
+async function getUser(id: string): Promise<User> {
+  const r = await fetch(`/api/users/${id}`);
+  return (await r.json()) as User;
+}
+```
+
+After:
+```ts
+const getUser = (id: UserId): Effect.Effect<User, FetchError | DecodeError> =>
+  Effect.gen(function* () {
+    const r = yield* Effect.tryPromise({
+      try: (signal) => fetch(`/api/users/${id}`, { signal }),
+      catch: (cause) => new FetchError({ cause }),
+    });
+    const body = yield* Effect.tryPromise({
+      try: () => r.json(),
+      catch: (cause) => new DecodeError({ cause }),
+    });
+    return yield* Schema.decodeUnknown(User)(body);
+  });
+```
+
+The before has one `async`, one cast, and zero error types. The after has three typed errors, one schema boundary, and a cancellable `fetch`. Cost: eight extra lines for an agent; hours of debugging saved.
+
+**Exhaustive switch over a union.**
+
+Before:
+```ts
+type Status = "pending" | "active" | "done";
+function icon(s: Status): string {
+  switch (s) {
+    case "pending": return "pending";
+    case "active":  return "active";
+    case "done":    return "done";
+  }
+}
+```
+
+After:
+```ts
+type Status = "pending" | "active" | "done";
+const absurd = (x: never): never => { throw new Error(`unreachable: ${x}`); };
+function icon(s: Status): string {
+  switch (s) {
+    case "pending": return "pending";
+    case "active":  return "active";
+    case "done":    return "done";
+    default:        return absurd(s);
+  }
+}
+```
+
+Add a fourth value to `Status` and the after version turns `absurd(s)` into a compile error at this call site. The before version silently returns `undefined`.
 
 ## Forbidden paths
 
@@ -705,7 +789,7 @@ Write the function bodies. Apply the four craft principles at every decision.
 - Every switch over a union ends in `default: return absurd(x)`. Add `function absurd(x: never): never { throw new Error(\`unreachable: ${JSON.stringify(x)}\`); }` locally if one is not in scope. Prefer importing an existing one.
 - Every `Option`, `Either`, or `Result.match` handles both branches explicitly.
 
-When you are tempted to reach for `any`, `unknown`, `Record<string, unknown>`, `as T`, or `throw new Error(...)`: stop. Ask whether the constraint can live higher up. Usually it can.
+When you are tempted to reach for `any`, `unknown`, `Record<string, unknown>`, `as T`, or `throw new Error(...)`: stop. Consult the decision table above and write the agent-era full version of the matching row. If no row matches, the constraint may need to live higher up than this module; escalate via stop rule 8.
 
 **Comment audit (mandatory before moving on).** Re-read every comment you inserted into the diff. Strip any comment that:
 
