@@ -10,6 +10,7 @@
   "license": "MIT",
   "files": [
     "bin",
+    "lsp",
     "skills"
   ],
   "keywords": [
@@ -22,5 +23,19 @@
     "effect",
     "kysely",
     "zapbot"
+  ],
+  "lspServers": [
+    {
+      "name": "agent-code-guard-syntax",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/lsp/syntax/launch.js"],
+      "fileTypes": ["typescript", "typescriptreact"]
+    },
+    {
+      "name": "agent-code-guard-architecture",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/lsp/architecture/dist/server/index.js"],
+      "fileTypes": ["typescript", "typescriptreact"]
+    }
   ]
 }

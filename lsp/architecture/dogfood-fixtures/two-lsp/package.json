@@ -1,0 +1,13 @@
+{
+  "name": "@safer-by-default/two-lsp-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "devDependencies": {
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-agent-code-guard": "^0.0.13",
+    "typescript": "^5.4.0",
+    "vscode-langservers-extracted": "^4.10.0"
+  }
+}
