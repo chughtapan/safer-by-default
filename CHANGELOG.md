@@ -1,3 +1,66 @@
+## 0.1.5 — 2026-05-16
+
+### Added: two LSP servers ship with the plugin
+
+`.claude-plugin/plugin.json` now declares two `lspServers` that auto-start when an LSP-aware editor or the Claude Code agent loop opens a TypeScript file. Both fire diagnostics with `codeDescription.href` populated so editor tooltips link directly to the relevant `PRINCIPLES.md` heading — reading the error reads the doctrine.
+
+- **`agent-code-guard-syntax`** wraps upstream `vscode-eslint-language-server`. Surfaces every `eslint-plugin-agent-code-guard` rule (bare casts, `throw new Error`, `Promise<T>`, raw SQL, manual enums, mocks in integration tests). Runs via a thin `node lsp/syntax/launch.js` wrapper that spawns the upstream binary.
+- **`agent-code-guard-architecture`** runs a custom Effect-shaped server backed by a workspace-scoped architecture analyzer: folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, cycle detection. File-header `// @agent-code-guard/architecture-exception: <rule>` directives provide per-file suppressions with `architecture-directive-parse-error` surfacing malformed directives so they can never silently fail. Runs via `bun lsp/architecture/server/index.ts` — TypeScript source directly, no build step at install time.
+
+`lsp/architecture/` is a self-contained subpackage (its own `package.json`, deps, and `tsconfig.json`). The architecture analyzer was ported from `eslint-plugin-agent-code-guard@0.0.13`'s `src/rules/architecture/` (recovered from acg's pre-removal history) plus the LSP server was ported from acg's PR #66-#70 branches. `lsp/architecture/check.ts` is a thin CI shim consumers can wire as `node lsp/architecture/check.js` (post-build) or `bun lsp/architecture/check.ts` (from source) for fail-the-build behavior outside the LSP protocol. A two-LSP programmatic dogfood test ships at `lsp/architecture/dogfood.ts` and runs in CI; it spawns both LSPs via the manifest's `command + args`, sends `didOpen` on a fixture with syntax + architecture violations, and asserts both fire with `codeDescription.href` populated.
+
+CI guard: the new `bun-runtime-smoke` job builds `lsp/architecture/server/index.ts` via `bun build --target=bun --no-output` on every push. Catches dependency drift where a future commit adds a Node-only API that bun can't run — sooner than the full dogfood would surface it.
+
+### Added: `/safer:setup` writes structural choices to project `CLAUDE.md`
+
+After the existing AskUserQuestion gathers stack choices (schema library, DB tool, integration-test glob), the setup skill now writes a sentinel-bounded `## Project structural choices (managed by /safer:setup — do not edit manually; rerun the skill to change)` section to the project's `CLAUDE.md`. Idempotent: rerun replaces ONLY the managed section between the sentinel heading and the next `## ` (or EOF); existing content above and below is preserved. Every Claude Code session in the project loads `CLAUDE.md` automatically, so these values become the per-session structural contract — the runtime expression of "ideal repo state" that used to live in the typescript skill body.
+
+### Doctrine: PRINCIPLES.md absorbs `## Phrases to reject` + voice guidance
+
+A new `## Phrases to reject` H2 lands after Part 4 (Communication), carrying the verbatim shortcut-phrase list ("this is just a prototype", "we'll add types later", "let me silence the linter for this one", etc.) plus the user-sovereignty deferral phrasing. The previous home was inside `skills/typescript/SKILL.tmpl`, which only loaded on TS triggers — now every skill that loads PRINCIPLES.md via `{{> principles}}` (every implement-*, review-senior, architect, …) gets the phrase blocklist in context. Voice guidance ("the signature speaks louder than the comment", "describe what is, not what was") folds into Part 4 → Communication's `### Voice` subsection. Existing principle headings (`## 1. Types beat tests` through `## 8. The Ratchet`) preserved verbatim so anchors in `eslint-plugin-agent-code-guard@0.0.14`'s `meta.docs.url` keep resolving.
+
+### Doctrine: tier-stratified decision tables in implement-{junior,senior,staff}
+
+The typescript skill's 35-row decision table (human-era shortcut vs agent-era full version, per shape-of-work) split across the three implement-* tiers by complexity:
+
+- **junior** owns Principle 1-4 single-module forks: parsing API responses, JSON parsing, function-can-fail, error in try/catch, env var access, async return type, identifier branding, switch over union, callback signature, throw in Effect code. Both before/after example pairs (parsing HTTP response, exhaustive switch) lift into junior.
+- **senior** owns Effect-runtime + testing-strategy seams: `Effect.tryPromise` catch shape, fetch inside Effect, `Layer.effect` for resources, `Config.string` env reads, happy-path vs error-path tests, test doubles for external services, positive-integer / non-empty-array brands, property-based tests via `fast-check`, parser/handler accepting untrusted input, testcontainers for code reading real DB / cache / queue.
+- **staff** owns cross-service + mutation: two services crossing shape boundary (generated JSON Schema via `json-schema-diff`), cross-service boundary under SLA (Pact V4 contracts), critical UI flow vs non-critical (Playwright vs component tests), lint-only CI vs full test job, mutation testing scope on critical modules (Stryker as required gate) vs repo-wide.
+
+Each tier's "How this modality projects from the doctrine" section references its embedded table. `bin/safer-gen-skills` regenerates all 16 SKILL.md files clean against the new content.
+
+### Breaking: `skills/typescript/` deleted
+
+The TypeScript craft floor skill is gone. Its load surface (3 sections beyond doctrine: ideal repo state, decision table, shortcut phrases) is now distributed:
+
+- **Ideal repo state** → `/safer:setup` writes it to project `CLAUDE.md` (Phase 7 above).
+- **Decision table** → tier-stratified across implement-* (Phase 6 above).
+- **Shortcut phrases** → `PRINCIPLES.md` `## Phrases to reject` (Phase 5 above).
+
+The LSP-on-every-write enforcement layer (Phase 4 above) catches violations reactively at the editor surface; the doctrine teaches them proactively at session start. Together they cover the same surface the typescript skill did, but with more uniform reach (PRINCIPLES.md applies to every skill; LSP fires on every write; setup-time CLAUDE.md persists per-repo).
+
+`skills/typescript/acg-rationale.json` and `bin/safer-acg-sync` deleted alongside — the rule rationale that previously lived there now ships in `eslint-plugin-agent-code-guard@0.0.14`'s rule `meta.docs.description` + `meta.docs.url` fields. The LSP propagates them via the standard ESLint diagnostic protocol; no sfd-side bridging needed. `.claude-plugin/plugin.json`'s description string updated: 17 → 16 skills, "typescript" removed from the skill-name enumeration (it stays as a language keyword in `keywords`).
+
+`skills/review-senior/SKILL.tmpl` and `skills/implement-{junior,senior,staff}/SKILL.tmpl` updated to drop `/safer:typescript` load references. `bin/safer-gen-skills` updated to drop the `<!-- BEGIN: acg-mapping --> ... <!-- END -->` template logic and the `acg-rationale.json` reads. A repo-wide grep for `skills/typescript`, `safer-acg-sync`, `acg-rationale`, or `/safer:typescript` returns zero hits.
+
+### Changed: architecture LSP runs `.ts` via bun, no `dist/` shipped
+
+Initial Phase 4 declared the architecture LSP as `node lsp/architecture/dist/server/index.js`, but `.gitignore` excluded `lsp/*/dist/` so end users running `/plugin install` from the marketplace got a manifest pointing at a file that didn't exist. Fixed by switching the manifest to `bun lsp/architecture/server/index.ts` — TypeScript source directly, no build step. `lsp/architecture/dogfood.ts` simultaneously made its plugin-root resolution source-vs-dist agnostic (walks up to find `.claude-plugin/plugin.json` instead of assuming dist depth). CI's `two-lsp-dogfood` job adds `oven-sh/setup-bun@v2` and runs `bun dogfood.ts` directly; the `pnpm build` step before dogfood is dropped. `lsp/architecture`'s `build-test` job (typecheck + vitest) is unchanged — `pnpm build` still runs `tsc` for typecheck, and vitest unit tests still consume the built output.
+
+Tradeoff: users need `bun` on `PATH`. Since safer-by-default is gstack-based and gstack requires bun for its `browse` skill, sfd users almost certainly already have it. If absent, the LSP fails with a visible `bun: command not found` (vs the silent miss the original `node + dist/` would have caused for users without a build step).
+
+### Docs
+
+- README gains `## Editor diagnostics (two LSPs)` between Quick start and Four parts.
+- ARCHITECTURE.md gains `## LSP integration` between CLI helpers and Install paths; `lsp/` added to repo layout.
+- CLAUDE.md `## Non-skill assets` gains `lsp/` bullet.
+- INSTALL.md `## Requirements` calls out `bun` as architecture-LSP runtime + `vscode-eslint-language-server` as syntax-LSP dependency. New `## LSP behavior at install time` section explains auto-start + failure modes.
+
+### For contributors
+
+- `lsp/architecture/` is a new code subdirectory with its own `package.json`, `tsconfig.json`, and CI job. SFD remains a Claude-plugin-first repo; the LSP is the only non-skill / non-bin code subdirectory.
+- New process-issue insights collected during the orchestration that produced 0.1.5 (worktree-isolation gaps in the Agent backend, gstack composed-skill subagent loading, safer-diff-scope's LOC-only tier classifier, stacked-PR merge-order quirks, the dogfood-skill name vs integration-smoke mismatch) captured in the parent epic's wake-up digest at chughtapan/agent-code-guard#71.
+
 ## 0.1.4 — 2026-05-08
 
 ### Breaking: `safer:investigate` renamed to `safer:diagnose`
