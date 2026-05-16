@@ -4,11 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "lsp/architecture/**"
+      - "lsp/**"
+      - ".claude-plugin/plugin.json"
       - ".github/workflows/lsp-architecture.yml"
   pull_request:
     paths:
-      - "lsp/architecture/**"
+      - "lsp/**"
+      - ".claude-plugin/plugin.json"
       - ".github/workflows/lsp-architecture.yml"
 
 jobs:
@@ -30,3 +32,48 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+
+  two-lsp-dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The dogfood test asserts `codeDescription.href` populated. Syntax
+      # rule URLs come from `meta.docs.url` in
+      # eslint-plugin-agent-code-guard. acg Phase 2 added the URLs on
+      # main but the latest npm release predates them; pin the SHA and
+      # build the tarball locally. Drop this whole job step (and revert
+      # the fixture `package.json` to `eslint-plugin-agent-code-guard:
+      # ^<next>`) once acg republishes.
+      - name: Build agent-code-guard at pinned SHA
+        env:
+          ACG_SHA: d11973a50425e0285e6c066769cbc10921f9a9fd
+        run: |
+          set -euxo pipefail
+          git clone https://github.com/chughtapan/agent-code-guard.git /tmp/acg
+          cd /tmp/acg
+          git checkout "$ACG_SHA"
+          pnpm install --frozen-lockfile
+          pnpm build
+          npm pack --silent
+          cp eslint-plugin-agent-code-guard-*.tgz \
+            "${GITHUB_WORKSPACE}/lsp/architecture/dogfood-fixtures/two-lsp/acg.tgz"
+      - name: Install fixture deps (with acg tarball)
+        working-directory: lsp/architecture/dogfood-fixtures/two-lsp
+        run: |
+          set -euxo pipefail
+          node -e "const fs=require('fs');const p='package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.devDependencies['eslint-plugin-agent-code-guard']='file:./acg.tgz';fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+          pnpm install --no-frozen-lockfile
+      - name: Install architecture LSP deps and build
+        working-directory: lsp/architecture
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: Run two-LSP dogfood
+        working-directory: lsp/architecture
+        run: node dist/dogfood.js

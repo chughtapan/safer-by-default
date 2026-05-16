@@ -16,6 +16,12 @@
 skills/*-workspace/
 skills/*/evals/iteration-*/
 
-# Per-package node modules and build output for nested LSP packages.
-lsp/*/node_modules/
-lsp/*/dist/
+# Per-package node modules and build output for nested LSP packages
+# and their dogfood fixtures.
+lsp/**/node_modules/
+lsp/**/dist/
+
+# Dogfood-fixture lockfiles + locally-built acg tarballs are generated
+# by CI on every run; pinning them adds churn without locking behavior.
+lsp/architecture/dogfood-fixtures/**/pnpm-lock.yaml
+lsp/architecture/dogfood-fixtures/**/*.tgz
