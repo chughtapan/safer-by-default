@@ -3,12 +3,26 @@
 #
 # The .tmpl is the human-edited source. It contains the YAML frontmatter and
 # modality-specific content. The generator inlines PRINCIPLES.md verbatim where
-# {{> principles}} appears, and stamps an AUTO-GENERATED marker right after
-# the frontmatter so CI / humans can detect manual edits to the rendered file.
+# {{> principles}} appears, inlines a vendor skill body where
+# {{> vendor-skill:<slug>}} appears (stripping the vendor file's leading YAML
+# frontmatter block), and stamps an AUTO-GENERATED marker right after the
+# wrapper frontmatter so CI / humans can detect manual edits to the rendered
+# file.
 #
 # Usage:
-#   bin/safer-gen-skills          # render every skills/*/SKILL.tmpl
-#   bin/safer-gen-skills --check  # exit non-zero if any SKILL.md is stale
+#   bin/safer-gen-skills                    # render every skills/*/SKILL.tmpl
+#   bin/safer-gen-skills --check            # exit non-zero if any SKILL.md is stale
+#   bin/safer-gen-skills --check --release  # also fail if the literal sentinel
+#                                           # __SAFER_SPEC_VERSION__ survives in
+#                                           # any committed SKILL.tmpl/SKILL.md
+#
+# Two-phase sentinel rationale: during the v0.2.0 integration PR, source
+# carries the literal __SAFER_SPEC_VERSION__ as an edit-point marker for the
+# install-command substitution. The integration PR's final commit replaces
+# the sentinel line with the dogfood `link:` install block. Bare `--check`
+# is the dev-loop form and stays green while source carries the sentinel;
+# `--check --release` is the release-mode form and fails if the sentinel
+# survived to the release branch. CI on release/* branches runs the latter.
 #
 # The generator is idempotent. Skills that don't yet have a .tmpl are skipped
 # (no SKILL.md is touched), so migration can land one skill at a time.
@@ -16,24 +30,60 @@ set -euo pipefail
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PRINCIPLES_FILE="$PLUGIN_DIR/PRINCIPLES.md"
+VENDOR_SKILLS_ROOT="$PLUGIN_DIR/vendor/safer-spec-development/skills"
+SENTINEL='__SAFER_SPEC_VERSION__'
 MARKER='<!-- AUTO-GENERATED from this directory'\''s SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->'
 
 CHECK_ONLY=0
-case "${1:-}" in
-  --check) CHECK_ONLY=1 ;;
-  -h|--help)
-    sed -n '2,/^set/p' "$0" | sed 's/^# *//;s/^#//'
-    exit 0
-    ;;
-  '') ;;
-  *) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
-esac
+RELEASE_MODE=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check) CHECK_ONLY=1; shift ;;
+    --release) RELEASE_MODE=1; shift ;;
+    -h|--help)
+      sed -n '2,/^set/p' "$0" | sed 's/^# *//;s/^#//'
+      exit 0
+      ;;
+    *) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
+  esac
+done
+
+if [ "$RELEASE_MODE" -eq 1 ] && [ "$CHECK_ONLY" -eq 0 ]; then
+  echo "ERROR: --release requires --check (release-mode is a check-only gate)" >&2
+  exit 1
+fi
 
 [ -f "$PRINCIPLES_FILE" ] || { echo "ERROR: $PRINCIPLES_FILE not found" >&2; exit 1; }
 
+# Pre-validate every {{> vendor-skill:<slug>}} directive in every template
+# against the actual vendor tree. awk's `getline` returns 0 on missing files,
+# producing silent empty output; this loop makes the failure mode loud.
+validate_vendor_directives() {
+  local tmpl="$1"
+  local missing=0
+  while IFS= read -r slug; do
+    [ -z "$slug" ] && continue
+    if ! printf '%s\n' "$slug" | grep -qE '^[a-z0-9-]+$'; then
+      echo "ERROR: vendor-skill slug '$slug' in $tmpl does not match ^[a-z0-9-]+$" >&2
+      missing=1
+      continue
+    fi
+    local vendor_path="$VENDOR_SKILLS_ROOT/$slug/SKILL.md"
+    if [ ! -f "$vendor_path" ]; then
+      echo "ERROR: vendor-skill $slug not found at $vendor_path (referenced from $tmpl)" >&2
+      missing=1
+    fi
+  done < <(grep -oE '^\{\{> vendor-skill:[a-z0-9-]+\}\}$' "$tmpl" | sed -E 's/^\{\{> vendor-skill:([a-z0-9-]+)\}\}$/\1/')
+  return "$missing"
+}
+
 render_one() {
   local tmpl="$1"
-  awk -v principles_file="$PRINCIPLES_FILE" -v marker="$MARKER" '
+  awk \
+    -v principles_file="$PRINCIPLES_FILE" \
+    -v vendor_root="$VENDOR_SKILLS_ROOT" \
+    -v marker="$MARKER" '
     BEGIN { fm = 0; injected = 0 }
     /^---$/ {
       print
@@ -50,6 +100,31 @@ render_one() {
       close(principles_file)
       next
     }
+    /^\{\{> vendor-skill:[a-z0-9-]+\}\}$/ {
+      slug = $0
+      sub(/^\{\{> vendor-skill:/, "", slug)
+      sub(/\}\}$/, "", slug)
+      vendor_path = vendor_root "/" slug "/SKILL.md"
+      in_fm = 0
+      fm_closed = 0
+      first_line = 1
+      while ((getline line < vendor_path) > 0) {
+        if (first_line) {
+          first_line = 0
+          if (line == "---") {
+            in_fm = 1
+            continue
+          }
+        }
+        if (in_fm && !fm_closed) {
+          if (line == "---") { fm_closed = 1; continue }
+          continue
+        }
+        print line
+      }
+      close(vendor_path)
+      next
+    }
     { print }
   ' "$tmpl"
 }
@@ -57,11 +132,16 @@ render_one() {
 STALE=0
 RENDERED=0
 TOTAL=0
+INVALID=0
 
 for tmpl in "$PLUGIN_DIR"/skills/*/SKILL.tmpl; do
   [ -f "$tmpl" ] || continue
   TOTAL=$((TOTAL + 1))
   out="$(dirname "$tmpl")/SKILL.md"
+  if ! validate_vendor_directives "$tmpl"; then
+    INVALID=$((INVALID + 1))
+    continue
+  fi
   rendered=$(render_one "$tmpl")
 
   if [ "$CHECK_ONLY" -eq 1 ]; then
@@ -83,10 +163,38 @@ for d in "$PLUGIN_DIR"/skills/*/; do
   PENDING=$((PENDING + 1))
 done
 
+SENTINEL_HITS=0
+if [ "$CHECK_ONLY" -eq 1 ] && [ "$RELEASE_MODE" -eq 1 ]; then
+  # Sentinel arm only fires under --check --release. Bare --check skips this
+  # so dev branches stay green while the v0.2.0 integration PR is still
+  # authoring the substitution.
+  while IFS= read -r hit; do
+    [ -z "$hit" ] && continue
+    SENTINEL_HITS=$((SENTINEL_HITS + 1))
+    echo "SENTINEL: $hit"
+  done < <(grep -rnF "$SENTINEL" "$PLUGIN_DIR/skills" --include='SKILL.tmpl' --include='SKILL.md' 2>/dev/null || true)
+fi
+
 if [ "$CHECK_ONLY" -eq 1 ]; then
   echo "checked: $TOTAL skills with .tmpl, $STALE stale"
   echo "pending migration (no .tmpl yet): $PENDING"
-  exit "$STALE"
+  if [ "$INVALID" -gt 0 ]; then
+    echo "invalid vendor-skill directives in $INVALID templates"
+  fi
+  if [ "$RELEASE_MODE" -eq 1 ]; then
+    if [ "$SENTINEL_HITS" -gt 0 ]; then
+      echo "release-mode: sentinel '$SENTINEL' survived in $SENTINEL_HITS files"
+    else
+      echo "release-mode: no sentinel '$SENTINEL' found in skills/"
+    fi
+  fi
+  EXIT_CODE=$((STALE + INVALID + SENTINEL_HITS))
+  exit "$EXIT_CODE"
+fi
+
+if [ "$INVALID" -gt 0 ]; then
+  echo "ERROR: $INVALID template(s) failed vendor-skill pre-validation; rendered $RENDERED of $TOTAL" >&2
+  exit 1
 fi
 
 echo "rendered: $RENDERED of $TOTAL skills with .tmpl"
