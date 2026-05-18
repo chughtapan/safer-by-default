@@ -233,6 +233,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
@@ -258,6 +259,19 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
 - "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
+
+### Living-spec is the ratchet's machine-readable surface
+
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+
+| Exit | Error | Mechanical route |
+|---|---|---|
+| `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
+| `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
+
+The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
 ---
 
@@ -350,7 +364,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:spec` label |
+| Spec doc | GitHub issue, `safer:contract` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -607,7 +621,7 @@ GitHub.
 - A natural-language intent from the user, OR a parent issue URL.
 - `gh` CLI authenticated (verify with `gh auth status`).
 - Write access to the repo (you will create issues, labels, and comments).
-- The modality skills exist in the plugin (`/safer:spec`, `/safer:architect`, etc.).
+- The modality skills exist in the plugin (`/safer:contract`, `/safer:architect`, etc.).
 
 ### Preamble (run first, verbatim)
 
@@ -678,7 +692,7 @@ Orchestrate operates at the **project** level. Boundaries:
 - **N sub-tasks** — one sub-issue each.
 - **Each sub-issue** carries exactly **one modality label** and exactly **one state label** at a time.
 - **State labels:** `planning`, `review`, `plan-approved`, `implementing`, `verifying`, `done`, `abandoned`.
-- **Modality labels:** `safer:spec`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:diagnose`, `safer:spike`, `safer:research`, `safer:review-senior`, `safer:verify`.
+- **Modality labels:** `safer:contract`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:diagnose`, `safer:spike`, `safer:research`, `safer:review-senior`, `safer:verify`.
 
 If a sub-task cannot be represented in this shape, you have the wrong decomposition. Re-triage.
 
@@ -766,7 +780,7 @@ Classification table:
 
 | If the intent looks like... | Route to |
 |---|---|
-| Ambiguous goal, no acceptance criteria | `/safer:spec` directly — no orchestration yet |
+| Ambiguous goal, no acceptance criteria | `/safer:contract` directly — no orchestration yet |
 | A reproducible bug, one symptom | `/safer:diagnose` directly |
 | A flagged-but-unreproduced bug (reviewer / dogfood / escalation observation, no repro in hand) | `/safer:diagnose` first — never `implement-*`. Eligible for `implement-*` only after diagnose publishes a reproduction artifact and codex returns `confirmed-root-cause`. |
 | "Can we do X?" / "Is X feasible?" | `/safer:spike` directly |
@@ -933,7 +947,7 @@ OK'd: <ISO timestamp> by <user@github>
 
 | # | Modality | Depends on | Acceptance | Sub-issue |
 |---|---|---|---|---|
-| 1 | spec | — | SPEC.md published as a comment on this epic; goals, non-goals, and explicit acceptance criteria present; `safer:spec` label; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
+| 1 | spec | — | SPEC.md published as a comment on this epic; goals, non-goals, and explicit acceptance criteria present; `safer:contract` label; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
 | 2 | architect | 1 | Design doc published as sub-issue body; modules named with file paths; public interfaces typed; stub files pushed to branch; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
 | 3 | implement-senior | 2 | Draft PR opened with `[impl-senior]` title prefix; all stubs replaced with bodies; `safer-diff-scope` reports `senior`; lint/typecheck/tests green locally; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
 | 4 | verify | 3 | Verify comment posted on PR #M naming each acceptance criterion and its ship/hold verdict; CI green; state `done` | <https://github.com/OWNER/REPO/issues/NNN> |
@@ -1485,7 +1499,7 @@ For each comment body, scan in priority order:
 for repo in $(jq -r '.repos[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/null || echo "$REPO"); do
   gh issue list --repo "$repo" --state open --limit 200 \
     --json number,title,labels,url,body \
-    --jq '.[] | select(.labels | map(.name) | any(test("^safer:(implement-(junior|senior|staff)|verify|spike|research|spec)$")))'
+    --jq '.[] | select(.labels | map(.name) | any(test("^safer:(implement-(junior|senior|staff)|verify|spike|research|contract)$")))'
 done > /tmp/orch-queue.jsonl
 ```
 
@@ -1861,26 +1875,26 @@ the team lead with the ledger URL when the loop converges or the budget
 runs out.
 ```
 
-#### spec
+#### contract
 
 ```
 source: orchestrate-auto-dispatch
 Dispatch with: `model: opus` per orchestrate Model routing table.
-You are a teammate on team `{TEAM}` invoking `/safer:spec`.
+You are a teammate on team `{TEAM}` invoking `/safer:contract`.
 
 Sub-issue: {ISSUE_URL}
 Parent epic: {PARENT_URL}
 
-Read PRINCIPLES.md and skills/spec/SKILL.md at the plugin root.
+Read PRINCIPLES.md and skills/contract/SKILL.md at the plugin root.
 
 Acceptance: {ACCEPTANCE}
 
-Produce a spec with goals, non-goals, invariants, and explicit acceptance
-criteria. No architecture, no libraries, no code. Publish as a comment on
-the parent epic (or sub-issue body per the skill's publication rule).
-After publishing, run /codex --mode review on the published artifact. The
-codex verdict must be `approve` before transitioning to `review`. If
-`changes-requested`, revise and re-run (one revision round). If `reject`,
+Produce a contract with goals, non-goals, invariants, and explicit
+acceptance criteria. No architecture, no libraries, no code. Publish as a
+comment on the parent epic (or sub-issue body per the skill's publication
+rule). After publishing, run /codex --mode review on the published
+artifact. The codex verdict must be `approve` before transitioning to
+`review`. If `changes-requested`, revise and re-run (one revision round). If `reject`,
 escalate to the user with codex's reasoning.
 Transition the sub-issue to `review`. Status marker + SendMessage the
 team lead with the spec URL.
@@ -1999,7 +2013,7 @@ Six runtime conditions park even when the action is technically inside the contr
 3. **Peer-review disagreement.** `/safer:review-senior` and `/codex` split verdicts on the same PR. Park; user resolves.
 4. **Stamina returns BLOCK** on a high-blast-radius artifact. Park; user resolves the BLOCK.
 5. **LOW-confidence on a non-junior recommendation.** Anything above implement-junior with LOW-confidence is asking the user to authorize a risky bet. Park.
-6. **Three diagnose splits without convergence.** When the parent epic's `## Diagnose splits (count: N)` section reaches 3 and no fork has returned codex `confirmed-root-cause`, the bug surface is wider than diagnose can map. Park the active diagnose sub-issues at `awaiting-amendment`. Escalate-target: `/safer:spec` (the symptom needs re-statement) or `/safer:architect` (the failure is structural, not localized). Quote the codex verdicts from each fork in the stop-the-line comment; the user picks the next modality.
+6. **Three diagnose splits without convergence.** When the parent epic's `## Diagnose splits (count: N)` section reaches 3 and no fork has returned codex `confirmed-root-cause`, the bug surface is wider than diagnose can map. Park the active diagnose sub-issues at `awaiting-amendment`. Escalate-target: `/safer:contract` (the symptom needs re-statement) or `/safer:architect` (the failure is structural, not localized). Quote the codex verdicts from each fork in the stop-the-line comment; the user picks the next modality.
 
 ---
 

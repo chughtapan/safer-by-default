@@ -11,11 +11,58 @@ description: >
   HOLD anywhere other than BLOCKED.
 axis: modality-routing
 
-# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
 setupPrompt: |
-  TBD by /safer:implement-staff.
+  Run /safer:verify on the PR. Phase 3's `pnpm exec safer-spec validate
+  --implemented` exits 10 (VersionSkewError): the installed codemod
+  version is `0.1.0` but the plugin's pinned floor is `~0.2.0`. Doctor's
+  output names the mismatch.
 
-workspace: []
+  Requirements:
+    - Verdict is `BLOCKED`.
+    - Doctor output appears verbatim in the verdict body.
+    - The HOLD routes to the user (pin the correct version), NOT to any
+      implement-* tier.
 
-judge:
-  TBD by /safer:implement-staff.
+workspace:
+  - path: package.json
+    content: |
+      {
+        "name": "dogfood",
+        "packageManager": "pnpm@9.0.0",
+        "devDependencies": {
+          "@chughtapan/safer-spec-development": "link:../vendor/safer-spec-development"
+        }
+      }
+  - path: doctor-output.txt
+    content: |
+      safer-spec doctor
+      installed: 0.1.0
+      required:  ~0.2.0
+      ERROR: VersionSkewError (CLI version 0.1.0 below pinned floor ~0.2.0)
+  - path: safer-spec-validate-output.json
+    content: |
+      {
+        "exitCode": 10,
+        "errors": [
+          { "_tag": "VersionSkewError", "code": 10,
+            "doctorOutput": "installed: 0.1.0\nrequired: ~0.2.0\n" }
+        ]
+      }
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  Verdict is `BLOCKED`. The verdict body shows the doctor output verbatim
+  (the `installed: 0.1.0` / `required: ~0.2.0` lines). Routing line tells
+  the user to pin the matching version.
+
+validationChecks:
+  - "Verdict is `BLOCKED`"
+  - "Verdict body contains `installed: 0.1.0` and `required: ~0.2.0` (verbatim from doctor)"
+  - "Verdict body contains the word `VersionSkewError` or `version skew`"
+  - "Routing line tells the user to pin / upgrade the codemod version (NOT to /safer:implement-* or /safer:architect)"
+  - "ANTI-PATTERN (FAIL): verdict is `HOLD` with a non-BLOCKED routing"
+  - "ANTI-PATTERN (FAIL): agent runs `pnpm update @chughtapan/safer-spec-development` mid-verify — pinning is the user's call"
+
+metadata:
+  batch: "v0.2.0-living-spec"

@@ -26,12 +26,12 @@ test_shows_calibration_with_events() {
   mkdir -p "$state/analytics"
   # Seed enough runs for calibration to produce output
   for _ in 1 2 3; do
-    SAFER_STATE_DIR="$state" "$LOG" --event-type safer.skill_run --modality spec --session t-$RANDOM >/dev/null 2>&1
+    SAFER_STATE_DIR="$state" "$LOG" --event-type safer.skill_run --modality contract --session t-$RANDOM >/dev/null 2>&1
   done
   local out
   out=$(SAFER_STATE_DIR="$state" "$BIN" 7d --repo unknown 2>&1)
   rm -rf "$state"
-  assert_contains "$out" "spec" "modality row shown"
+  assert_contains "$out" "contract" "modality row shown"
 }
 
 run_test "safer-vp runs without events or gh" test_runs_without_events
