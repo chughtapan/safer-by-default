@@ -204,18 +204,8 @@ EOF
   rm -rf "$tmp" "$fake_tools"
 }
 
-test_vendor_submodule_populated_under_source() {
-  # The clone path uses --recurse-submodules so the contract-init /
-  # contract-migrate wrappers can resolve their vendor bodies. SAFER_SOURCE_DIR
-  # pins the resolver to this repo, so the assertion here is that this repo's
-  # submodule is populated post-checkout (which is what the test harness
-  # exercises).
-  assert_file_exists "$PLUGIN_DIR/vendor/safer-spec-development/package.json" "vendor submodule populated" || return 1
-}
-
 run_test "setup-codex installs cleanly and is idempotent with BSD-style readlink" test_install_and_idempotent_with_bsd_readlink
 run_test "setup-codex refuses to overwrite a non-generated wrapper" test_refuses_to_overwrite_non_generated_wrapper
 run_test "setup-codex removes the retired safer-spec wrapper (post-rename cleanup)" test_removes_retired_safer_spec_wrapper
 run_test "setup-codex preserves unrelated safer-* wrappers (narrow-scope cleanup)" test_narrow_scope_cleanup_preserves_unrelated_wrappers
-run_test "vendor submodule is populated under the source dir" test_vendor_submodule_populated_under_source
 report

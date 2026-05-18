@@ -32,6 +32,10 @@ PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PRINCIPLES_FILE="$PLUGIN_DIR/PRINCIPLES.md"
 VENDOR_SKILLS_ROOT="$PLUGIN_DIR/vendor/safer-spec-development/skills"
 SENTINEL='__SAFER_SPEC_VERSION__'
+# Single source of truth for the vendor-skill directive shape. Both the
+# shell-side pre-validator (grep) and the awk-side renderer match against
+# this so they cannot drift.
+VENDOR_DIRECTIVE_RE='^\{\{> vendor-skill:[a-z0-9-]+\}\}$'
 MARKER='<!-- AUTO-GENERATED from this directory'\''s SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->'
 
 CHECK_ONLY=0
@@ -74,7 +78,7 @@ validate_vendor_directives() {
       echo "ERROR: vendor-skill $slug not found at $vendor_path (referenced from $tmpl)" >&2
       missing=1
     fi
-  done < <(grep -oE '^\{\{> vendor-skill:[a-z0-9-]+\}\}$' "$tmpl" | sed -E 's/^\{\{> vendor-skill:([a-z0-9-]+)\}\}$/\1/')
+  done < <(grep -oE "$VENDOR_DIRECTIVE_RE" "$tmpl" | sed -E 's/^\{\{> vendor-skill:([a-z0-9-]+)\}\}$/\1/')
   return "$missing"
 }
 
@@ -83,7 +87,8 @@ render_one() {
   awk \
     -v principles_file="$PRINCIPLES_FILE" \
     -v vendor_root="$VENDOR_SKILLS_ROOT" \
-    -v marker="$MARKER" '
+    -v marker="$MARKER" \
+    -v vendor_directive_re="$VENDOR_DIRECTIVE_RE" '
     BEGIN { fm = 0; injected = 0 }
     /^---$/ {
       print
@@ -100,7 +105,7 @@ render_one() {
       close(principles_file)
       next
     }
-    /^\{\{> vendor-skill:[a-z0-9-]+\}\}$/ {
+    $0 ~ vendor_directive_re {
       slug = $0
       sub(/^\{\{> vendor-skill:/, "", slug)
       sub(/\}\}$/, "", slug)
@@ -188,8 +193,12 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
       echo "release-mode: no sentinel '$SENTINEL' found in skills/"
     fi
   fi
-  EXIT_CODE=$((STALE + INVALID + SENTINEL_HITS))
-  exit "$EXIT_CODE"
+  # Any combined failure exits 1; the gate is a binary signal so a high
+  # combined count cannot wrap past 255 and look green.
+  if [ "$STALE" -gt 0 ] || [ "$INVALID" -gt 0 ] || [ "$SENTINEL_HITS" -gt 0 ]; then
+    exit 1
+  fi
+  exit 0
 fi
 
 if [ "$INVALID" -gt 0 ]; then
