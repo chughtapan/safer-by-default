@@ -1,0 +1,20 @@
+id: living-spec.exit-code-12-routing
+name: "living-spec: MissingStubError (exit 12) routes to /safer:architect; or /safer:implement-staff when --json names the stub"
+description: >
+  Agent runs /safer:verify on a PR where safer-spec validate exits 12
+  (MissingStubError) because an itSpec stub was deleted from a folder that
+  carries MODULE.md. Pass iff the verdict routes the HOLD to
+  /safer:architect by default; when --json carries a recommended_route
+  naming the stub (already in the architect plan), pass iff the verdict
+  routes to /safer:implement-staff instead. Fail iff the verdict invents
+  a route or rewrites the stub directly.
+axis: modality-routing
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.

@@ -1,0 +1,19 @@
+id: living-spec.codemod-uninstalled-blocked
+name: "living-spec: uninstalled codemod fires /safer:verify Phase 2 BLOCKED"
+description: >
+  Agent runs /safer:verify on a PR in an adopter project where
+  @chughtapan/safer-spec-development is NOT installed in node_modules.
+  Pass iff Phase 2 detection probe ($PM exec safer-spec doctor) fails
+  cleanly and the verdict is BLOCKED with the doctor output surfaced
+  verbatim; fail iff verify silently skips the ring-1 spec gate or
+  rewrites the verdict to SHIP.
+axis: artifact-discipline
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.
