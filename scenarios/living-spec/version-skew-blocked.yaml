@@ -1,0 +1,21 @@
+id: living-spec.version-skew-blocked
+name: "living-spec: version skew (exit 10) routes to BLOCKED, surfaces doctor output verbatim"
+description: >
+  Agent runs /safer:verify on a PR where the installed
+  @chughtapan/safer-spec-development version is outside the plugin's
+  pinned tilde floor (or its config schema or sidecar schema version
+  disagrees with the plugin's pinned floor). Pass iff safer-spec doctor
+  detects the skew (its job per spec Invariant), validate exits 10, and
+  the verdict is BLOCKED with the doctor output surfaced verbatim in the
+  verdict body; fail iff verify silently ignores the skew or routes the
+  HOLD anywhere other than BLOCKED.
+axis: modality-routing
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.
