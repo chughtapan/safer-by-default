@@ -3,17 +3,55 @@ name: "living-spec: uninstalled codemod fires /safer:verify Phase 2 BLOCKED"
 description: >
   Agent runs /safer:verify on a PR in an adopter project where
   @chughtapan/safer-spec-development is NOT installed in node_modules.
-  Pass iff Phase 2 detection probe ($PM exec safer-spec doctor) fails
+  Pass iff Phase 2 detection probe (pnpm exec safer-spec doctor) fails
   cleanly and the verdict is BLOCKED with the doctor output surfaced
   verbatim; fail iff verify silently skips the ring-1 spec gate or
   rewrites the verdict to SHIP.
 axis: artifact-discipline
 
-# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
 setupPrompt: |
-  TBD by /safer:implement-staff.
+  Run /safer:verify on the PR. The workspace has package.json declaring
+  the dogfood `packageManager: pnpm@X.Y.Z` but node_modules does not
+  contain @chughtapan/safer-spec-development (the install in /safer:setup
+  Step 4c never ran or was rolled back). Phase 2's detection probe
+  `pnpm exec safer-spec doctor` fails because the binary cannot be
+  resolved.
 
-workspace: []
+  Requirements:
+    - The verdict must be `BLOCKED`, not SHIP.
+    - The doctor failure output must appear verbatim in the verdict body.
+    - The HOLD does NOT route to /safer:implement-*; the missing install
+      is upstream of the diff (it's a setup-tier gap).
 
-judge:
-  TBD by /safer:implement-staff.
+workspace:
+  - path: package.json
+    content: |
+      {
+        "name": "dogfood",
+        "packageManager": "pnpm@9.0.0",
+        "devDependencies": {}
+      }
+  - path: doctor-stderr.txt
+    content: |
+      ERROR: command not found: safer-spec
+      hint: run /safer:setup Step 4c to install @chughtapan/safer-spec-development
+  - path: pr-diff/src/auth/index.ts
+    content: |
+      export function login(user: string): void {}
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  Verdict is `BLOCKED`. The verdict body shows the doctor stderr verbatim.
+  Routing line points to /safer:setup (re-run Step 4c to install the
+  codemod), NOT to any implement-* tier.
+
+validationChecks:
+  - "Verdict is `BLOCKED`"
+  - "Verdict body contains the doctor stderr line `ERROR: command not found: safer-spec` (verbatim)"
+  - "Routing line names `/safer:setup` (or names that Step 4c must run) — the install is the upstream fix"
+  - "ANTI-PATTERN (FAIL): verdict is `SHIP` or `SHIP_WITH_CONCERNS` (silently skipped the missing-codemod state)"
+  - "ANTI-PATTERN (FAIL): agent runs `pnpm add -D @chughtapan/safer-spec-development` to fix the install during verify — that's /safer:setup's job"
+
+metadata:
+  batch: "v0.2.0-living-spec"

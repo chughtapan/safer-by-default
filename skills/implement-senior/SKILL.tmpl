@@ -172,6 +172,8 @@ If the architect plan URL was not passed with the invocation, stop and ask. No p
 - Touching infrastructure (CI, build, deploy config).
 - Doing work that cannot be traced to a specific line in the plan. Every edit has a plan anchor.
 
+When the modules in the plan carry `MODULE.md` (the v0.2.0 living-spec layer), update `@spec.*` JSDoc directives on existing public exports across the touched modules to reflect the diff. Introducing a new `@spec.*` directive on a NEW public export is upstream architect-tier work — route via `safer-escalate --from implement-senior --to architect --cause NEW_SPEC_DIRECTIVE`. Editing per-folder `.safer-spec/<slug>.json` sidecars by hand to clear `safer-spec validate` errors is the Principle 7 paper-over anti-pattern; route to `/safer:contract` instead.
+
 ## Scope budget
 
 Shape is the rule; volume is a soft guide.

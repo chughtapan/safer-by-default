@@ -10,11 +10,67 @@ description: >
   a route or rewrites the stub directly.
 axis: modality-routing
 
-# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
 setupPrompt: |
-  TBD by /safer:implement-staff.
+  Run /safer:verify on the PR represented by the workspace. `safer-spec
+  validate --implemented` exits 12 (`MissingStubError`): the sidecar
+  references a stub `parseRequestBody` that the test file
+  src/auth/index.spec.test.ts no longer carries (the agent deleted the
+  `itSpec.todo` body in the diff).
 
-workspace: []
+  Two cases the verdict must distinguish:
+    (a) `--json` carries no `recommended_route` → route HOLD to
+        `/safer:architect` (the missing stub is a plan-tier omission).
+    (b) `--json` carries `recommended_route: "/safer:implement-staff"`
+        (the architect plan already named the stub; implement-staff owns
+        materializing it) → route to `/safer:implement-staff` instead.
 
-judge:
-  TBD by /safer:implement-staff.
+workspace:
+  - path: pr-diff/src/auth/index.spec.test.ts
+    content: |
+      import { describe } from "vitest";
+      describe("auth", () => {
+        // itSpec.todo for parseRequestBody was DELETED in this diff.
+      });
+  - path: pr-diff/src/auth/.safer-spec/auth.json
+    content: |
+      {
+        "formatVersion": "0.4",
+        "exports": {
+          "parseRequestBody": { "kind": "function", "properties": ["Roundtrip"] }
+        }
+      }
+  - path: pr-diff/safer-spec-validate-output.json
+    content: |
+      {
+        "exitCode": 12,
+        "errors": [
+          { "_tag": "MissingStubError", "symbol": "parseRequestBody",
+            "sidecarPath": "src/auth/.safer-spec/auth.json" }
+        ]
+      }
+  - path: pr-diff/safer-spec-validate-output-with-route.json
+    content: |
+      {
+        "exitCode": 12,
+        "errors": [
+          { "_tag": "MissingStubError", "symbol": "parseRequestBody",
+            "sidecarPath": "src/auth/.safer-spec/auth.json",
+            "recommendedRoute": "/safer:implement-staff" }
+        ]
+      }
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  Verdict is `HOLD`. Case (a) routes to `/safer:architect`. Case (b)
+  routes to `/safer:implement-staff` honoring the override.
+
+validationChecks:
+  - "Verdict is `HOLD`"
+  - "Case (a): routing line names `/safer:architect`"
+  - "Case (b): routing line names `/safer:implement-staff` (recommended_route override honored)"
+  - "ANTI-PATTERN (FAIL): verdict invents a route to `/safer:contract` (the sidecar entry already exists; the gap is the stub, not the directive)"
+  - "ANTI-PATTERN (FAIL): agent rewrites src/auth/index.spec.test.ts to re-add the itSpec.todo body — that's upstream work, not verify's"
+
+metadata:
+  batch: "v0.2.0-living-spec"

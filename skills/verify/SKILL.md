@@ -231,6 +231,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
@@ -256,6 +257,19 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
 - "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
+
+### Living-spec is the ratchet's machine-readable surface
+
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+
+| Exit | Error | Mechanical route |
+|---|---|---|
+| `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
+| `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
+
+The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
 ---
 
@@ -348,7 +362,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:spec` label |
+| Spec doc | GitHub issue, `safer:contract` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -653,15 +667,23 @@ Common patterns:
 - Rust: `cargo fmt --check && cargo clippy && cargo test`.
 - Go: `go vet ./... && go test ./...`.
 
-**ESLint as the safer-plugin syntax floor.** When the project has been configured by `/safer:setup`, the project's eslint config carries `eslint-plugin-agent-code-guard` rules; these rules are the syntax floor that previously surfaced via an LSP path and now surface via this CLI. The detection order for the lint command is:
-
-1. `package.json` `scripts.lint` if present.
-2. Else, if `eslint.config.{js,mjs,ts,cjs}` exists, treat `$PM exec eslint .` as the lint command.
-3. Else, no lint command — record absence; do not invent one.
-
 If multiple test targets exist (unit, integration, e2e), run all of them unless a sub-issue criterion explicitly scopes verify to a subset. Record which you ran.
 
 If you cannot detect any command, `BLOCKED`; ask the user which commands to run. Do not guess.
+
+**Living-spec layer probe (v0.2.0 dogfood ring-1).** When the diff's adopter is the v0.2.0 dogfood workspace (TS+vitest, `packageManager: pnpm`, `@chughtapan/safer-spec-development` resolved through pnpm `link:` to the vendored submodule), Phase 2 adds a doctor probe before Phase 3 runs. Doctor failure is `BLOCKED` with the doctor output surfaced verbatim; the rest of verify does not proceed until doctor passes.
+
+```bash
+mkdir -p /tmp/safer-verify-$PR
+if ! pnpm exec safer-spec doctor >/tmp/safer-verify-$PR/doctor.log 2>&1; then
+  VERDICT=BLOCKED
+  echo "BLOCKED: safer-spec doctor failed; surfacing output verbatim in verdict."
+  cat /tmp/safer-verify-$PR/doctor.log
+  exit 0
+fi
+```
+
+`pnpm exec` is literal in v0.2.0 dogfood because setup pinned `packageManager: pnpm@X.Y.Z` in the workspace `package.json`; verify reads the same field through its existing PM detection and resolves `$PM=pnpm`. Post-publish, when the codemod resolves via the npm name on any PM, the snippets lift to `$PM exec`.
 
 ### Phase 3 — Run
 
@@ -677,6 +699,28 @@ $TEST_CMD      > /tmp/safer-verify-$PR/test.log      2>&1; TEST_EXIT=$?
 Record exit codes. A non-zero exit from any command is a failure; aggregate all failures into the findings section. Do not short-circuit on the first failure; run every detected command so the verdict reports the full picture.
 
 Flakiness: if a test failed with a pattern that suggests flakiness (timeout, network, port bind), re-run the failing test once with the same command. Record both runs. A pass-on-retry is `SHIP_WITH_CONCERNS` with "flaky test" as the concern; never `SHIP`.
+
+**Living-spec validate gate (v0.2.0 dogfood ring-1).** After lint/typecheck/test, run `pnpm exec safer-spec validate --implemented` wrapped in a Node-based 60s timeout helper. The helper is one self-contained `node -e` invocation (Invariant 4 — no new `bin/` helper); it passes `$PM` and its argv through `process.argv` rather than shell-interpolating into the `-e` string, eliminating shell-quoting risk if `$PM` ever contains a space or metacharacter.
+
+```bash
+SAFER_VALIDATE_TIMEOUT_MS="${SAFER_VALIDATE_TIMEOUT_MS:-60000}"
+# Disable set -e around the timed call so the non-zero exit is captured, not eaten.
+# verify runs under set -e; exit codes 10/11/12/13 are intentional, not crashes.
+set +e
+TIMEOUT_MS="$SAFER_VALIDATE_TIMEOUT_MS" node -e '
+  const { spawn } = require("child_process");
+  const [pm, ...rest] = process.argv.slice(2);
+  const timeoutMs = Number(process.env.TIMEOUT_MS) || 60000;
+  const child = spawn(pm, rest, { stdio: "inherit" });
+  const timer = setTimeout(() => { child.kill("SIGKILL"); process.exit(124); }, timeoutMs);
+  child.on("exit", (code) => { clearTimeout(timer); process.exit(code ?? 1); });
+' -- pnpm exec safer-spec validate --implemented \
+  > /tmp/safer-verify-$PR/spec-validate.log 2>&1
+SPEC_VALIDATE_EXIT=$?
+set -e
+```
+
+Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec layer); `10` (version skew) → `BLOCKED` with doctor output verbatim; `11` (`MissingSpecPropertyError`) → `HOLD` route `/safer:contract` (override if `--json` carries `recommended_route`); `12` (`MissingStubError`) → `HOLD` route `/safer:architect` (or `/safer:implement-staff` if `--json` names the stub); `13` (`MissingImplError`) → `HOLD` route `/safer:implement-{junior,senior,staff}` per `--json recommended_route`; fallback to `bin/safer-diff-scope` whole-PR with a verdict-body note that routing is PR-level imprecise; `124` (timeout) → `BLOCKED` with stderr surfaced. Phase 5's verdict table carries the same rows.
 
 ### Phase 3.5 — Compose gstack testing layer (rings 2 + 3)
 
@@ -720,6 +764,15 @@ Every criterion is ticked explicitly. A criterion without a tick is a malformed 
 
 If the sub-issue has no acceptance criteria, `BLOCKED`; the contract is missing. Do not invent criteria from the diff.
 
+**Sidecar thresholds (v0.2.0 dogfood).** When the diff touches a folder carrying `MODULE.md`, every public export in that folder has an `@spec.*` JSDoc directive AND the per-sidecar property-test thresholds in `.safer-spec/<slug>.json` are met by the test output:
+
+- [ ] every public export in the touched folder has `@spec.kind`, `@spec.property`, and (where applicable) `@spec.threshold` JSDoc directives
+- [ ] the `itSpec` invocations in the test file exercise each named `PropertyType` to its declared threshold
+- [ ] no `it.todo`/`itSpec.todo` placeholders remain on a public export the diff introduces or modifies
+- [ ] `safer-spec validate --implemented` returned `0` for the folders the diff touched
+
+A folder without `MODULE.md` skips this checklist. A folder with `MODULE.md` where any line is unticked is a Phase 5 `HOLD` regardless of lint/typecheck/test exit codes.
+
 ### Phase 5 — Decide
 
 | Condition | Verdict |
@@ -733,6 +786,13 @@ If the sub-issue has no acceptance criteria, `BLOCKED`; the contract is missing.
 | Any composed-target HOLD (Phase 3.5) | `HOLD` |
 | Any composed-target SHIP_WITH_CONCERNS (Phase 3.5) | `SHIP_WITH_CONCERNS` |
 | All composed targets pass | no change to ring-1 verdict |
+| `safer-spec validate --implemented` exit `0` | no change to ring-1 verdict |
+| Exit `10` (version skew) | `BLOCKED`; surface doctor output verbatim |
+| Exit `11` (`MissingSpecPropertyError`) | `HOLD` → `/safer:contract` (override per `--json recommended_route`) |
+| Exit `12` (`MissingStubError`) | `HOLD` → `/safer:architect` (or `/safer:implement-staff` per `--json`) |
+| Exit `13` (`MissingImplError`) | `HOLD` → `/safer:implement-{junior,senior,staff}` per `--json`; fallback `bin/safer-diff-scope` whole-PR |
+| Exit `124` (validate timeout) | `BLOCKED`; surface stderr verbatim |
+| Stop rule 7 (stale sidecar) | `HOLD` → `/safer:contract` |
 
 The verdict is mechanical. No judgment call beyond flakiness detection. If the mechanics say HOLD, the verdict is HOLD regardless of how close the diff is to green.
 
@@ -771,6 +831,14 @@ Total: N  Passed: N  Failed: N  Skipped: N  Flaky: N
 - /health: <verdict> score <N/10> — <artifact URL>
 - /qa: <verdict> bugs <N> — <artifact URL>
 - ... (omit rows for targets whose trigger did not fire)
+
+### Per-folder spec gates
+<one row per folder with MODULE.md that the diff touched; SHIP/HOLD verdict per the sidecar-threshold checklist (Phase 4)>
+- <folder>: SHIP | HOLD — <missing directive | unmet threshold | itSpec.todo on N exports>
+- ... (omit when the diff touched no MODULE.md folder)
+
+### Codemod warnings
+<verbatim stderr from `safer-spec validate` on exit 0; surfaces deprecation warnings the codemod prints even on success; omitted when stderr is empty>
 
 ## Routing
 <if HOLD: route to implement-junior | implement-senior | diagnose | architect>
@@ -820,6 +888,7 @@ Each stop rule fires on a specific condition. When fired, produce an escalation 
 4. **Missing test infrastructure.** The repo has no runnable test command and no lint command. Status: `BLOCKED` to user; the repo is not verify-ready.
 5. **Persistent flakiness.** A test passes on retry but fails again on a third run. Status: `HOLD` with "flaky test is a regression" as the finding; route to `diagnose`. Do not `SHIP_WITH_CONCERNS` for a test that is unstable at this level.
 6. **Scope mismatch mid-run.** The diff grew between review-senior's review and your checkout (the author pushed more commits). Status: `BLOCKED`; ask review-senior to re-review the new head. Do not verify a diff that has not been reviewed at the current SHA.
+7. **Stale sidecar (v0.2.0 dogfood).** `safer-spec validate` reports a sidecar `.safer-spec/<slug>.json` whose declared exports no longer match the folder's `index.ts` public surface (an export was renamed, removed, or its `@spec.kind` directive deleted in the diff). Status: `HOLD` → `/safer:contract` via `safer-escalate --from verify --to contract --cause STALE_SIDECAR`. The fix is upstream: the contract step authors the directive on the new export shape; verify does not edit sidecar JSON or `@spec.*` directives directly (Invariant 2 violation — editing the sidecar to clear the validate error is the Principle 7 anti-pattern "paper-over").
 
 ## Completion status
 

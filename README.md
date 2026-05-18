@@ -17,7 +17,7 @@ It is not. This plugin recalibrates.
 /plugin install safer@safer-by-default
 ```
 
-Skills load as `safer:<name>` (`/safer:spec`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
+Skills load as `safer:<name>` (`/safer:contract`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
 **Codex**:
 
@@ -85,17 +85,25 @@ The doctrine factors into four orthogonal axes. The first two govern *what code 
 
 Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `SKILL.md` for one projection of the principles onto one kind of work.
 
+## Prerequisites (v0.2.0)
+
+v0.2.0 of `safer-by-default` is **TypeScript + vitest only**. `/safer:setup` halts with a "use safer-by-default 0.1.x" pointer on non-TS / non-vitest projects. v0.2.0 is also **dogfood-only**: the supported adopter is the maintainer's own `chughtapan/safer-by-default` clone with the `vendor/safer-spec-development/` submodule populated; external adopters wait for the publish follow-up (when the codemod publishes to npm).
+
+`/safer:setup` pins the dogfood workspace to **pnpm** (sets `packageManager: pnpm@X.Y.Z` in `package.json`); npm and bun are not supported in v0.2.0 because their `link:`-protocol semantics differ. Yarn 1/2 could be added later but is not in scope for v0.2.0.
+
 ## Skill catalog
 
-Sixteen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
+Eighteen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
 
-Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:spec` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
+Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:contract` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
 
 ### Design / exploration
 
 | Skill | When to invoke | Output |
 |---|---|---|
-| `/safer:spec` | ambiguous intent; no acceptance criteria | spec doc → GitHub issue |
+| `/safer:contract` | ambiguous intent; no acceptance criteria | contract doc → GitHub issue |
+| `/safer:contract-init` | bootstrap living-spec for a new module (per-folder `MODULE.md` + sidecar) | new `MODULE.md` + `.safer-spec/<slug>.json` + property-test stub |
+| `/safer:contract-migrate` | port a module to a new `SPEC_FORMAT_VERSION` | per-file dry-run diff + per-file rewrite |
 | `/safer:architect` | need module/interface/data-flow structure | design doc + interface stubs + every artifact that defines the system (docs, configs, scripts, CI, deploy files) |
 | `/safer:diagnose` | reproducible bug | smallest repro + codex verdict |
 | `/safer:spike` | "is X feasible?" | throwaway code + go/no-go |
@@ -135,12 +143,16 @@ user intent
     ▼
 /safer:orchestrate       ─── creates parent epic + sub-issues on GitHub
     │
-    ├── /safer:spec         → spec published to sub-issue
+    ├── /safer:contract         → contract published to sub-issue
     ├── /safer:architect    → design doc + interfaces published
     ├── /safer:implement-*  → draft PR opened
     ├── /safer:review-senior → native PR review
     └── /safer:verify       → ship/hold verdict on PR
 ```
+
+### Workspace monorepos
+
+`/safer:setup` Step 4c installs the codemod **once** at the dogfood workspace root (`$SBD_ROOT/dogfood/`); the `link:`-protocol install populates the workspace's `node_modules/.bin`. If the dogfood layout has `vitest.workspace.ts` or per-package `vitest.config.{ts,js,mts}` files, setup repeats the **wire+seed** step (reporter patch + `safer-spec.config.json` seed) per workspace package, but the codemod install runs only at the workspace root.
 
 **Parent epic + sub-issues:** The orchestrate skill breaks one user intent into a GitHub issue (parent epic) and creates child sub-issues for each work unit (spec, architecture, implementation, review). Each sub-issue tracks one modality of work.
 
