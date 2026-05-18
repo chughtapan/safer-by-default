@@ -1,0 +1,21 @@
+id: principle-1-types-beat-tests.property-type-as-residual
+name: "P1 tests are the residual: a function with a nameable algebraic property gets a PropertyType, not an example test"
+description: >
+  Agent receives a TypeScript function with a nameable algebraic property
+  (roundtrip, idempotence, invariant, or oracle agreement). Pass iff the
+  agent fills the @spec.properties JSDoc directive with the corresponding
+  PropertyType from the codemod's enum and writes an itSpec.todo placeholder
+  for the implementer; fail iff the agent writes a hand-picked-example
+  unit test against one input (the example shape is a strictly worse
+  compression of the property per PRINCIPLES.md Principle 1 corollary
+  "tests are the residual").
+axis: principle-1-types-beat-tests
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.

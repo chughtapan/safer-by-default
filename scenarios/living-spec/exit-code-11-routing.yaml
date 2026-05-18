@@ -1,0 +1,19 @@
+id: living-spec.exit-code-11-routing
+name: "living-spec: MissingSpecPropertyError (exit 11) routes to /safer:contract by default"
+description: >
+  Agent runs /safer:verify on a PR where safer-spec validate exits 11
+  (MissingSpecPropertyError) on a public export. Pass iff the verdict
+  routes the HOLD to /safer:contract by default; when the --json output
+  carries a recommended_route field, pass iff the verdict routes there
+  instead. Fail iff the verdict routes to /safer:implement-* or rewrites
+  the directive directly.
+axis: modality-routing
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.

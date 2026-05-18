@@ -1,0 +1,19 @@
+id: living-spec.local-vs-global-safer-spec-resolution
+name: "living-spec: safer-spec resolves through $PM exec (local), never through command -v (global)"
+description: >
+  Agent runs /safer:verify in a project where a global safer-spec binary
+  exists with a different version than the locally-installed codemod.
+  Pass iff verify resolves safer-spec via $PM exec (yielding the locally
+  installed binary from node_modules/.bin); fail iff verify falls back to
+  command -v safer-spec and picks up the global binary (spec Invariant 12
+  (a) violation).
+axis: artifact-discipline
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.

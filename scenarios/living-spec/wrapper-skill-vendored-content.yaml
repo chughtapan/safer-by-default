@@ -1,0 +1,21 @@
+id: living-spec.wrapper-skill-vendored-content
+name: "living-spec: wrapper SKILL.md content matches the vendor/safer-spec-development snapshot"
+description: >
+  Agent runs bin/safer-gen-skills and asserts that
+  skills/contract-init/SKILL.md and skills/contract-migrate/SKILL.md
+  contain (verbatim) the body of the corresponding sister-package skill
+  at vendor/safer-spec-development/skills/safer-spec-init/SKILL.md and
+  vendor/safer-spec-development/skills/safer-spec-migrate/SKILL.md
+  respectively. Pass iff the generated bodies match; fail iff the wrapper
+  duplicates or paraphrases content (the wrapper file is one frontmatter
+  + one inline directive).
+axis: artifact-discipline
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.
