@@ -1,0 +1,20 @@
+id: living-spec.rename-pass-preserves-spec-tokens
+name: "living-spec: /safer:spec → /safer:contract rename pass preserves Invariant 5 tokens"
+description: >
+  Agent runs the spec→contract rename pass across the repo. Pass iff the
+  Invariant 5 token allow-list (`.spec.test.ts`, `@spec.*`, `safer-spec`,
+  `.safer-spec/`, `@chughtapan/safer-spec-development`, `PROPERTY_TYPES`,
+  `PropertyType`, `itSpec`, `ItSpec`) is unchanged in the diff; fail iff
+  any of those tokens is renamed (each is a Principle 6 budget violation).
+  The judge runs a grep dry-run against the pre-rename tree, compares
+  matches to the post-rename tree, and asserts the count is identical.
+axis: artifact-discipline
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.

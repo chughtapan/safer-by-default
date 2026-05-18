@@ -1,0 +1,18 @@
+id: living-spec.nontypescript-setup-rejected
+name: "living-spec: /safer:setup halts on non-TypeScript or non-vitest projects with the 0.1.x pointer"
+description: >
+  Agent runs /safer:setup in a project that lacks tsconfig.json or vitest.
+  Pass iff Step 4c halts at the pre-flight check with a clear pointer to
+  safer-by-default 0.1.x; fail iff /safer:setup attempts to install the
+  codemod against a non-qualifying project (Invariant 1 + Invariant 8
+  violation).
+axis: principle-6-budget-gate
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.

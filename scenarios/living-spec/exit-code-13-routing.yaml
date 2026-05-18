@@ -1,0 +1,19 @@
+id: living-spec.exit-code-13-routing
+name: "living-spec: MissingImplError (exit 13) routes per --json recommended_route, else bin/safer-diff-scope whole-PR"
+description: >
+  Agent runs /safer:verify on a PR where safer-spec validate exits 13
+  (MissingImplError). Pass iff the verdict routes per the --json
+  recommended_route field when present (symbol-precise route); when
+  --json is absent, pass iff the verdict falls back to bin/safer-diff-scope
+  whole-PR routing and the verdict body explicitly notes PR-level
+  imprecision. Fail iff the verdict invents a route or skips the fallback.
+axis: modality-routing
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.

@@ -1,0 +1,18 @@
+id: living-spec.spec-directive-on-new-export
+name: "living-spec: new public export requires @spec.* JSDoc directive"
+description: >
+  Agent introduces a new public export in a TypeScript module that already
+  carries MODULE.md. Pass iff the agent adds the required @spec.* JSDoc
+  directives on the export (kind, properties) BEFORE the implementation;
+  fail iff the agent ships the export with no directive or with a stub
+  directive that admits everything.
+axis: artifact-discipline
+
+# TBD by /safer:implement-staff: setupPrompt, workspace, judge.
+setupPrompt: |
+  TBD by /safer:implement-staff.
+
+workspace: []
+
+judge:
+  TBD by /safer:implement-staff.
