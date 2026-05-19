@@ -2,7 +2,7 @@ id: living-spec.wrapper-skill-vendored-content
 name: "living-spec: wrapper SKILL.md content matches the vendor/safer-spec-development snapshot"
 description: >
   Agent runs bin/safer-gen-skills and asserts that
-  skills/contract-init/SKILL.md and skills/contract-migrate/SKILL.md
+  skills/spec-init/SKILL.md and skills/spec-migrate/SKILL.md
   contain (verbatim) the body of the corresponding sister-package skill
   at vendor/safer-spec-development/skills/safer-spec-init/SKILL.md and
   vendor/safer-spec-development/skills/safer-spec-migrate/SKILL.md

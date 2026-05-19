@@ -105,8 +105,8 @@ resolve_source_dir() {
     log "  ↻ refreshing existing clone: $XDG_SOURCE_DIR" >&2
     git -C "$XDG_SOURCE_DIR" fetch --quiet --depth 1 origin HEAD >&2 || warn "git fetch failed; continuing with local clone"
     git -C "$XDG_SOURCE_DIR" reset --quiet --hard FETCH_HEAD 2>/dev/null || true
-    # v0.2.0: ensure vendored sister submodule is populated so the contract-init
-    # / contract-migrate wrappers can resolve their vendor bodies. Idempotent.
+    # v0.2.0: ensure vendored sister submodule is populated so the spec-init
+    # / spec-migrate wrappers can resolve their vendor bodies. Idempotent.
     git -C "$XDG_SOURCE_DIR" submodule update --init --recursive --quiet 2>/dev/null || warn "submodule update failed; vendor-skill resolution may be incomplete"
   else
     log "  ↓ cloning $REPO_URL → $XDG_SOURCE_DIR" >&2
@@ -340,31 +340,6 @@ for skill_dir in "$SOURCE_DIR"/skills/*; do
   [ -d "$skill_dir" ] || continue
   [ -f "$skill_dir/SKILL.md" ] || continue
   write_wrapper "$(basename "$skill_dir")"
-done
-
-# v0.2.0 rename cleanup: remove ONLY the known retired wrapper from earlier
-# versions. Broad-scope cleanup ("every safer-* whose suffix isn't in the
-# current skills list") risks removing locally-installed unrelated wrappers;
-# the narrow form is sufficient for the spec→contract rename. Future renames
-# extend this explicit retired-name list.
-RETIRED_WRAPPERS=("safer-spec")
-for retired in "${RETIRED_WRAPPERS[@]}"; do
-  retired_dir="$SKILLS_DIR/$retired"
-  retired_file="$retired_dir/SKILL.md"
-  [ -d "$retired_dir" ] || continue
-  if [ "$CHECK_ONLY" -eq 1 ]; then
-    if [ -f "$retired_file" ] && grep -Fq "$MARKER" "$retired_file"; then
-      warn "stale retired wrapper present: $retired_dir (would be removed)"
-    fi
-    continue
-  fi
-  if [ -f "$retired_file" ] && grep -Fq "$MARKER" "$retired_file"; then
-    rm -rf "$retired_dir"
-    log "  ↻ removed retired wrapper: $retired_dir"
-  else
-    # Non-generated wrapper at retired path; refuse to delete.
-    warn "retired wrapper path $retired_dir exists without the generated marker; leaving in place"
-  fi
 done
 log ""
 

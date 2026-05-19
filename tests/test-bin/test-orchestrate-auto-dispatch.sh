@@ -22,7 +22,7 @@ source "$HERE/../test-helpers.sh"
 SKILL_MD="$(cd "$HERE/../.." && pwd)/skills/orchestrate/SKILL.md"
 
 # The label regex from SKILL.md Step 6a.
-MODALITY_REGEX='^safer:(implement-(junior|senior|staff)|verify|spike|research|contract)$'
+MODALITY_REGEX='^safer:(implement-(junior|senior|staff)|verify|spike|research|spec)$'
 
 # The idempotency marker format from SKILL.md Step 6e.
 MARKER_REGEX='^<!-- orchestrate:dispatched teammate=[A-Za-z0-9_-]+ at=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z -->$'
@@ -41,7 +41,7 @@ test_regex_matches_all_seven_modalities() {
     "safer:verify"
     "safer:spike"
     "safer:research"
-    "safer:contract"
+    "safer:spec"
   )
   for l in "${labels[@]}"; do
     echo "$l" | grep -qE "$MODALITY_REGEX" || { echo "regex missed: $l"; return 1; }
@@ -237,7 +237,7 @@ test_skill_md_pins_pane_ceiling_to_twenty() {
 
 test_skill_md_has_all_seven_templates() {
   # One section per dispatchable modality.
-  for modality in implement-junior implement-senior implement-staff verify spike research contract; do
+  for modality in implement-junior implement-senior implement-staff verify spike research spec; do
     grep -qE "^#### ${modality}$" "$SKILL_MD" || { echo "missing template: $modality"; return 1; }
   done
   return 0

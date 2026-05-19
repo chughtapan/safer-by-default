@@ -207,7 +207,7 @@ Unavailability tagging:
   `{css,scss,tsx,jsx,html,svg}` or `design/**`; add 4 if it touches
   `skills/**/SKILL.md`, `prompts/**`, `eval/**`, or an LLM-prompt file).
 - URL matches `/issues/\d+#issuecomment-` → read the comment's `safer:*`
-  label on the parent issue. `safer:contract` → `contract`; `safer:architect`
+  label on the parent issue. `safer:spec` → `contract`; `safer:architect`
   → `design`; anything else → `plan`.
 - URL matches `/issues/\d+` → `plan`.
 
@@ -379,7 +379,7 @@ Every invocation ends with exactly one status marker on the last line:
   No. Silent skip is forbidden. Emit DONE_WITH_CONCERNS so the
   orchestrator can see that convergence is unmeasured.
 - **"I'll rewrite the routing table to cover a new case I just noticed."**
-  No. The routing table lives in SPEC r4.1 §5(h). Route to `/safer:contract`
+  No. The routing table lives in SPEC r4.1 §5(h). Route to `/safer:spec`
   if a new case is needed (Principle 8, Ratchet).
 - **"This PR is small; I'll skip `/codex`."** No. Every row in the
   routing table is mandatory for its kind. `/codex` is an independent

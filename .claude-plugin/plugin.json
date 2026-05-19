@@ -1,7 +1,7 @@
 {
   "name": "safer",
   "version": "0.2.0",
-  "description": "Claude Code plugin: modality-based skills that recalibrate agents toward compiler-grade craft and scope discipline. Eighteen skills across contract, contract-init, contract-migrate, architect, implement (junior/senior/staff), diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit. Composes with eslint-plugin-agent-code-guard (lint floor), @chughtapan/safer-spec-development (per-folder living-spec layer), and zapbot (GitHub publish).",
+  "description": "Claude Code plugin: modality-based skills that recalibrate agents toward compiler-grade craft and scope discipline. Eighteen skills across spec, spec-init, spec-migrate, architect, implement (junior/senior/staff), diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit. Composes with eslint-plugin-agent-code-guard (lint floor), @chughtapan/safer-spec-development (per-folder living-spec layer), and zapbot (GitHub publish).",
   "author": {
     "name": "Tapan Chugh"
   },

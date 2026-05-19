@@ -235,7 +235,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:spec`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
@@ -264,12 +264,12 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 
 ### Living-spec is the ratchet's machine-readable surface
 
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:spec-init` / `/safer:spec-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
 
 | Exit | Error | Mechanical route |
 |---|---|---|
 | `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:spec` |
 | `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
 | `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
 
@@ -366,7 +366,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Spec doc | GitHub issue, `safer:spec` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |

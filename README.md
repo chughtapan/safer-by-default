@@ -17,7 +17,7 @@ It is not. This plugin recalibrates.
 /plugin install safer@safer-by-default
 ```
 
-Skills load as `safer:<name>` (`/safer:contract`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
+Skills load as `safer:<name>` (`/safer:spec`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
 **Codex**:
 
@@ -95,15 +95,15 @@ v0.2.0 of `safer-by-default` is **TypeScript + vitest only**. `/safer:setup` hal
 
 Eighteen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
 
-Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:contract` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
+Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:spec` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
 
 ### Design / exploration
 
 | Skill | When to invoke | Output |
 |---|---|---|
-| `/safer:contract` | ambiguous intent; no acceptance criteria | contract doc → GitHub issue |
-| `/safer:contract-init` | bootstrap living-spec for a new module (per-folder `MODULE.md` + sidecar) | new `MODULE.md` + `.safer-spec/<slug>.json` + property-test stub |
-| `/safer:contract-migrate` | port a module to a new `SPEC_FORMAT_VERSION` | per-file dry-run diff + per-file rewrite |
+| `/safer:spec` | ambiguous intent; no acceptance criteria | contract doc → GitHub issue |
+| `/safer:spec-init` | bootstrap living-spec for a new module (per-folder `MODULE.md` + sidecar) | new `MODULE.md` + `.safer-spec/<slug>.json` + property-test stub |
+| `/safer:spec-migrate` | port a module to a new `SPEC_FORMAT_VERSION` | per-file dry-run diff + per-file rewrite |
 | `/safer:architect` | need module/interface/data-flow structure | design doc + interface stubs + every artifact that defines the system (docs, configs, scripts, CI, deploy files) |
 | `/safer:diagnose` | reproducible bug | smallest repro + codex verdict |
 | `/safer:spike` | "is X feasible?" | throwaway code + go/no-go |
@@ -143,7 +143,7 @@ user intent
     ▼
 /safer:orchestrate       ─── creates parent epic + sub-issues on GitHub
     │
-    ├── /safer:contract         → contract published to sub-issue
+    ├── /safer:spec         → contract published to sub-issue
     ├── /safer:architect    → design doc + interfaces published
     ├── /safer:implement-*  → draft PR opened
     ├── /safer:review-senior → native PR review

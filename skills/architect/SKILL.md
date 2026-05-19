@@ -8,7 +8,7 @@ description: |
   with `throw new Error("not implemented")` bodies) so downstream
   `implement-*` modalities can execute against a published contract.
   Use when a spec exists and the next question is "what shape of code."
-  Do NOT use when no spec exists (send to `/safer:contract` first), or when
+  Do NOT use when no spec exists (send to `/safer:spec` first), or when
   the work is obviously one-module (send to `/safer:implement-junior`).
 triggers:
   - architect this
@@ -234,7 +234,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:spec`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
@@ -263,12 +263,12 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 
 ### Living-spec is the ratchet's machine-readable surface
 
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:spec-init` / `/safer:spec-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
 
 | Exit | Error | Mechanical route |
 |---|---|---|
 | `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:spec` |
 | `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
 | `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
 
@@ -365,7 +365,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Spec doc | GitHub issue, `safer:spec` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -567,7 +567,7 @@ The branch architect publishes is a complete intent specification — interfaces
 
 Architect takes a published spec and lays out the shape of code that satisfies it. One design doc, one branch carrying every artifact that defines what the system *is* — except function bodies. Every module you name has a purpose, a public surface, a dependency list, and an error channel. Every data flow arrow is explicit. Every library choice is justified by a spec constraint, not a preference. Every documentation surface, setup script, deployment file, and CI workflow that describes the changed surface is current on this branch — the implementer should be able to read the design and the configs alone and know what to build.
 
-Architect does not write function bodies, pick algorithms beyond naming them ("uses a bounded LRU cache"; the implementation of the cache is downstream), run tests against the new code, or modify files unrelated to the design. Architect does not revise the spec. If the spec has a gap, the ratchet sends it back to `/safer:contract`.
+Architect does not write function bodies, pick algorithms beyond naming them ("uses a bounded LRU cache"; the implementation of the cache is downstream), run tests against the new code, or modify files unrelated to the design. Architect does not revise the spec. If the spec has a gap, the ratchet sends it back to `/safer:spec`.
 
 ### The complete intent specification
 
@@ -627,7 +627,7 @@ GitHub.
 
 ## Inputs required
 
-- A published spec. The spec is either a GitHub issue labeled `safer:contract` in state `plan-approved`, or a sub-issue body with the 7-section spec structure, or a comment on a parent epic carrying that structure.
+- A published spec. The spec is either a GitHub issue labeled `safer:spec` in state `plan-approved`, or a sub-issue body with the 7-section spec structure, or a comment on a parent epic carrying that structure.
 - `gh` CLI authenticated. Verify with `gh auth status`.
 - Write access to the repo. You will push a branch and open a draft PR.
 - Read access to the existing codebase. You will align new modules with existing conventions.
@@ -690,7 +690,7 @@ If the spec URL was not provided with the invocation, ask for it via `AskUserQue
 - Running tests against the new code or adding test bodies. Adding test file names and empty `it.todo("...")` entries is fine; nothing more.
 - Modifying files unrelated to the design (the design's scope is the changed surface, not the whole repo).
 - Mass repo cleanup, refactoring touches, or "while I'm here" doc/config rewrites that the design did not require.
-- Revising the spec. If the spec has a gap, escalate to `/safer:contract`.
+- Revising the spec. If the spec has a gap, escalate to `/safer:spec`.
 - Introducing tools the spec did not authorize.
 
 ## Scope budget
@@ -747,9 +747,9 @@ Is the spec architect-ready? Check each:
 - Invariants name the properties that must hold.
 - Open questions, if any, are labeled as such with recommended defaults.
 
-If the spec fails any check, stop. Escalate to `/safer:contract` via `safer-escalate --from architect --to contract --cause <CAUSE>`. Do not fill the gap yourself.
+If the spec fails any check, stop. Escalate to `/safer:spec` via `safer-escalate --from architect --to spec --cause <CAUSE>`. Do not fill the gap yourself.
 
-The readiness gate applies regardless of who authored the spec — `/safer:contract` skill, the user directly, or an upstream pipeline. A spec is architect-ready or it isn't; authorship doesn't change the requirement.
+The readiness gate applies regardless of who authored the spec — `/safer:spec` skill, the user directly, or an upstream pipeline. A spec is architect-ready or it isn't; authorship doesn't change the requirement.
 
 ### Phase 3 — Decompose into modules
 
@@ -795,7 +795,7 @@ Nothing else in the body. No "happy path." No partial logic. No comments like `/
 | `applyMigration` | `Idempotence` | applyMigration(applyMigration(s)) === applyMigration(s) |
 | `chooseLeader` | `Invariant` | only one node has `leader: true` after the call |
 
-`PropertyType` is the residual-shape from Principle 1: a function with a nameable algebraic property earns a `fast-check` property over an example test. The architect commits to the named PropertyType in the design doc; the implementer writes the `itSpec.todo`/`itSpec` invocations that exercise it. An export without a nameable PropertyType is a Phase 4 escalation to `/safer:contract` (stop rule 7 below).
+`PropertyType` is the residual-shape from Principle 1: a function with a nameable algebraic property earns a `fast-check` property over an example test. The architect commits to the named PropertyType in the design doc; the implementer writes the `itSpec.todo`/`itSpec` invocations that exercise it. An export without a nameable PropertyType is a Phase 4 escalation to `/safer:spec` (stop rule 7 below).
 
 ### Phase 5 — Name the data flow
 
@@ -876,7 +876,7 @@ The threshold rule: if the design doc names the implementation tier as `implemen
 Apply findings against the parent epic's `## Contract` autonomy budget:
 
 - **Findings within budget** (revising the architect plan does not introduce new modules, new deps, or other items the contract forbids in `Always-park`) → autonomously revise the design doc, re-publish, re-run `/plan-eng-review` once. If clean, proceed to codex.
-- **Findings cross the budget** (review recommends a new module the spec didn't authorize, a new dep, a new public contract beyond what was named) → escalate via `safer-escalate --to contract --cause PLAN_EXPANSION_FROM_REVIEW`. This is a ratchet-up; the orchestrator parks for amendment per the contract doctrine.
+- **Findings cross the budget** (review recommends a new module the spec didn't authorize, a new dep, a new public contract beyond what was named) → escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_REVIEW`. This is a ratchet-up; the orchestrator parks for amendment per the contract doctrine.
 - **Reject / structural concerns** the architect cannot resolve in one round → escalate to user with reasoning; do NOT transition.
 
 **Codex review-after (cross-model challenge, runs second).** After `/plan-eng-review` is clean (or skipped), run `/codex` on the (possibly revised) design doc:
@@ -886,7 +886,7 @@ Apply findings against the parent epic's `## Contract` autonomy budget:
 ```
 
 - `approve` → proceed to `review`.
-- `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to contract --cause PLAN_EXPANSION_FROM_CODEX`.
+- `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_CODEX`.
 - `reject` → escalate to user; do NOT transition.
 
 The motivation: `/plan-eng-review` is a structured architecture-quality audit (catches missing edge cases by going through a checklist); `/codex` is a cross-model independent challenge (catches blind spots in the audit's own framing). Plan-eng-review first means codex sees the audited plan, not the raw one — codex spends its budget on what plan-eng-review missed, not on what plan-eng-review would have caught.
@@ -908,12 +908,12 @@ Report `DONE` or `DONE_WITH_CONCERNS` with the design doc URL and the draft PR U
 ## Stop rules
 
 1. **No spec.** → `NEEDS_CONTEXT`. Ask for the spec URL. Do not write a design from the user's chat.
-2. **Spec has a load-bearing gap.** Acceptance criterion is un-architecturable as written. → `ESCALATED` to `/safer:contract`. State the gap.
+2. **Spec has a load-bearing gap.** Acceptance criterion is un-architecturable as written. → `ESCALATED` to `/safer:spec`. State the gap.
 3. **You started writing a function body.** → Iron rule fired. Delete the body. Re-read this file.
-4. **Design needs more than 5 new modules.** → `ESCALATED` to `/safer:contract`. The spec spans more than one design effort; split it.
+4. **Design needs more than 5 new modules.** → `ESCALATED` to `/safer:spec`. The spec spans more than one design effort; split it.
 5. **Dependency you want to add has no license info available.** → `NEEDS_CONTEXT` to user. Do not "probably MIT" a dependency choice.
-6. **Existing module would have to change its public surface to support this design.** → `ESCALATED` to `/safer:contract` or `/safer:architect` of that existing module. That is not your surface to revise.
-7. **New public export without a nameable `PropertyType`.** The Property-test gates table requires a PropertyType per new export in a `MODULE.md`-bearing area. If no roundtrip/idempotence/invariant/oracle-agreement shape exists, the contract is incomplete: either the export is the wrong shape for this surface, or the spec needs another acceptance criterion that names the residual. → `ESCALATED` to `/safer:contract` via `safer-escalate --from architect --to contract --cause PROPERTY_TYPE_MISSING`.
+6. **Existing module would have to change its public surface to support this design.** → `ESCALATED` to `/safer:spec` or `/safer:architect` of that existing module. That is not your surface to revise.
+7. **New public export without a nameable `PropertyType`.** The Property-test gates table requires a PropertyType per new export in a `MODULE.md`-bearing area. If no roundtrip/idempotence/invariant/oracle-agreement shape exists, the contract is incomplete: either the export is the wrong shape for this surface, or the spec needs another acceptance criterion that names the residual. → `ESCALATED` to `/safer:spec` via `safer-escalate --from architect --to spec --cause PROPERTY_TYPE_MISSING`.
 
 ## Completion status
 
@@ -928,7 +928,7 @@ Your final message to the caller carries exactly one status marker on the last l
 ## Escalation artifact template
 
 ```bash
-safer-escalate --from architect --to contract --cause <SPEC_GAP|AMBIGUITY|OUT_OF_SCOPE>
+safer-escalate --from architect --to spec --cause <SPEC_GAP|AMBIGUITY|OUT_OF_SCOPE>
 ```
 
 The tool populates the body from structured flags. If you need to add narrative, pipe via `--body-file`:

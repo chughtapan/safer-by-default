@@ -1,5 +1,5 @@
 ---
-name: contract
+name: spec
 version: 0.1.0
 description: |
   Turn an ambiguous intent into a contract document: goals, non-goals,
@@ -25,7 +25,7 @@ allowed-tools:
 
 <!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
 
-# /safer:contract
+# /safer:spec
 
 ## Doctrine
 
@@ -231,7 +231,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:spec`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
@@ -260,12 +260,12 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 
 ### Living-spec is the ratchet's machine-readable surface
 
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:spec-init` / `/safer:spec-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
 
 | Exit | Error | Mechanical route |
 |---|---|---|
 | `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:spec` |
 | `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
 | `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
 
@@ -362,7 +362,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Spec doc | GitHub issue, `safer:spec` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -590,9 +590,9 @@ PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
   --correlation-id "$SESSION-1" \
   --body-stdin) || case $? in
     10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
-    21) safer-escalate --from contract --to orchestrate --cause recipient-retired ;;
-    20|22) safer-escalate --from contract --to orchestrate --cause peer-transport-invalid ;;
-    30|*) safer-escalate --from contract --to orchestrate --cause peer-transport-failed ;;
+    21) safer-escalate --from spec --to orchestrate --cause recipient-retired ;;
+    20|22) safer-escalate --from spec --to orchestrate --cause peer-transport-invalid ;;
+    30|*) safer-escalate --from spec --to orchestrate --cause peer-transport-failed ;;
   esac
 ```
 
@@ -615,7 +615,7 @@ GitHub.
 gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated"; exit 1; }
 eval "$(safer-slug 2>/dev/null)" || true
 SESSION="$$-$(date +%s)"
-safer-telemetry-log --event-type safer.skill_run --modality contract --session "$SESSION" 2>/dev/null || true
+safer-telemetry-log --event-type safer.skill_run --modality spec --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
 # Update gate: halt user-initiated work when an upgrade is available.
@@ -721,8 +721,8 @@ EOF
 if [ -n "${SAFER_PARENT_ISSUE:-}" ]; then
   URL=$(safer-publish --kind comment --issue "$SAFER_PARENT_ISSUE" --body-file "$TMP")
 else
-  # Standalone invocation: create a new issue labeled safer:contract.
-  URL=$(safer-publish --kind issue --title "[safer:contract] $INTENT_SUMMARY" --body-file "$TMP" --labels "safer:contract,planning")
+  # Standalone invocation: create a new issue labeled safer:spec.
+  URL=$(safer-publish --kind issue --title "[safer:spec] $INTENT_SUMMARY" --body-file "$TMP" --labels "safer:spec,planning")
 fi
 
 echo "$URL"
@@ -734,7 +734,7 @@ rm -f "$TMP"
 - If the spec's acceptance criteria imply **implement-junior**-tier execution (single module, internals only, no new public surface, no new dep), `/plan-eng-review` is OPTIONAL — log the skip-decision on the sub-issue with the threshold reasoning and proceed to codex.
 - If the spec implies **implement-senior** or **implement-staff** tier (multi-module, new modules, new deps, new public surface), or the spec touches setup/deployment/infra (railway.toml, Dockerfile, CI workflows, env vars), `/plan-eng-review` is MANDATORY.
 
-`/plan-eng-review` is interactive by default. Within `/safer:contract` it runs **hold-scope autonomous**: spec invokes it programmatically; user-facing prompts are forbidden inside the gstack body and route up to `/safer:orchestrate` per the runtime contract. Spec treats the review's recommended defaults as the autonomous answer.
+`/plan-eng-review` is interactive by default. Within `/safer:spec` it runs **hold-scope autonomous**: spec invokes it programmatically; user-facing prompts are forbidden inside the gstack body and route up to `/safer:orchestrate` per the runtime contract. Spec treats the review's recommended defaults as the autonomous answer.
 
 ```
 /plan-eng-review --artifact "$URL" --hold-scope
@@ -767,7 +767,7 @@ safer-transition-label --issue "$ISSUE" --from planning --to review
 Emit the end event:
 
 ```bash
-safer-telemetry-log --event-type safer.skill_end --modality contract \
+safer-telemetry-log --event-type safer.skill_end --modality spec \
   --session "$SESSION" --outcome success --issue "$ISSUE"
 ```
 
@@ -783,7 +783,7 @@ Report `DONE` or `DONE_WITH_CONCERNS` (if open questions remain). Include the sp
 4. **User asks you to architect or implement.** → `NEEDS_CONTEXT`. Hand off to the correct modality; do not overstep.
 5. **The spec keeps growing beyond 2 pages.** → Re-triage. The intent is actually multiple intents; split into sub-issues and hand back to `orchestrate`.
 
-Escalation template populated via `safer-escalate --from contract --to user --cause <C>`.
+Escalation template populated via `safer-escalate --from spec --to user --cause <C>`.
 
 ## Completion status
 
@@ -801,7 +801,7 @@ Every invocation ends with exactly one status marker on the last line of your re
 |---|---|
 | Invoked under `orchestrate` with a sub-issue | Spec body written to the sub-issue; label transitioned `planning` → `review` |
 | Invoked under `orchestrate` with only a parent epic | Spec published as a comment on the parent epic |
-| Invoked standalone (no orchestrator) | New issue labeled `safer:contract,planning`; user can transition manually |
+| Invoked standalone (no orchestrator) | New issue labeled `safer:spec,planning`; user can transition manually |
 
 ## Anti-patterns
 
@@ -819,7 +819,7 @@ Every invocation ends with exactly one status marker on the last line of your re
 - [ ] Every assumption is explicit and flagged for user confirmation.
 - [ ] Every open question has a recommended default.
 - [ ] No architecture, library, or code decisions appear in the spec.
-- [ ] The spec is published to GitHub (comment on parent epic, or a new `safer:contract` issue).
+- [ ] The spec is published to GitHub (comment on parent epic, or a new `safer:spec` issue).
 - [ ] `safer.skill_end` event emitted with outcome and issue number.
 - [ ] Status marker on the last line of your response.
 
