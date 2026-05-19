@@ -23,9 +23,11 @@ safer-by-default/
 ├── .claude-plugin/
 │   ├── marketplace.json       ← Claude Code marketplace registration
 │   └── plugin.json            ← plugin metadata
-├── skills/                    ← 16 modality skills, one folder each
+├── skills/                    ← 18 modality skills, one folder each
 │   ├── orchestrate/
-│   ├── spec/
+│   ├── contract/
+│   ├── contract-init/
+│   ├── contract-migrate/
 │   ├── architect/
 │   ├── implement-{junior,senior,staff}/
 │   ├── diagnose/
@@ -38,6 +40,8 @@ safer-by-default/
 │   ├── docs-reader/
 │   ├── ux-audit/
 │   └── setup/
+├── vendor/                    ← floor-pinned sister-repo submodules
+│   └── safer-spec-development/ ← per-folder living-spec codemod (v0.2.0)
 ├── bin/                       ← 14 CLI helpers; auto-PATH at session start (see "CLI helpers" below)
 ├── lib/                       ← shell modules sourced by bin/ scripts
 ├── lsp/                       ← single LSP entry declared in plugin.json (see "LSP integration" below)
@@ -133,7 +137,7 @@ It then symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex skill wrapp
 
 `bin/safer-update-check` polls `https://raw.githubusercontent.com/chughtapan/safer-by-default/main/VERSION` once per hour, cache at `~/.safer/last-update-check`. On mismatch, prints `UPGRADE_AVAILABLE <local> <remote>` to stdout. Silent on network failure or when up to date.
 
-**Update gate**: user-facing entry skills (spec, architect, diagnose, spike, research, setup, ux-audit) halt at the preamble if `_UPD` is non-empty AND `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. Output: `PRECONDITION_FAIL` block telling the user to run the marketplace install commands. The model relays the message and waits for confirmation before doing any work.
+**Update gate**: user-facing entry skills (contract, contract-init, contract-migrate, architect, diagnose, spike, research, setup, ux-audit) halt at the preamble if `_UPD` is non-empty AND `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. Output: `PRECONDITION_FAIL` block telling the user to run the marketplace install commands. The model relays the message and waits for confirmation before doing any work.
 
 `/safer:orchestrate` uses a refined gate: halts only on fresh-pipeline starts (no open `safer:parent` epic exists). Autonomous re-entry — cron ticks, parent-epic polling — skips the gate so in-flight pipelines drain to completion.
 
@@ -147,7 +151,7 @@ Dispatched skills (with `SAFER_PARENT_ISSUE` set) skip the gate. The user upgrad
 
 **Pipeline** (GitHub):
 - Parent epic — labeled `safer:parent`. Body carries `## Contract`, `## Status`, `## Contract history`.
-- Sub-issues — one per modality. Labeled with the modality state (`safer:spec`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`).
+- Sub-issues — one per modality. Labeled with the modality state (`safer:contract`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`).
 - Comments — every published artifact (spec doc, design doc, persona feedback, audit findings, escalation notices, wake-up digests).
 
 The orchestrator reads pipeline state from GitHub on every tick; nothing pipeline-relevant lives in local files.

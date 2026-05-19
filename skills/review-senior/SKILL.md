@@ -2,7 +2,7 @@
 name: review-senior
 version: 0.2.0
 description: |
-  Dispatcher for pre-merge artifact review. Routes a PR, design doc, spec,
+  Dispatcher for pre-merge artifact review. Routes a PR, design doc, contract,
   plan, UI-touching change, or LLM-prompt change to the correct composed
   gstack skill set per the SPEC r4.1 §5(h) routing table. Does NOT itself
   read diffs or write reviews; the composed gstack skills do that. Single
@@ -230,12 +230,13 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
 When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
 
-- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, contract, etc.) is the right home.
 - **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
 
 The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
@@ -253,8 +254,21 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 **Anti-patterns.**
 - "I'll add a boolean flag to handle this edge case." *(Boolean flags are the canonical shape of sidestepping a design flaw.)*
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
-- "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
+- "The contract is ambiguous; I'll pick what makes sense." *(Escalate to contract.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
+
+### Living-spec is the ratchet's machine-readable surface
+
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+
+| Exit | Error | Mechanical route |
+|---|---|---|
+| `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
+| `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
+
+The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
 ---
 
@@ -347,7 +361,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:spec` label |
+| Spec doc | GitHub issue, `safer:contract` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -435,7 +449,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `spec` | ~2× | below Research; purely thinking-bound |
+| `contract` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -561,7 +575,7 @@ gstack verdicts.
 | Artifact kind | Composed gstack skills |
 |---|---|
 | PR diff | `/review` + `/simplify` + `/codex` |
-| Plan / spec / design doc | `/plan-eng-review` + `/codex` |
+| Plan / contract / design doc | `/plan-eng-review` + `/codex` |
 | UI-touching change (PR or design doc) | add `/plan-design-review` |
 | LLM prompt change | add the repo's eval suites per `CLAUDE.md` |
 
@@ -571,7 +585,7 @@ authored it. A PR that happens to include UI copy routes under rows 1 + 3.
 A PR that introduces a new LLM prompt routes under rows 1 + 4.
 
 The routing table is additive. A UI-touching PR runs rows 1 and 3; a
-spec that describes an LLM prompt runs rows 2 and 4.
+contract that describes an LLM prompt runs rows 2 and 4.
 
 ## Craft checks the reviewer still owns (Principles 1-4)
 
@@ -702,7 +716,7 @@ Unavailability tagging:
 
 ```
 --artifact <url>   GitHub issue-comment URL, sub-issue body URL, or PR URL
---kind <pr|design|spec|plan|ui|prompt>   (optional; inferred if omitted)
+--kind <pr|design|contract|plan|ui|prompt>   (optional; inferred if omitted)
 ```
 
 `--kind` inference rules (when the flag is omitted):
@@ -711,8 +725,8 @@ Unavailability tagging:
   `{css,scss,tsx,jsx,html,svg}` or `design/**`; add 4 if it touches
   `skills/**/SKILL.md`, `prompts/**`, `eval/**`, or an LLM-prompt file).
 - URL matches `/issues/\d+#issuecomment-` → read the comment's `safer:*`
-  label on the parent issue. `safer:spec` → `spec`; `safer:architect` →
-  `design`; anything else → `plan`.
+  label on the parent issue. `safer:contract` → `contract`; `safer:architect`
+  → `design`; anything else → `plan`.
 - URL matches `/issues/\d+` → `plan`.
 
 ## Workflow
@@ -800,7 +814,7 @@ UI-touching artifacts add `/plan-design-review --artifact <URL> --hold-scope` to
 `--hold-scope` is mandatory: it tells the composed skill to run autonomous; user-facing prompts that would fire mid-run escalate to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`.
 
 For PR rows, the composed skills post their verdicts as inline comments
-or PR reviews; for design/plan/spec rows, the composed skills post
+or PR reviews; for design/plan/contract rows, the composed skills post
 threaded comments on the artifact URL.
 
 Partial-miss handling (SOME composed skills missing): emit
@@ -832,7 +846,7 @@ Combine per-skill verdicts into one artifact verdict. Rules:
 
 Publish the aggregate via `gh pr review` (for PR rows) or
 `safer-publish --kind comment --issue "$ISSUE" --body-file <file>`
-(for design/plan/spec rows).
+(for design/plan/contract rows).
 
 ### Phase 4 — Transition the sub-issue label
 
@@ -883,7 +897,7 @@ Every invocation ends with exactly one status marker on the last line:
   No. Silent skip is forbidden. Emit DONE_WITH_CONCERNS so the
   orchestrator can see that convergence is unmeasured.
 - **"I'll rewrite the routing table to cover a new case I just noticed."**
-  No. The routing table lives in SPEC r4.1 §5(h). Route to `/safer:spec`
+  No. The routing table lives in SPEC r4.1 §5(h). Route to `/safer:contract`
   if a new case is needed (Principle 8, Ratchet).
 - **"This PR is small; I'll skip `/codex`."** No. Every row in the
   routing table is mandatory for its kind. `/codex` is an independent

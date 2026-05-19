@@ -47,6 +47,14 @@ assert_symlink() {
   return 1
 }
 
+assert_absent() {
+  local path="$1"
+  local label="${2:-path absent}"
+  if [ ! -e "$path" ]; then return 0; fi
+  echo "    FAIL ($label): $path still exists"
+  return 1
+}
+
 run_setup() {
   local home_dir="$1"
   local bin_dir="$2"
@@ -81,8 +89,10 @@ test_install_and_idempotent_with_bsd_readlink() {
 
   assert_contains "$out" "Codex setup complete." "first install completes" || { rm -rf "$tmp" "$fake_tools"; return 1; }
   assert_contains "$out2" "Codex setup complete." "second install completes" || { rm -rf "$tmp" "$fake_tools"; return 1; }
-  assert_file_exists "$tmp/.codex/skills/safer-spec/SKILL.md" "safer:spec wrapper exists" || { rm -rf "$tmp" "$fake_tools"; return 1; }
-  assert_contains "$(cat "$tmp/.codex/skills/safer-spec/SKILL.md")" "safer-by-default codex wrapper" "wrapper marker present" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_file_exists "$tmp/.codex/skills/safer-contract/SKILL.md" "safer:contract wrapper exists" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_file_exists "$tmp/.codex/skills/safer-contract-init/SKILL.md" "safer:contract-init wrapper exists" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_file_exists "$tmp/.codex/skills/safer-contract-migrate/SKILL.md" "safer:contract-migrate wrapper exists" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_contains "$(cat "$tmp/.codex/skills/safer-contract/SKILL.md")" "safer-by-default codex wrapper" "wrapper marker present" || { rm -rf "$tmp" "$fake_tools"; return 1; }
   assert_symlink "$tmp/.codex/skills/safer-by-default" "plugin root link exists" || { rm -rf "$tmp" "$fake_tools"; return 1; }
   assert_symlink "$bin_dir/safer-update-check" "binary link exists" || { rm -rf "$tmp" "$fake_tools"; return 1; }
 
@@ -100,7 +110,7 @@ test_refuses_to_overwrite_non_generated_wrapper() {
   tmp=$(mktemp -d)
   fake_tools=$(make_fake_tools)
   bin_dir="$tmp/local-bin"
-  wrapper_dir="$tmp/.codex/skills/safer-spec"
+  wrapper_dir="$tmp/.codex/skills/safer-contract"
   mkdir -p "$wrapper_dir"
   cat > "$wrapper_dir/SKILL.md" <<'EOF'
 ---
@@ -119,6 +129,83 @@ EOF
   rm -rf "$tmp" "$fake_tools"
 }
 
+test_removes_retired_safer_spec_wrapper() {
+  local tmp
+  local fake_tools
+  local bin_dir
+  local retired_dir
+  local out
+
+  tmp=$(mktemp -d)
+  fake_tools=$(make_fake_tools)
+  bin_dir="$tmp/local-bin"
+
+  # Pre-seed the retired wrapper at the OLD name with the safer-by-default
+  # generated marker (so the cleanup recognizes it as one to remove).
+  retired_dir="$tmp/.codex/skills/safer-spec"
+  mkdir -p "$retired_dir"
+  cat > "$retired_dir/SKILL.md" <<'EOF'
+---
+name: "safer:spec"
+description: "old wrapper"
+---
+
+<!-- safer-by-default codex wrapper -->
+
+# safer:spec
+
+stale body
+EOF
+
+  out=$(run_setup "$tmp" "$bin_dir" "$fake_tools" 2>&1)
+
+  assert_contains "$out" "Codex setup complete." "install completes" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_absent "$retired_dir" "retired safer-spec wrapper removed" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_file_exists "$tmp/.codex/skills/safer-contract/SKILL.md" "renamed safer:contract wrapper present" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+
+  rm -rf "$tmp" "$fake_tools"
+}
+
+test_narrow_scope_cleanup_preserves_unrelated_wrappers() {
+  local tmp
+  local fake_tools
+  local bin_dir
+  local foreign_dir
+  local out
+
+  tmp=$(mktemp -d)
+  fake_tools=$(make_fake_tools)
+  bin_dir="$tmp/local-bin"
+
+  # Seed an UNRELATED wrapper not in the retired list. The narrow-scope
+  # cleanup must NOT touch it, even though it carries the safer-by-default
+  # generated marker (the user may have hand-installed it from a fork).
+  foreign_dir="$tmp/.codex/skills/safer-experimental"
+  mkdir -p "$foreign_dir"
+  cat > "$foreign_dir/SKILL.md" <<'EOF'
+---
+name: "safer:experimental"
+description: "user-installed wrapper not shipped by this plugin"
+---
+
+<!-- safer-by-default codex wrapper -->
+
+# safer:experimental
+
+custom body
+EOF
+
+  out=$(run_setup "$tmp" "$bin_dir" "$fake_tools" 2>&1)
+
+  assert_contains "$out" "Codex setup complete." "install completes" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_file_exists "$foreign_dir/SKILL.md" "unrelated wrapper preserved" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+  assert_contains "$(cat "$foreign_dir/SKILL.md")" "custom body" "unrelated wrapper body unchanged" || { rm -rf "$tmp" "$fake_tools"; return 1; }
+
+  rm -rf "$tmp" "$fake_tools"
+}
+
 run_test "setup-codex installs cleanly and is idempotent with BSD-style readlink" test_install_and_idempotent_with_bsd_readlink
 run_test "setup-codex refuses to overwrite a non-generated wrapper" test_refuses_to_overwrite_non_generated_wrapper
+run_test "setup-codex removes the retired safer-spec wrapper (post-rename cleanup)" test_removes_retired_safer_spec_wrapper
+run_test "setup-codex preserves unrelated safer-* wrappers (narrow-scope cleanup)" test_narrow_scope_cleanup_preserves_unrelated_wrappers
 report

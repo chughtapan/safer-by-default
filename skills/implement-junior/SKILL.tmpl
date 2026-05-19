@@ -230,6 +230,8 @@ If the sub-issue URL was not passed with the invocation, ask. No sub-issue means
 - Writing a "quick fix" in a sibling module, even one line.
 - Rewriting the architect plan, even if you disagree.
 
+When the target module's folder already carries `MODULE.md` (the v0.2.0 living-spec layer the codemod manages), update `@spec.*` JSDoc directives on existing public exports to reflect changes in the diff. Introducing a new `@spec.kind`/`@spec.property`/`@spec.threshold` directive on a NEW public export is upstream architect-tier work — route via `safer-escalate --from implement-junior --to architect --cause NEW_SPEC_DIRECTIVE`. Editing the per-folder sidecar `.safer-spec/<slug>.json` by hand to clear a `safer-spec validate` error is the Principle 7 paper-over anti-pattern; route to `/safer:contract` instead.
+
 ## Scope budget
 
 Shape is the rule. Volume is a soft guide.
@@ -421,7 +423,7 @@ Report `DONE` with the PR URL. If you left concerns (flaky upstream test, open q
 
 ```bash
 safer-escalate --from implement-junior \
-  --to <architect|implement-senior|spec> \
+  --to <architect|implement-senior|contract> \
   --cause <CROSS_MODULE|SURFACE_CHANGE|NEW_DEP|NEW_TYPE|DIFF_SCOPE_SENIOR|DIFF_SCOPE_STAFF|PLAN_GAP>
 ```
 

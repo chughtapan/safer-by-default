@@ -1,0 +1,78 @@
+id: living-spec.rename-pass-preserves-spec-tokens
+name: "living-spec: /safer:spec → /safer:contract rename pass preserves Invariant 5 tokens"
+description: >
+  Agent runs the spec→contract rename pass across the repo. Pass iff the
+  Invariant 5 token allow-list (`.spec.test.ts`, `@spec.*`, `safer-spec`,
+  `.safer-spec/`, `@chughtapan/safer-spec-development`, `PROPERTY_TYPES`,
+  `PropertyType`, `itSpec`, `ItSpec`) is unchanged in the diff; fail iff
+  any of those tokens is renamed (each is a Principle 6 budget violation).
+  The judge runs a grep dry-run against the pre-rename tree, compares
+  matches to the post-rename tree, and asserts the count is identical.
+axis: artifact-discipline
+
+setupPrompt: |
+  Apply the v0.2.0 rename pass to the workspace below. Only the literal
+  slash command `/safer:spec` and the GitHub label `safer:spec` (and
+  modality CLI identifiers like `--from spec`, `--to spec`,
+  `--modality spec`) are in scope.
+
+  PRESERVED TOKENS (NEVER rename these — each is a different concept):
+    - `.spec.test.ts` (test-file suffix)
+    - `@spec.kind`, `@spec.property`, `@spec.threshold` (JSDoc directives)
+    - `safer-spec` (the codemod CLI binary name)
+    - `.safer-spec/` (sidecar directory name)
+    - `@chughtapan/safer-spec-development` (sister npm package name)
+    - `PROPERTY_TYPES`, `PropertyType` (type/value identifier)
+    - `itSpec`, `ItSpec` (vitest helper / type)
+    - The English word "spec" used in prose (e.g., "write the spec",
+      "the spec document") — these stay as English.
+
+  Apply the rename, then return the diff.
+
+workspace:
+  - path: README.md
+    content: |
+      # Project
+
+      Run `/safer:spec` to draft the spec. The `safer:spec` GitHub label
+      tracks spec-tier work. Tests carry the `.spec.test.ts` suffix and
+      use `itSpec(...)` from `@chughtapan/safer-spec-development`. JSDoc
+      directives like `@spec.kind` mark public exports; `PropertyType`
+      enumerates the algebraic properties.
+  - path: src/foo.spec.test.ts
+    content: |
+      import { itSpec, type PropertyType } from "@chughtapan/safer-spec-development";
+      itSpec.todo("roundtrip", { kind: "Roundtrip" });
+  - path: src/.safer-spec/foo.json
+    content: |
+      {"formatVersion": "0.4", "exports": {}}
+  - path: bin/dispatch.sh
+    content: |
+      #!/bin/bash
+      safer-escalate --from spec --to architect --cause example
+      safer-publish --kind issue --labels "safer:spec,planning"
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  README.md now has `/safer:contract` (slash) and `safer:contract` (label)
+  but `.spec.test.ts`, `itSpec`, `PropertyType`, `@spec.kind`,
+  `@chughtapan/safer-spec-development` are unchanged. src/foo.spec.test.ts
+  and src/.safer-spec/foo.json are unchanged. bin/dispatch.sh has
+  `--from contract --to architect` and `--labels "safer:contract,planning"`.
+
+validationChecks:
+  - "README.md no longer contains `/safer:spec` (slash command) or `safer:spec` (label) — both are renamed"
+  - "README.md still contains `.spec.test.ts` (filename suffix)"
+  - "README.md still contains `itSpec`, `PropertyType`, `@spec.kind`, `@chughtapan/safer-spec-development`"
+  - "src/foo.spec.test.ts is UNCHANGED in content (filename preserved, body preserved)"
+  - "src/.safer-spec/foo.json path is UNCHANGED (the dot-prefixed directory name is not renamed)"
+  - "bin/dispatch.sh changed `--from spec` to `--from contract` (modality CLI identifier)"
+  - "bin/dispatch.sh changed `safer:spec,planning` label to `safer:contract,planning`"
+  - "ANTI-PATTERN (FAIL): agent renamed `.spec.test.ts` to `.contract.test.ts`"
+  - "ANTI-PATTERN (FAIL): agent renamed `itSpec` to `itContract`"
+  - "ANTI-PATTERN (FAIL): agent renamed `@chughtapan/safer-spec-development` to `@chughtapan/safer-contract-development`"
+  - "ANTI-PATTERN (FAIL): agent renamed the English word 'spec' in `# Project ... spec document` prose"
+
+metadata:
+  batch: "v0.2.0-living-spec"

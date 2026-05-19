@@ -9,7 +9,7 @@ description: |
   under load?"), when literature review is load-bearing, or when the next step
   depends on answers the team does not have yet. Do NOT use when the question
   is a yes/no feasibility probe (route to /safer:spike) or when the work is to
-  ship code (route to /safer:spec or /safer:implement-*).
+  ship code (route to /safer:contract or /safer:implement-*).
 triggers:
   - research this
   - open question
@@ -235,12 +235,13 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
 When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
 
-- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, contract, etc.) is the right home.
 - **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
 
 The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
@@ -258,8 +259,21 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 **Anti-patterns.**
 - "I'll add a boolean flag to handle this edge case." *(Boolean flags are the canonical shape of sidestepping a design flaw.)*
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
-- "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
+- "The contract is ambiguous; I'll pick what makes sense." *(Escalate to contract.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
+
+### Living-spec is the ratchet's machine-readable surface
+
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+
+| Exit | Error | Mechanical route |
+|---|---|---|
+| `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
+| `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
+
+The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
 ---
 
@@ -352,7 +366,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:spec` label |
+| Spec doc | GitHub issue, `safer:contract` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -440,7 +454,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `spec` | ~2× | below Research; purely thinking-bound |
+| `contract` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -541,7 +555,7 @@ Then defer to user sovereignty if they insist. Name exactly what is being skippe
 
 - **Principle 5 (Discipline over capability)** applies double here. Research that drifts into implementation work ceases to be research. Discipline is staying inside the hypothesis loop.
 - **Part 4 → Every output carries receipts** is the central output. Every insight carries a confidence level and the evidence behind it. "I think so" is not a research artifact.
-- **Principle 8 (Ratchet)** applies at exit. An insight matures into a spec; it does not mature into code that the research skill ships. If the next step is to write code, escalate to `/safer:spec`.
+- **Principle 8 (Ratchet)** applies at exit. An insight matures into a spec; it does not mature into code that the research skill ships. If the next step is to write code, escalate to `/safer:contract`.
 - **Part 4 → Durable records.** The iteration ledger is published as one comment per round, so a future agent can read how the conclusion was reached.
 - **Part 4 → Write for the cold-start reader.** The final report is readable by an agent with no session context. "As we discussed" and "see the conversation" are anti-patterns.
 
@@ -651,7 +665,7 @@ If any `safer-*` binary is missing, continue without it. Telemetry is optional.
 - Grading your own work leniently. A GOOD round is not EXCELLENT; name it GOOD and take another round.
 - Accepting a HIGH-confidence insight without reproducible evidence. HIGH requires the evidence to hold on a second look.
 - Expanding the question mid-loop. A new question is a new research issue.
-- Reaching for implementation when an insight matures. That is escalation to `/safer:spec`, not continuation here.
+- Reaching for implementation when an insight matures. That is escalation to `/safer:contract`, not continuation here.
 
 ## Scope budget
 
@@ -772,10 +786,10 @@ When the loop exits (either EXCELLENT at >= 0.8, or budget exhausted), write the
 - <hypothesis>. Rejected in round <N> because <reason>.
 
 ## Open questions
-- <question that this research did not resolve>. Recommended modality: <research | spike | spec>.
+- <question that this research did not resolve>. Recommended modality: <research | spike | contract>.
 
 ## Recommended next modality
-<one of: spec, architect, spike, research (new issue), none>. Reason: <one sentence>.
+<one of: contract, architect, spike, research (new issue), none>. Reason: <one sentence>.
 
 ## Ledger
 Rounds 1 to <N>. See comments on this issue.
@@ -792,7 +806,7 @@ safer-telemetry-log --event-type safer.skill_end --modality research \
   --duration-s "$(($(date +%s) - _TEL_START))" 2>/dev/null || true
 ```
 
-If the research matured into a spec-ready artifact, hand off via the graduation statement in the report. Do not write the spec yourself. That is `/safer:spec`.
+If the research matured into a spec-ready artifact, hand off via the graduation statement in the report. Do not write the spec yourself. That is `/safer:contract`.
 
 ## Stop rules
 
@@ -800,7 +814,7 @@ Each stop rule ends with an escalation artifact via `safer-escalate --from resea
 
 1. **Round budget exhausted without EXCELLENT.** Emit `DONE_WITH_CONCERNS`. Name each hypothesis that was advanced but not settled. Target: caller (user or `orchestrate`).
 2. **User input contradicts a working hypothesis.** A mid-loop user comment rejects a claim the loop has been building on. Emit `NEEDS_CONTEXT`, reconcile with the user, then resume.
-3. **The answer requires shipping code.** The research matured past insight into implementation. Emit `ESCALATED` to `/safer:spec`. Do not ship the code yourself.
+3. **The answer requires shipping code.** The research matured past insight into implementation. Emit `ESCALATED` to `/safer:contract`. Do not ship the code yourself.
 4. **Unfalsifiable claim.** A round produces a claim you cannot name a rejecting result for. Stop, reformulate the claim, count as a POOR round.
 5. **Three consecutive POOR rounds.** The question is mis-framed. Emit `ESCALATED` to caller for reframing.
 

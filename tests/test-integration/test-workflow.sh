@@ -63,7 +63,7 @@ echo "  ok  gh authenticated; $REPO accessible"
 # --- 1. Ensure required labels exist ---
 echo "── integration: ensure labels ──"
 LABELS_TO_ENSURE=(
-  "safer:spec" "safer:architect" "safer:implement-junior" "safer:implement-senior"
+  "safer:contract" "safer:architect" "safer:implement-junior" "safer:implement-senior"
   "safer:implement-staff" "safer:diagnose" "safer:spike" "safer:research"
   "safer:review-senior" "safer:verify"
   "planning" "review" "plan-approved" "implementing" "verifying" "done" "triaged" "abandoned"
@@ -83,7 +83,7 @@ cat > "$TMP_BODY" <<EOF
 ## Decomposition
 | # | Modality | Depends on | Acceptance | Sub-issue |
 |---|---|---|---|---|
-| 1 | spec | — | criteria listed | TBD |
+| 1 | contract | — | criteria listed | TBD |
 | 2 | implement-junior | 1 | PR merged | TBD |
 
 [integration-test-marker: $TS_SUFFIX]
@@ -109,10 +109,10 @@ echo "  ok  created epic #$EPIC_NUM"
 echo "── integration: create sub-issue ──"
 SUB_OUT=$("$BIN/safer-publish" \
   --kind issue \
-  --title "[safer:spec] integration test spec $TS_SUFFIX" \
+  --title "[safer:contract] integration test spec $TS_SUFFIX" \
   --body "Integration test sub-issue. Parent epic: #$EPIC_NUM" \
   --parent "$EPIC_NUM" \
-  --labels "safer:spec,planning" \
+  --labels "safer:contract,planning" \
   --repo "$REPO")
 SUB_NUM=$(echo "$SUB_OUT" | grep -oE '[0-9]+$')
 if [ -z "$SUB_NUM" ]; then
@@ -151,14 +151,14 @@ fi
 
 # --- 6. Telemetry + dashboards ---
 echo "── integration: telemetry + dashboards ──"
-"$BIN/safer-telemetry-log" --event-type safer.skill_run --modality spec --session "int-$TS_SUFFIX" --issue "$SUB_NUM" >/dev/null
-"$BIN/safer-telemetry-log" --event-type safer.skill_end --modality spec --session "int-$TS_SUFFIX" --outcome success --duration-s 15 >/dev/null
+"$BIN/safer-telemetry-log" --event-type safer.skill_run --modality contract --session "int-$TS_SUFFIX" --issue "$SUB_NUM" >/dev/null
+"$BIN/safer-telemetry-log" --event-type safer.skill_end --modality contract --session "int-$TS_SUFFIX" --outcome success --duration-s 15 >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.skill_run --modality implement-junior --session "int-$TS_SUFFIX" >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.stop_rule_fired --modality implement-junior --cause "second module touched" >/dev/null
 
 CAL=$("$BIN/safer-calibration" 7d 2>&1)
-if echo "$CAL" | grep -qE "^spec " && echo "$CAL" | grep -qE "^implement-junior "; then
-  echo "  ok  calibration shows spec and implement-junior rows"
+if echo "$CAL" | grep -qE "^contract " && echo "$CAL" | grep -qE "^implement-junior "; then
+  echo "  ok  calibration shows contract and implement-junior rows"
   PASSED=$((PASSED + 1))
 else
   echo "  FAIL: calibration output missing expected modalities:"
@@ -167,7 +167,7 @@ else
 fi
 
 VP=$("$BIN/safer-vp" 7d --repo "$REPO" 2>&1)
-if echo "$VP" | grep -q "VP Engineering" && echo "$VP" | grep -qE "^spec "; then
+if echo "$VP" | grep -q "VP Engineering" && echo "$VP" | grep -qE "^contract "; then
   echo "  ok  VP dashboard renders"
   PASSED=$((PASSED + 1))
 else

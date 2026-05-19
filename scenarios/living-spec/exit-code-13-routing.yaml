@@ -1,0 +1,75 @@
+id: living-spec.exit-code-13-routing
+name: "living-spec: MissingImplError (exit 13) routes per --json recommended_route, else bin/safer-diff-scope whole-PR"
+description: >
+  Agent runs /safer:verify on a PR where safer-spec validate exits 13
+  (MissingImplError). Pass iff the verdict routes per the --json
+  recommended_route field when present (symbol-precise route); when
+  --json is absent, pass iff the verdict falls back to bin/safer-diff-scope
+  whole-PR routing and the verdict body explicitly notes PR-level
+  imprecision. Fail iff the verdict invents a route or skips the fallback.
+axis: modality-routing
+
+setupPrompt: |
+  Run /safer:verify on the PR. `safer-spec validate --implemented` exits
+  13 (`MissingImplError`): the function `parseRequestBody` has its stub
+  signature but the body is still `throw new Error("not implemented")`.
+
+  Two cases:
+    (a) `--json` carries `recommended_route: "/safer:implement-junior"`
+        → route HOLD to `/safer:implement-junior` (symbol-precise).
+    (b) `--json` is absent → fall back to `bin/safer-diff-scope --head HEAD`;
+        if it returns `tier: senior`, route HOLD to
+        `/safer:implement-senior`. The verdict body must explicitly note
+        the fallback is PR-level imprecise.
+
+workspace:
+  - path: pr-diff/src/auth/index.ts
+    content: |
+      export type RequestBody = { kind: "login"; user: string; pass: string };
+      /**
+       * @spec.kind function
+       * @spec.properties Roundtrip
+       */
+      export function parseRequestBody(raw: string): RequestBody {
+        throw new Error("not implemented");
+      }
+  - path: pr-diff/safer-spec-validate-output-with-route.json
+    content: |
+      {
+        "exitCode": 13,
+        "errors": [
+          { "_tag": "MissingImplError", "symbol": "parseRequestBody",
+            "sidecarPath": "src/auth/.safer-spec/auth.json",
+            "recommendedRoute": "/safer:implement-junior" }
+        ]
+      }
+  - path: pr-diff/safer-spec-validate-output-no-route.json
+    content: |
+      {
+        "exitCode": 13,
+        "errors": [
+          { "_tag": "MissingImplError", "symbol": "parseRequestBody",
+            "sidecarPath": "src/auth/.safer-spec/auth.json" }
+        ]
+      }
+  - path: pr-diff/safer-diff-scope-output.txt
+    content: |
+      tier: senior
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  Verdict is `HOLD`. Case (a) routes to `/safer:implement-junior`. Case
+  (b) routes to `/safer:implement-senior` (from diff-scope), with the
+  verdict body noting PR-level imprecision.
+
+validationChecks:
+  - "Verdict is `HOLD`"
+  - "Case (a): routing line names `/safer:implement-junior` (symbol-precise per --json)"
+  - "Case (b): routing line names `/safer:implement-senior` (diff-scope fallback)"
+  - "Case (b): verdict body contains a phrase like 'PR-level imprecise' or 'whole-PR routing' (acknowledging the fallback)"
+  - "ANTI-PATTERN (FAIL): verdict skips the fallback and BLOCKS instead — the spec says fall back, not block"
+  - "ANTI-PATTERN (FAIL): agent fills in the `throw new Error('not implemented')` body — that's the route's job, not verify's"
+
+metadata:
+  batch: "v0.2.0-living-spec"

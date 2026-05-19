@@ -2,6 +2,17 @@
 
 Install paths, dependency requirements, and troubleshooting for safer-by-default. For the 30-second version, see the README's Quick start.
 
+## v0.2.0 prerequisites (read first)
+
+v0.2.0 is **TypeScript + vitest only** AND **dogfood-only**. Before running any install command below, confirm:
+
+- The adopter workspace is the maintainer's `chughtapan/safer-by-default` clone with the `vendor/safer-spec-development/` submodule populated (`git submodule update --init --recursive`).
+- `/safer:setup` will be invoked from `$SBD_ROOT/dogfood/` (the canonical dogfood path). Non-dogfood CWDs halt with a `NotDogfoodCwd` pointer.
+- The workspace carries `tsconfig.json` and `vitest.config.{ts,js,mts}`. Non-TS / non-vitest workspaces halt with a "use safer-by-default 0.1.x" pointer.
+- `pnpm` is installed. v0.2.0's dogfood install uses pnpm's `link:` protocol; npm and bun have different `link:` semantics and are not supported in v0.2.0.
+
+External adopters (anyone outside `chughtapan/safer-by-default`) stay on `safer-by-default` 0.1.x until the publish follow-up (when the codemod publishes to npm) lifts the dogfood pre-flight halt.
+
 ## Claude Code (canonical)
 
 Inside a Claude Code session:
@@ -11,7 +22,7 @@ Inside a Claude Code session:
 /plugin install safer@safer-by-default
 ```
 
-Skills register under the `safer:<name>` namespace (`/safer:spec`, `/safer:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
+Skills register under the `safer:<name>` namespace (`/safer:contract`, `/safer:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
 
 **Verify**:
 
@@ -58,7 +69,7 @@ It then symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex skill wrapp
 | `SAFER_REPO_URL` | Git remote for the XDG fallback clone | `https://github.com/chughtapan/safer-by-default.git` |
 | `CODEX_HOME` | Codex config root | `~/.codex` |
 
-**Verify**: Codex should now respond to `safer:spec`, `safer:architect`, etc. The wrapper SKILL.md files at `~/.codex/skills/safer-<name>/` carry a marker comment (`<!-- safer-by-default codex wrapper -->`) so re-runs replace generated wrappers but leave hand-written ones at the same path untouched.
+**Verify**: Codex should now respond to `safer:contract`, `safer:architect`, etc. The wrapper SKILL.md files at `~/.codex/skills/safer-<name>/` carry a marker comment (`<!-- safer-by-default codex wrapper -->`) so re-runs replace generated wrappers but leave hand-written ones at the same path untouched.
 
 **Upgrade**: re-run `./setup-codex`. The XDG clone refreshes; the wrappers regenerate. If you're using the CC plugin cache as the source, run `/plugin marketplace update safer-by-default` first to refresh that cache, then `./setup-codex`.
 
@@ -70,7 +81,7 @@ After the plugin is installed:
 safer-setup-labels
 ```
 
-Creates the GitHub issue labels (`safer:parent`, `safer:spec`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`, …) the skills publish under. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
+Creates the GitHub issue labels (`safer:parent`, `safer:contract`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`, …) the skills publish under. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
 
 ## Working from source (developers)
 

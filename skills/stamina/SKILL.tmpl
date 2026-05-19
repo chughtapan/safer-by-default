@@ -246,7 +246,7 @@ LABEL=$(gh issue view "$SUB_ISSUE" --json labels -q '.labels[].name' | grep '^sa
 |---|---|
 | `safer:implement-junior` | 1 |
 | `safer:implement-senior`, `safer:diagnose`, `safer:spike`, `safer:research` | 2 |
-| `safer:spec`, `safer:architect` | 3 |
+| `safer:contract`, `safer:architect` | 3 |
 | `safer:implement-staff` | 3 |
 
 **Dispatch set selection.** From the chosen N, select role-diverse reviewers until |set| ≥ N. Roles map to skills:
@@ -464,7 +464,7 @@ Nothing stamina produces lives outside GitHub.
 
 ```bash
 safer-escalate --from stamina \
-  --to <spec|architect|implement-*> \
+  --to <contract|architect|implement-*> \
   --cause <REVIEWER_BLOCK|IRON_RULE_FIRED|HOMOGENEOUS_DISPATCH|CLASSIFIER_ERROR|USER_BUDGET_OVERRIDE>
 ```
 

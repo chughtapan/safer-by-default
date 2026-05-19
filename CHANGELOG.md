@@ -1,3 +1,69 @@
+## 0.2.0 — 2026-05-18
+
+v0.2.0 composes `@chughtapan/safer-spec-development` (the per-folder living-spec codemod) into `safer-by-default` as a required dependency for the maintainer's dogfood workspace. The skill formerly called `/safer:spec` is renamed `/safer:contract`; two new wrapper skills (`/safer:contract-init` and `/safer:contract-migrate`) expose the codemod's per-folder bootstrap and migration flows from inside the plugin. The codemod's typed exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the correct upstream modality, expressing Principle 8 (the ratchet) as integers a CI gate can read.
+
+**v0.2.0 is dogfood-only.** External adopters stay on `safer-by-default` 0.1.x until the publish follow-up (when the codemod publishes to npm) lifts the maintainer-repo pre-flight halt and replaces the `link:`-protocol install with an `@chughtapan/safer-spec-development@~X.Y.Z` install.
+
+### Breaking
+
+- Slash `/safer:spec` removed (hard cut, no alias). The renamed skill is `/safer:contract`. Adopters must run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` to reload; until reload, the old cache continues to surface `/safer:spec`. Post-reload, invoking `/safer:spec` returns Claude Code's "skill not found".
+- `bin/safer-setup-labels` creates `safer:contract` (the new modality label) and no longer creates `safer:spec`. Existing `safer:spec` GitHub labels on adopter repos are not migrated automatically; relabel manually (the script does not touch existing issues by design — Non-goal 3).
+- `/safer:setup` is TypeScript + vitest only in v0.2.0. Non-TS or non-vitest adopters stay on 0.1.x.
+- `/safer:setup` v0.2.0 is dogfood-only: it pre-flight halts unless the CWD is `$SBD_ROOT/dogfood/` inside a populated clone of `chughtapan/safer-by-default`. External adopters wait for the publish follow-up.
+
+### Added
+
+- `vendor/safer-spec-development/` git submodule pinned at sister sha `c63ad4882d` (the post-rename merge into sister main).
+- Two wrapper skills `skills/contract-init/` + `skills/contract-migrate/` that surface the sister codemod's `safer-spec-init` / `safer-spec-migrate` skills inside the plugin. Bodies are inlined at `bin/safer-gen-skills` time from the submodule via the new `{{> vendor-skill:<slug>}}` template directive.
+- `bin/safer-gen-skills --check --release` release-mode gate. Bare `--check` is unchanged and stays green while source carries the `__SAFER_SPEC_VERSION__` sentinel during integration-PR development. `--check --release` fails when the literal sentinel survives in any committed `SKILL.tmpl` or `SKILL.md`, catching the case where the integration PR forgot the final substitution. CI on `release/*` branches runs the release-mode form.
+- `/safer:setup` Step 4c wires the codemod into the dogfood workspace: pre-flight halts (NotInSaferByDefaultClone, VendorSubmoduleAbsent, NotDogfoodCwd, PnpmAbsent, NotTypeScriptError); pins `packageManager: pnpm@X.Y.Z` to `package.json`; installs the codemod via `pnpm add -D link:../vendor/safer-spec-development`; runs `pnpm exec safer-spec doctor`; seeds `safer-spec.config.json`; wires the vitest reporter (sentinel-bounded); appends `SPEC_LAYER=required` to the managed `CLAUDE.md` section; records the doctor output in the Step 11 receipt. Workspace monorepos repeat the seed+wire per workspace package.
+- `/safer:verify` Phase 2/3 ring-1 codemod gate: `pnpm exec safer-spec doctor` (Phase 2 detection probe; failure is `BLOCKED` with doctor output verbatim) and `pnpm exec safer-spec validate --implemented` (Phase 3, wrapped in a Node-based 60s timeout helper). Phase 4 adds the sidecar-thresholds checklist; Phase 5's verdict table gains routing rows for exits 10/11/12/13 and exit 124 (timeout); Phase 6 adds `### Per-folder spec gates` and `### Codemod warnings` sub-sections.
+- `/safer:architect` reads adjacent `MODULE.md` files in Phase 1; Phase 3b runs `pnpm exec safer-spec generate --skeleton-only --dry-run <folder>` for each new folder under a `MODULE.md`-bearing area and embeds the output as a fenced block in the design doc's Modules section; Phase 4 requires a per-export `Property-test gates` sub-section naming each new export's `PropertyType` (Roundtrip, Idempotence, Invariant, OracleAgreement); a new stop rule fires when a new export has no nameable `PropertyType`.
+- `/safer:implement-staff` traceability table gains a `Sidecar property` column; Phase 4 requires `@spec.kind`/`@spec.property`/`@spec.threshold` JSDoc on every new public export in a `MODULE.md`-bearing area; Phase 7 requires `itSpec`/`itSpec.todo` for every PropertyType row; Phase 8 runs `pnpm exec safer-spec validate --implemented` as the pre-PR scope check; Phase 9 PR body gains `## Property-test gates`; a new stop rule fires when a new public export lacks `@spec.*` JSDoc.
+- `/safer:implement-junior` and `/safer:implement-senior` carry one-paragraph cross-references describing how diffs in `MODULE.md`-bearing folders update existing `@spec.*` directives, when to route to architect for NEW directives, and why hand-editing the sidecar JSON is the Principle 7 paper-over anti-pattern.
+- `bin/safer-setup-labels` now creates the full modality-label set: `safer:contract`, `safer:architect`, `safer:implement-{junior,senior,staff}`, `safer:research`, `safer:spike`, `safer:deferred`.
+- `setup-codex` clones with `--recurse-submodules` so vendored sister content lands in the Codex install. The skill-wrapper install loop runs after a narrow-scope retired-wrapper cleanup that removes ONLY `~/.codex/skills/safer-spec` (the known retired wrapper from the rename); other `safer-*` wrappers are left in place. `tests/test-bin/test-setup-codex.sh` asserts the retired-wrapper removal, the three new wrappers (`safer-contract`, `safer-contract-init`, `safer-contract-migrate`), and narrow-scope preservation of an unrelated mock wrapper.
+- 11 scenarios under `scenarios/living-spec/` and one new scenario under `scenarios/principles/P1-types-beat-tests/property-type-as-residual.yaml`. Bodies are skeleton-shaped (id / name / axis / description); `setupPrompt` / `workspace` / `judge` blocks are filled by downstream `/safer:implement-staff` iterations against the demo project.
+- `INSTALL.md` "Demo: living-spec cycle" section describes the end-to-end demo path (TS + vitest, one `auth/` module exposing `signInWithProvider`, walking `/safer:setup → /safer:contract → /safer:architect → /safer:implement-staff → /safer:verify`).
+
+### Doctrine
+
+- `PRINCIPLES.md` Part 2 gains a "Living-spec is the ratchet's machine-readable surface" sub-section after Principle 8's anti-patterns, naming exit codes 10/11/12/13 as Principle 8's machine-readable escalation targets.
+- `PRINCIPLES.md` Principle 7's anti-patterns gain a bullet rejecting the sidecar-edit / `@spec.kind`-edit paper-over: editing the sidecar JSON or the directive to clear a `safer-spec validate` error sidesteps Invariant 2; the route is the exit-code modality, not the JSON edit.
+
+### Deferred to publish follow-up
+
+These items depend on the codemod publishing to npm and are explicitly out of scope for v0.2.0:
+
+- Sister-package `@chughtapan/safer-spec-development` v0.2.0 npm publish.
+- Marketplace publish itself (the `git tag` + `/plugin marketplace publish` step). v0.2.0 content updates ship (VERSION, plugin.json, marketplace.json); the publish step does not.
+- Sister-minor CI contract test that installs the latest published patch within the pinned tilde range. Without an npm publish, there's no patch to install.
+- External-adopter install. v0.2.0's pre-flight halts unless the CWD is the maintainer's dogfood workspace.
+- Sister-package `safer-spec --version` reporting package version (not `SPEC_FORMAT_VERSION`). The integration runs version-skew detection through `safer-spec doctor` per spec Assumption 4, not `--version`; `--version` semantics belong with publish bookkeeping.
+- Step 4c install line swapping from `link:../vendor/safer-spec-development` to `@chughtapan/safer-spec-development@~X.Y.Z`. The CF-3 lifecycle: this swap is a **one-off manual `SKILL.tmpl` edit** in the publish follow-up PR, not a re-substitution of the sentinel. The sentinel mechanism is the v0.2.0-integration-PR pattern; reusing it for the publish follow-up would add complexity for a one-line change.
+
+### User-impact
+
+To pick up v0.2.0 in Claude Code:
+
+```
+/plugin marketplace update safer-by-default
+/plugin install safer@safer-by-default
+```
+
+**If you're an external adopter on 0.1.x:**
+
+- Stay on 0.1.x. v0.2.0 is dogfood-only (it pre-flight halts unless invoked from inside a `chughtapan/safer-by-default` clone with the submodule populated). External-adopter support ships in the publish follow-up (when the codemod publishes to npm).
+- 0.1.x continues to receive bug-fix releases on the `0.1.x` branch. Track that branch for updates.
+
+**If you're the maintainer dogfooding v0.2.0:**
+
+- After reload, `/safer:spec` returns "skill not found"; use `/safer:contract` instead.
+- Existing GitHub issues carrying the `safer:spec` label remain labeled; `bin/safer-setup-labels` no longer creates that label and does not touch existing issues. Manual relabel per repo.
+- `/safer:setup` halts on non-TypeScript / non-vitest projects with a "use safer-by-default 0.1.x" pointer. The dogfood workspace must carry `tsconfig.json` and a `vitest.config.{ts,js,mts}`.
+- `/safer:setup` halts unless invoked from `$SBD_ROOT/dogfood/` inside a populated `chughtapan/safer-by-default` clone. Initialize the submodule first: `git submodule update --init --recursive`.
+- `/safer:setup` requires pnpm. Install pnpm before running setup; the dogfood workspace's `packageManager:` field gets pinned at setup time.
+
 ## 0.1.6 — 2026-05-16
 
 ### Breaking: LSP path consolidates behind a single proxy entry
@@ -144,7 +210,7 @@ Heuristic-based UX audit modality. Read-only on the live UI; emits a goal-linked
 - `skills/ux-audit/SKILL.md`: new skill at v0.1.0. Seven inspection protocols (H1 Nielsen, H2 cognitive walkthrough, H3 WCAG 2.1 AA, H4 responsive, H5 form/microinteraction, H6 stakeholder/artifact read, H7 information architecture). Iron rule: every recommendation has finding + evidence + goal-link.
 - Composition: per-protocol gstack pairings — `/browse` + `/design-review` for visual heuristics, `/qa-only` for cognitive-walkthrough reporting, `/setup-browser-cookies` for auth-blocked surfaces, optional `/plan-ceo-review` via `--challenge-goal` to stress-test the named goal.
 - Workflow: URL/path inference from trigger, complaint-keyword H6 front-run, `SAFER_PARENT_ISSUE` as single orchestrate-context signal (used by Phase 6 publication and SendMessage gating), Phase 1.5 time-budget checkpoint (30-min progress comment, 60-min hard stop), `--prior <issue#>` for re-audit deltas, `DONE_PARKED` status when an orchestrate contract is missing inputs.
-- Out of scope by design: applying fixes (recommendations route to `/safer:implement-*`, `/safer:architect`, or `/safer:spec`), analytics ingestion, plan-mode review of redesign-specs, auto-dispatch of recommendations.
+- Out of scope by design: applying fixes (recommendations route to `/safer:implement-*`, `/safer:architect`, or `/safer:contract`), analytics ingestion, plan-mode review of redesign-specs, auto-dispatch of recommendations.
 
 ### Contracts: explicit autonomy grants
 

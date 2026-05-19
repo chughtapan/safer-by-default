@@ -16,12 +16,12 @@ test_requires_event_type() {
 test_writes_event() {
   local state
   state=$(mktemp -d)
-  SAFER_STATE_DIR="$state" "$BIN" --event-type safer.skill_run --modality spec --session abc-123
+  SAFER_STATE_DIR="$state" "$BIN" --event-type safer.skill_run --modality contract --session abc-123
   local out
   out=$(cat "$state/analytics/events.jsonl")
   rm -rf "$state"
   assert_contains "$out" '"event_type":"safer.skill_run"' "event_type present"
-  assert_contains "$out" '"modality":"spec"' "modality present"
+  assert_contains "$out" '"modality":"contract"' "modality present"
   assert_contains "$out" '"session":"abc-123"' "session present"
   assert_contains "$out" '"ts":"' "timestamp present"
 }
@@ -30,7 +30,7 @@ test_numeric_fields() {
   local state
   state=$(mktemp -d)
   SAFER_STATE_DIR="$state" "$BIN" --event-type safer.skill_end \
-    --modality spec --duration-s 42 --issue 7
+    --modality contract --duration-s 42 --issue 7
   local out
   out=$(cat "$state/analytics/events.jsonl")
   rm -rf "$state"

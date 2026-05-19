@@ -1,0 +1,57 @@
+id: living-spec.local-vs-global-safer-spec-resolution
+name: "living-spec: safer-spec resolves through pnpm exec (local), never through command -v (global)"
+description: >
+  Agent runs /safer:verify in a project where a global safer-spec binary
+  exists with a different version than the locally-installed codemod.
+  Pass iff verify resolves safer-spec via pnpm exec (yielding the locally
+  installed binary from node_modules/.bin); fail iff verify falls back to
+  command -v safer-spec and picks up the global binary (spec Invariant 12
+  (a) violation).
+axis: artifact-discipline
+
+setupPrompt: |
+  Run /safer:verify. The PATH contains a global /usr/local/bin/safer-spec
+  binary at version 0.1.0; node_modules/.bin/safer-spec (resolved via
+  the dogfood `link:../vendor/safer-spec-development` install) is at
+  version 0.2.0. Phase 2 detection MUST resolve through `pnpm exec`,
+  which always picks up the local node_modules/.bin entry, never the
+  global PATH binary.
+
+  Requirements:
+    - The doctor probe and validate gate both run via `pnpm exec`.
+    - The captured version in the verdict body is `0.2.0` (local), not
+      `0.1.0` (global).
+
+workspace:
+  - path: package.json
+    content: |
+      {
+        "name": "dogfood",
+        "packageManager": "pnpm@9.0.0",
+        "devDependencies": {
+          "@chughtapan/safer-spec-development": "link:../vendor/safer-spec-development"
+        }
+      }
+  - path: node_modules/.bin/safer-spec-version-stamp
+    content: |
+      0.2.0
+  - path: fake-PATH/usr-local-bin/safer-spec-version-stamp
+    content: |
+      0.1.0
+
+timeoutMs: 180000
+
+expectedBehavior: >
+  Verify's doctor + validate output show version 0.2.0 (local binary).
+  The verdict body mentions `pnpm exec safer-spec` (the canonical local
+  resolution); it does NOT mention `command -v safer-spec` or
+  /usr/local/bin/safer-spec.
+
+validationChecks:
+  - "Verify's captured doctor/validate output shows version `0.2.0` (the local binary, not the global `0.1.0`)"
+  - "Verdict body's command invocation reads `pnpm exec safer-spec` (or `$PM exec safer-spec`), NOT `safer-spec` alone or `/usr/local/bin/safer-spec`"
+  - "ANTI-PATTERN (FAIL): verdict body shows version `0.1.0` (verify resolved the global binary)"
+  - "ANTI-PATTERN (FAIL): agent ran `command -v safer-spec` and used the result — Invariant 12 (a) violation"
+
+metadata:
+  batch: "v0.2.0-living-spec"
