@@ -77,6 +77,17 @@ validate_vendor_directives() {
     if [ ! -f "$vendor_path" ]; then
       echo "ERROR: vendor-skill $slug not found at $vendor_path (referenced from $tmpl)" >&2
       missing=1
+      continue
+    fi
+    # Refuse to inline a symlinked vendor SKILL.md. The supply-chain threat
+    # model: a compromised sister-repo merge could plant `SKILL.md` as a
+    # symlink pointing at `/etc/passwd` or any host-private file; awk's
+    # `getline` would follow it and inline the contents into a rendered
+    # SKILL.md. Sister-repo skills ship as regular files; a symlink at this
+    # path is a tamper signal.
+    if [ -L "$vendor_path" ]; then
+      echo "ERROR: vendor-skill $slug at $vendor_path is a symlink (referenced from $tmpl); refusing to inline" >&2
+      missing=1
     fi
   done < <(grep -oE "$VENDOR_DIRECTIVE_RE" "$tmpl" | sed -E 's/^\{\{> vendor-skill:([a-z0-9-]+)\}\}$/\1/')
   return "$missing"
@@ -113,6 +124,7 @@ render_one() {
       in_fm = 0
       fm_closed = 0
       first_line = 1
+      h1_demoted = 0
       while ((getline line < vendor_path) > 0) {
         if (first_line) {
           first_line = 0
@@ -124,6 +136,14 @@ render_one() {
         if (in_fm && !fm_closed) {
           if (line == "---") { fm_closed = 1; continue }
           continue
+        }
+        # Demote the vendor body’s first H1 to H2. The wrapper file already
+        # carries its own H1 (e.g. `# /safer:contract-init`); without this the
+        # generated SKILL.md emits two H1s and the document outline reads as
+        # two top-level sections.
+        if (!h1_demoted && line ~ /^# /) {
+          sub(/^# /, "## ", line)
+          h1_demoted = 1
         }
         print line
       }

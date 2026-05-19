@@ -23,7 +23,7 @@ v0.2.0 composes `@chughtapan/safer-spec-development` (the per-folder living-spec
 - `/safer:implement-junior` and `/safer:implement-senior` carry one-paragraph cross-references describing how diffs in `MODULE.md`-bearing folders update existing `@spec.*` directives, when to route to architect for NEW directives, and why hand-editing the sidecar JSON is the Principle 7 paper-over anti-pattern.
 - `bin/safer-setup-labels` now creates the full modality-label set: `safer:contract`, `safer:architect`, `safer:implement-{junior,senior,staff}`, `safer:research`, `safer:spike`, `safer:deferred`.
 - `setup-codex` clones with `--recurse-submodules` so vendored sister content lands in the Codex install. The skill-wrapper install loop runs after a narrow-scope retired-wrapper cleanup that removes ONLY `~/.codex/skills/safer-spec` (the known retired wrapper from the rename); other `safer-*` wrappers are left in place. `tests/test-bin/test-setup-codex.sh` asserts the retired-wrapper removal, the three new wrappers (`safer-contract`, `safer-contract-init`, `safer-contract-migrate`), and narrow-scope preservation of an unrelated mock wrapper.
-- 12 scenarios under `scenarios/living-spec/` and one new scenario under `scenarios/principles/P1-types-beat-tests/property-type-as-residual.yaml`. Bodies are skeleton-shaped (id / name / axis / description); `setupPrompt` / `workspace` / `judge` blocks are filled by downstream `/safer:implement-staff` iterations against the demo project.
+- 11 scenarios under `scenarios/living-spec/` and one new scenario under `scenarios/principles/P1-types-beat-tests/property-type-as-residual.yaml`. Bodies are skeleton-shaped (id / name / axis / description); `setupPrompt` / `workspace` / `judge` blocks are filled by downstream `/safer:implement-staff` iterations against the demo project.
 - `INSTALL.md` "Demo: living-spec cycle" section describes the end-to-end demo path (TS + vitest, one `auth/` module exposing `signInWithProvider`, walking `/safer:setup → /safer:contract → /safer:architect → /safer:implement-staff → /safer:verify`).
 
 ### Doctrine
@@ -51,12 +51,18 @@ To pick up v0.2.0 in Claude Code:
 /plugin install safer@safer-by-default
 ```
 
-After reload:
+**If you're an external adopter on 0.1.x:**
 
-- `/safer:spec` returns "skill not found"; use `/safer:contract` instead.
-- Existing GitHub issues carrying the `safer:spec` label remain labeled; `bin/safer-setup-labels` no longer creates that label, but does not touch existing issues. Manual relabel per repo.
-- `/safer:setup` halts on non-TypeScript / non-vitest projects with a "use safer-by-default 0.1.x" pointer. Stay on 0.1.x if your project isn't TS+vitest.
-- `/safer:setup` halts unless invoked from `$SBD_ROOT/dogfood/` inside a populated `chughtapan/safer-by-default` clone. External adopters wait for the publish follow-up.
+- Stay on 0.1.x. v0.2.0 is dogfood-only (it pre-flight halts unless invoked from inside a `chughtapan/safer-by-default` clone with the submodule populated). External-adopter support ships in the publish follow-up (when the codemod publishes to npm).
+- 0.1.x continues to receive bug-fix releases on the `0.1.x` branch. Track that branch for updates.
+
+**If you're the maintainer dogfooding v0.2.0:**
+
+- After reload, `/safer:spec` returns "skill not found"; use `/safer:contract` instead.
+- Existing GitHub issues carrying the `safer:spec` label remain labeled; `bin/safer-setup-labels` no longer creates that label and does not touch existing issues. Manual relabel per repo.
+- `/safer:setup` halts on non-TypeScript / non-vitest projects with a "use safer-by-default 0.1.x" pointer. The dogfood workspace must carry `tsconfig.json` and a `vitest.config.{ts,js,mts}`.
+- `/safer:setup` halts unless invoked from `$SBD_ROOT/dogfood/` inside a populated `chughtapan/safer-by-default` clone. Initialize the submodule first: `git submodule update --init --recursive`.
+- `/safer:setup` requires pnpm. Install pnpm before running setup; the dogfood workspace's `packageManager:` field gets pinned at setup time.
 
 ## 0.1.6 — 2026-05-16
 

@@ -34,7 +34,7 @@ allowed-tools:
 # /safer:contract-migrate
 
 
-# safer-spec-migrate
+## safer-spec-migrate
 
 You are migrating a project's committed safer-spec artifacts (`MODULE.md`, `.safer-spec/<slug>.json`) from one `SPEC_FORMAT_VERSION` to another. `generate` and `validate` are CLI commands; `migrate` is a SKILL because the diff between format versions involves judgment (which fields to drop, how to merge new sections, what to flag for the human) that a coding agent does more reliably than a versioned codegen path baked into the CLI.
 
