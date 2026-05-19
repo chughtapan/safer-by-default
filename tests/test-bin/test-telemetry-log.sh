@@ -21,7 +21,7 @@ test_writes_event() {
   out=$(cat "$state/analytics/events.jsonl")
   rm -rf "$state"
   assert_contains "$out" '"event_type":"safer.skill_run"' "event_type present"
-  assert_contains "$out" '"modality":"spec"' "modality present"
+  assert_contains "$out" '"modality":"contract"' "modality present"
   assert_contains "$out" '"session":"abc-123"' "session present"
   assert_contains "$out" '"ts":"' "timestamp present"
 }

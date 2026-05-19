@@ -450,7 +450,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `spec` | ~2× | below Research; purely thinking-bound |
+| `contract` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -887,7 +887,7 @@ Each stop rule fires on a specific condition. When fired, produce an escalation 
 
 1. **You fixed a test.** Iron rule violation. Discard the edit (revert the file via `git checkout -- <file>`). Redo the run cleanly. The verdict cannot ship with verify-authored code in the diff.
 2. **Acceptance criteria unverifiable without more context.** Multiple criteria need external evidence verify cannot collect. Status: `BLOCKED`. Name each unverifiable criterion and what would verify it.
-3. **The tests themselves are broken.** The test file has a syntax error, or the test harness does not start, or a test is asserting against stale fixtures that were never updated with the diff. Status: `ESCALATED` to `spec` or `architect` (the contract the tests encode is wrong). Do not patch the tests.
+3. **The tests themselves are broken.** The test file has a syntax error, or the test harness does not start, or a test is asserting against stale fixtures that were never updated with the diff. Status: `ESCALATED` to `contract` or `architect` (the contract the tests encode is wrong). Do not patch the tests.
 4. **Missing test infrastructure.** The repo has no runnable test command and no lint command. Status: `BLOCKED` to user; the repo is not verify-ready.
 5. **Persistent flakiness.** A test passes on retry but fails again on a third run. Status: `HOLD` with "flaky test is a regression" as the finding; route to `diagnose`. Do not `SHIP_WITH_CONCERNS` for a test that is unstable at this level.
 6. **Scope mismatch mid-run.** The diff grew between review-senior's review and your checkout (the author pushed more commits). Status: `BLOCKED`; ask review-senior to re-review the new head. Do not verify a diff that has not been reviewed at the current SHA.
@@ -927,7 +927,7 @@ A `HOLD` verdict is a valid terminal output for this modality: verify's job is t
 <each failing command or criterion, with file:line or test name>
 
 ## Recommended route
-<implement-junior | implement-senior | diagnose | architect | spec>
+<implement-junior | implement-senior | diagnose | architect | contract>
 
 ## Confidence
 <LOW|MED|HIGH> <evidence>

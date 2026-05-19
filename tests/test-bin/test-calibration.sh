@@ -13,7 +13,7 @@ seed_state() {
   local state="$1"
   mkdir -p "$state/analytics"
   # Use safer-telemetry-log so timestamps are current (within window)
-  # Healthy modality: spec (5 runs, 1 escalation)
+  # Healthy modality: contract (5 runs, 1 escalation)
   for _ in 1 2 3 4 5; do
     SAFER_STATE_DIR="$state" "$LOG" --event-type safer.skill_run --modality contract --session t-$RANDOM >/dev/null 2>&1
   done
@@ -48,7 +48,7 @@ test_tags_healthy() {
   local out
   out=$(SAFER_STATE_DIR="$state" "$BIN" 7d 2>&1)
   rm -rf "$state"
-  assert_contains "$out" "spec" "spec row present"
+  assert_contains "$out" "contract" "contract row present"
   assert_contains "$out" "HEALTHY" "HEALTHY tag present somewhere"
 }
 

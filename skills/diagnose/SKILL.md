@@ -451,7 +451,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `spec` | ~2× | below Research; purely thinking-bound |
+| `contract` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -713,7 +713,7 @@ Run `/codex` with the published reproduction artifact. Codex is the cross-model 
 /codex --mode diagnose --artifact <repro-URL> --hold-scope
 ```
 
-(`--hold-scope` keeps codex from prompting the user mid-run; if codex would prompt, it escalates to `/safer:orchestrate` per the same convention as architect/spec/verify.)
+(`--hold-scope` keeps codex from prompting the user mid-run; if codex would prompt, it escalates to `/safer:orchestrate` per the same convention as architect/contract/verify.)
 
 Codex returns one of three verdicts:
 

@@ -161,8 +161,8 @@ test_vendor_skill_symlink_refused() {
   local tmp; tmp=$(mktemp -d)
   build_fixture "$tmp"
   write_vendor_skill "$tmp" "real-target"
-  # Replace example-vendor/SKILL.md with a symlink to a host-private file
-  # (the threat model: a compromised sister-repo merge plants a symlink).
+  # Plant the leaf SKILL.md as a symlink to a host-private file (the
+  # threat model: a compromised sister-repo merge plants a leaf symlink).
   mkdir -p "$tmp/vendor/safer-spec-development/skills/example-vendor"
   local secret="$tmp/secret-host-file"
   echo "host-private-content-must-not-inline" > "$secret"
@@ -173,11 +173,121 @@ test_vendor_skill_symlink_refused() {
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
   assert_ne "$rc" "0" "renderer refuses symlinked vendor SKILL.md" || { rm -rf "$tmp"; return 1; }
-  assert_contains "$out" "symlink" "stderr names the symlink refusal" || { rm -rf "$tmp"; return 1; }
+  assert_contains "$out" "refusing to inline" "stderr names the refusal" || { rm -rf "$tmp"; return 1; }
   # The host-private contents must NOT have been inlined.
   if [ -f "$tmp/skills/example/SKILL.md" ]; then
     ! grep -qF "host-private-content-must-not-inline" "$tmp/skills/example/SKILL.md" \
       || { rm -rf "$tmp"; echo "    FAIL: symlink target was inlined"; return 1; }
+  fi
+  rm -rf "$tmp"
+}
+
+test_vendor_skill_dir_symlink_refused() {
+  # Round-2 security finding: the leaf-only `[ -L "$vendor_path" ]` check
+  # missed directory-component symlinks. A compromised sister-repo merge can
+  # plant the per-slug directory as a symlink pointing at an attacker-controlled
+  # tree where the leaf SKILL.md is a regular file. Git represents directory
+  # symlinks and file symlinks identically at the tree level. The guard must
+  # close both shapes.
+  local tmp; tmp=$(mktemp -d)
+  build_fixture "$tmp"
+  # Attacker tree: a real directory holding a real SKILL.md the attacker
+  # controls. The leaf is NOT a symlink — only the slug directory is.
+  local attacker_dir="$tmp/attacker-tree/example-vendor"
+  mkdir -p "$attacker_dir"
+  cat > "$attacker_dir/SKILL.md" <<'EOF'
+---
+name: example-vendor
+---
+
+# example-vendor
+
+SECRET-CONTENT-VIA-DIR-SYMLINK-9999 — host-private vector that must never inline.
+EOF
+  # Plant the per-slug DIRECTORY as a symlink under the vendor tree.
+  mkdir -p "$tmp/vendor/safer-spec-development/skills"
+  ln -s "$attacker_dir" "$tmp/vendor/safer-spec-development/skills/example-vendor"
+  write_wrapper_skill "$tmp" "example" "example-vendor"
+
+  local rc
+  local out
+  out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
+  assert_ne "$rc" "0" "renderer refuses directory-symlink in vendor tree" || { rm -rf "$tmp"; return 1; }
+  assert_contains "$out" "refusing to inline" "stderr names the directory-symlink refusal" || { rm -rf "$tmp"; return 1; }
+  if [ -f "$tmp/skills/example/SKILL.md" ]; then
+    ! grep -qF "SECRET-CONTENT-VIA-DIR-SYMLINK-9999" "$tmp/skills/example/SKILL.md" \
+      || { rm -rf "$tmp"; echo "    FAIL: directory-symlink target was inlined"; return 1; }
+  fi
+  rm -rf "$tmp"
+}
+
+test_vendor_skill_in_root_dir_symlink_refused() {
+  # The trickiest case: directory symlink whose target lives WITHIN the
+  # vendor root. The canonical-prefix check passes (resolved path is still
+  # inside $VENDOR_SKILLS_ROOT). Only the component-walk arm catches this.
+  # Threat model: attacker plants a symlink to bypass per-folder governance
+  # boundaries WITHIN the sister repo (e.g., redirect /skills/safer-spec-init/
+  # to /skills/safer-spec-migrate/ to swap which body the wrapper renders).
+  local tmp; tmp=$(mktemp -d)
+  build_fixture "$tmp"
+  # Plant a real target inside the vendor root.
+  mkdir -p "$tmp/vendor/safer-spec-development/skills/real-target"
+  cat > "$tmp/vendor/safer-spec-development/skills/real-target/SKILL.md" <<'EOF'
+---
+name: real-target
+---
+
+# real-target
+
+IN-ROOT-REDIRECT-TARGET — must not inline via a directory-symlink redirect.
+EOF
+  # Plant a directory-symlink under the vendor root pointing at the in-root target.
+  ln -s "$tmp/vendor/safer-spec-development/skills/real-target" \
+    "$tmp/vendor/safer-spec-development/skills/example-vendor"
+  write_wrapper_skill "$tmp" "example" "example-vendor"
+
+  local rc
+  local out
+  out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
+  assert_ne "$rc" "0" "renderer refuses in-root directory-symlink" || { rm -rf "$tmp"; return 1; }
+  assert_contains "$out" "refusing to inline" "stderr names the in-root symlink refusal" || { rm -rf "$tmp"; return 1; }
+  if [ -f "$tmp/skills/example/SKILL.md" ]; then
+    ! grep -qF "IN-ROOT-REDIRECT-TARGET" "$tmp/skills/example/SKILL.md" \
+      || { rm -rf "$tmp"; echo "    FAIL: in-root symlink target was inlined"; return 1; }
+  fi
+  rm -rf "$tmp"
+}
+
+test_vendor_skill_escape_via_canonical_path_refused() {
+  # Sibling shape: when the leaf or a directory symlink's target lives entirely
+  # OUTSIDE $VENDOR_SKILLS_ROOT, the canonicalize+prefix-check arm fires (the
+  # symlink-component walk also catches this, but the prefix-check is the
+  # belt to the walk's suspenders — covering attacker patterns the walk
+  # might miss as the implementation evolves).
+  local tmp; tmp=$(mktemp -d)
+  build_fixture "$tmp"
+  local outside_target="$tmp/outside-tree/example-vendor"
+  mkdir -p "$outside_target"
+  cat > "$outside_target/SKILL.md" <<'EOF'
+---
+name: example-vendor
+---
+
+# example-vendor
+
+ESCAPE-TARGET-CONTENT — must not inline.
+EOF
+  mkdir -p "$tmp/vendor/safer-spec-development/skills"
+  ln -s "$outside_target" "$tmp/vendor/safer-spec-development/skills/example-vendor"
+  write_wrapper_skill "$tmp" "example" "example-vendor"
+
+  local rc
+  local out
+  out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
+  assert_ne "$rc" "0" "renderer refuses canonical-path escape" || { rm -rf "$tmp"; return 1; }
+  if [ -f "$tmp/skills/example/SKILL.md" ]; then
+    ! grep -qF "ESCAPE-TARGET-CONTENT" "$tmp/skills/example/SKILL.md" \
+      || { rm -rf "$tmp"; echo "    FAIL: outside-root content was inlined"; return 1; }
   fi
   rm -rf "$tmp"
 }
@@ -200,6 +310,9 @@ run_test "vendor-skill directive inlines body, strips frontmatter, demotes H1" t
 run_test "--check --release passes on a clean tree" test_check_release_passes_on_clean_tree
 run_test "--check --release fails when sentinel is in SKILL.tmpl directly" test_check_release_fails_on_sentinel_in_tmpl
 run_test "--check --release fails when sentinel inlines via vendor body" test_check_release_fails_on_sentinel_via_vendor_indirection
-run_test "renderer refuses symlinked vendor SKILL.md (supply-chain guard)" test_vendor_skill_symlink_refused
+run_test "renderer refuses symlinked vendor SKILL.md (supply-chain guard, leaf)" test_vendor_skill_symlink_refused
+run_test "renderer refuses directory-symlink in vendor tree (supply-chain guard, dir)" test_vendor_skill_dir_symlink_refused
+run_test "renderer refuses in-root directory-symlink (component-walk arm)" test_vendor_skill_in_root_dir_symlink_refused
+run_test "renderer refuses canonical-path escape outside vendor root" test_vendor_skill_escape_via_canonical_path_refused
 run_test "renderer pre-validates and fails loud on missing vendor slug" test_vendor_directive_pre_validates_missing_slug
 report

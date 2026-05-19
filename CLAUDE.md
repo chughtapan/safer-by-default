@@ -25,4 +25,4 @@ Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:contract
 
 ## Skill routing
 
-- Stamina review on high-blast-radius artifact (public-surface PR, spec, architect plan) → invoke `/safer:stamina`.
+- Stamina review on high-blast-radius artifact (public-surface PR, contract, architect plan) → invoke `/safer:stamina`.

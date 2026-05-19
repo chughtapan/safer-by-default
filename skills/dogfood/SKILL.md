@@ -2,7 +2,7 @@
 name: dogfood
 version: 0.1.0
 description: |
-  Read any published artifact (spec, design doc, PR body, issue comment,
+  Read any published artifact (contract, design doc, PR body, issue comment,
   investigation writeup) with NO prior session context and report on how a
   cold-start consumer would feel picking it up. Scores four numeric axes
   (clarity, completeness, actionability, trust) plus a friction list with
@@ -454,7 +454,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `spec` | ~2× | below Research; purely thinking-bound |
+| `contract` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |

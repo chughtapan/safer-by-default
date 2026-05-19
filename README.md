@@ -154,7 +154,7 @@ user intent
 
 `/safer:setup` Step 4c installs the codemod **once** at the dogfood workspace root (`$SBD_ROOT/dogfood/`); the `link:`-protocol install populates the workspace's `node_modules/.bin`. If the dogfood layout has `vitest.workspace.ts` or per-package `vitest.config.{ts,js,mts}` files, setup repeats the **wire+seed** step (reporter patch + `safer-spec.config.json` seed) per workspace package, but the codemod install runs only at the workspace root.
 
-**Parent epic + sub-issues:** The orchestrate skill breaks one user intent into a GitHub issue (parent epic) and creates child sub-issues for each work unit (spec, architecture, implementation, review). Each sub-issue tracks one modality of work.
+**Parent epic + sub-issues:** The orchestrate skill breaks one user intent into a GitHub issue (parent epic) and creates child sub-issues for each work unit (contract, architecture, implementation, review). Each sub-issue tracks one modality of work.
 
 **Scope discipline:** The principles enforce that each skill works in isolation — one module, one design phase, one code review — without reaching sideways into sibling work. The `/safer:implement-junior` skill, for example, fills one module's internals and does not touch a second file. If a second file is needed, the work is escalated to a senior skill that has permission to cross module boundaries.
 

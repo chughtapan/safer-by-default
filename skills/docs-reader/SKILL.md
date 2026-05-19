@@ -452,7 +452,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `spec` | ~2× | below Research; purely thinking-bound |
+| `contract` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -668,9 +668,9 @@ Four personas live as prompt files in `prompts/`:
 | `prompts/cli-ergonomics-auditor.md` | CLI ergonomics auditor | flag coherence, error messages, noisy output, discoverability |
 | `prompts/security-skeptic.md` | Security skeptic | auth claims, secret handling, trust boundaries, supply-chain surface |
 
-Each file states: role, inputs accepted, evidence-citation rule, output schema, stop rules, status marker vocabulary. A persona not in this list is not shipped in v1; adding one is a new spec, not a staff call.
+Each file states: role, inputs accepted, evidence-citation rule, output schema, stop rules, status marker vocabulary. A persona not in this list is not shipped in v1; adding one is a new contract, not a staff call.
 
-A 5th `non-engineer-pm` persona was considered in spec Q1 and rejected for v1 (rationale: jargon-density overlaps with `cold-start-junior`; adding a persona later is cheap — one new prompt file, no new skill).
+A 5th `non-engineer-pm` persona was considered in contract Q1 and rejected for v1 (rationale: jargon-density overlaps with `cold-start-junior`; adding a persona later is cheap — one new prompt file, no new skill).
 
 ## Workflow
 
