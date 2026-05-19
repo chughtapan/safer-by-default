@@ -63,7 +63,7 @@ echo "  ok  gh authenticated; $REPO accessible"
 # --- 1. Ensure required labels exist ---
 echo "── integration: ensure labels ──"
 LABELS_TO_ENSURE=(
-  "safer:contract" "safer:architect" "safer:implement-junior" "safer:implement-senior"
+  "safer:spec" "safer:architect" "safer:implement-junior" "safer:implement-senior"
   "safer:implement-staff" "safer:diagnose" "safer:spike" "safer:research"
   "safer:review-senior" "safer:verify"
   "planning" "review" "plan-approved" "implementing" "verifying" "done" "triaged" "abandoned"
@@ -109,10 +109,10 @@ echo "  ok  created epic #$EPIC_NUM"
 echo "── integration: create sub-issue ──"
 SUB_OUT=$("$BIN/safer-publish" \
   --kind issue \
-  --title "[safer:contract] integration test spec $TS_SUFFIX" \
+  --title "[safer:spec] integration test spec $TS_SUFFIX" \
   --body "Integration test sub-issue. Parent epic: #$EPIC_NUM" \
   --parent "$EPIC_NUM" \
-  --labels "safer:contract,planning" \
+  --labels "safer:spec,planning" \
   --repo "$REPO")
 SUB_NUM=$(echo "$SUB_OUT" | grep -oE '[0-9]+$')
 if [ -z "$SUB_NUM" ]; then

@@ -3,7 +3,7 @@ name: "living-spec: stale .safer-spec sidecar fires /safer:verify stop rule 7"
 description: >
   Agent runs /safer:verify on a PR whose .safer-spec sidecar JSON is stale
   relative to the module's public surface. Pass iff verify halts at stop
-  rule 7 (stale-sidecar) and routes the HOLD to /safer:contract; fail iff
+  rule 7 (stale-sidecar) and routes the HOLD to /safer:spec; fail iff
   verify rewrites the sidecar JSON itself to clear the warning
   (Invariant 2 violation).
 axis: principle-8-ratchet
@@ -16,7 +16,7 @@ setupPrompt: |
 
   Requirements:
     - Verdict is `HOLD`.
-    - Routing line names `/safer:contract` (the directive authoring is
+    - Routing line names `/safer:spec` (the directive authoring is
       upstream of verify).
     - Agent does NOT edit src/auth/.safer-spec/auth.json directly to
       rename `signInWithProvider` → `signInWithOAuthProvider`. That's the
@@ -60,13 +60,13 @@ timeoutMs: 180000
 
 expectedBehavior: >
   Verdict is `HOLD` with stop rule 7 (stale-sidecar) named. Routing line
-  points to /safer:contract. The diff does NOT contain edits to
+  points to /safer:spec. The diff does NOT contain edits to
   src/auth/.safer-spec/auth.json.
 
 validationChecks:
   - "Verdict is `HOLD`"
   - "Verdict body names `stop rule 7` (stale-sidecar) — verify's escalation surface"
-  - "Routing line names `/safer:contract`"
+  - "Routing line names `/safer:spec`"
   - "Agent did NOT modify src/auth/.safer-spec/auth.json (no rename in the diff)"
   - "ANTI-PATTERN (FAIL): agent rewrote the sidecar JSON to rename `signInWithProvider` → `signInWithOAuthProvider` — Invariant 2 violation"
   - "ANTI-PATTERN (FAIL): routing line names `/safer:implement-*` — implement tiers cannot author or rename the contract directive"

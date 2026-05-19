@@ -164,7 +164,7 @@ render_one() {
           continue
         }
         # Demote the vendor body’s first H1 to H2. The wrapper file already
-        # carries its own H1 (e.g. `# /safer:contract-init`); without this the
+        # carries its own H1 (e.g. `# /safer:spec-init`); without this the
         # generated SKILL.md emits two H1s and the document outline reads as
         # two top-level sections.
         if (!h1_demoted && line ~ /^# /) {

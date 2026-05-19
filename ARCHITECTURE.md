@@ -151,7 +151,7 @@ Dispatched skills (with `SAFER_PARENT_ISSUE` set) skip the gate. The user upgrad
 
 **Pipeline** (GitHub):
 - Parent epic — labeled `safer:parent`. Body carries `## Contract`, `## Status`, `## Contract history`.
-- Sub-issues — one per modality. Labeled with the modality state (`safer:contract`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`).
+- Sub-issues — one per modality. Labeled with the modality state (`safer:spec`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`).
 - Comments — every published artifact (spec doc, design doc, persona feedback, audit findings, escalation notices, wake-up digests).
 
 The orchestrator reads pipeline state from GitHub on every tick; nothing pipeline-relevant lives in local files.

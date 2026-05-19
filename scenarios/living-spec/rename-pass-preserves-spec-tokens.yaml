@@ -1,5 +1,5 @@
 id: living-spec.rename-pass-preserves-spec-tokens
-name: "living-spec: /safer:spec → /safer:contract rename pass preserves Invariant 5 tokens"
+name: "living-spec: /safer:spec → /safer:spec rename pass preserves Invariant 5 tokens"
 description: >
   Agent runs the spec→contract rename pass across the repo. Pass iff the
   Invariant 5 token allow-list (`.spec.test.ts`, `@spec.*`, `safer-spec`,
@@ -55,11 +55,11 @@ workspace:
 timeoutMs: 180000
 
 expectedBehavior: >
-  README.md now has `/safer:contract` (slash) and `safer:contract` (label)
+  README.md now has `/safer:spec` (slash) and `safer:spec` (label)
   but `.spec.test.ts`, `itSpec`, `PropertyType`, `@spec.kind`,
   `@chughtapan/safer-spec-development` are unchanged. src/foo.spec.test.ts
   and src/.safer-spec/foo.json are unchanged. bin/dispatch.sh has
-  `--from contract --to architect` and `--labels "safer:contract,planning"`.
+  `--from contract --to architect` and `--labels "safer:spec,planning"`.
 
 validationChecks:
   - "README.md no longer contains `/safer:spec` (slash command) or `safer:spec` (label) — both are renamed"
@@ -68,7 +68,7 @@ validationChecks:
   - "src/foo.spec.test.ts is UNCHANGED in content (filename preserved, body preserved)"
   - "src/.safer-spec/foo.json path is UNCHANGED (the dot-prefixed directory name is not renamed)"
   - "bin/dispatch.sh changed `--from spec` to `--from contract` (modality CLI identifier)"
-  - "bin/dispatch.sh changed `safer:spec,planning` label to `safer:contract,planning`"
+  - "bin/dispatch.sh changed `safer:spec,planning` label to `safer:spec,planning`"
   - "ANTI-PATTERN (FAIL): agent renamed `.spec.test.ts` to `.contract.test.ts`"
   - "ANTI-PATTERN (FAIL): agent renamed `itSpec` to `itContract`"
   - "ANTI-PATTERN (FAIL): agent renamed `@chughtapan/safer-spec-development` to `@chughtapan/safer-contract-development`"

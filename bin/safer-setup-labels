@@ -34,7 +34,7 @@ main() {
 
   # Modality labels (one per skill that authors a labeled durable artifact).
   # Idempotent: re-running adds only what's missing.
-  create_label_idempotent "safer:contract"          "0e8a16" "contract modality: spec / acceptance criteria authored by /safer:contract"
+  create_label_idempotent "safer:spec"          "0e8a16" "spec modality: spec / acceptance criteria authored by /safer:spec"
   create_label_idempotent "safer:architect"         "1d76db" "architect modality: design doc / interface stubs by /safer:architect"
   create_label_idempotent "safer:implement-junior"  "5319e7" "implement-junior modality: single-module internals"
   create_label_idempotent "safer:implement-senior"  "5319e7" "implement-senior modality: cross-module within architect plan"
@@ -52,7 +52,8 @@ create_label_idempotent() {
   local description="$3"
 
   # Check if label already exists. -Fxq for exact (fixed, full-line) match
-  # so a label like `safer:contract` does not collide with `safer:contract-init`.
+  # so labels with shared prefixes (e.g. `safer:implement-junior` vs
+  # `safer:implement-senior`) cannot collide via partial match.
   # awk -F'\t' splits on the literal tab `gh label list` uses as its column
   # delimiter, so labels that ever contain whitespace stay intact instead of
   # being silently truncated at the first space.

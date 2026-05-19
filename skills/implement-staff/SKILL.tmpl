@@ -120,7 +120,7 @@ GitHub.
 
 ## Inputs required
 
-- A spec in state `plan-approved`, published on GitHub (issue labeled `safer:contract`, or an architect plan that references and aligns with a published spec).
+- A spec in state `plan-approved`, published on GitHub (issue labeled `safer:spec`, or an architect plan that references and aligns with a published spec).
 - A sub-issue labeled `safer:implement-staff`.
 - `gh` authenticated.
 - Local repo on a clean working tree.
@@ -159,7 +159,7 @@ If the spec URL was not passed with the invocation, stop and ask. No spec, no st
 - Transitioning the sub-issue label `planning` → `implementing` → `review`.
 
 **Forbidden:**
-- Revising the spec. If the spec is wrong or incomplete, escalate to `/safer:contract`.
+- Revising the spec. If the spec is wrong or incomplete, escalate to `/safer:spec`.
 - Introducing a new module the spec did not authorize, even if "it would make the new module cleaner."
 - Adding a public surface not in the spec or plan ("might be useful later" is the debt pattern).
 - Adding a dep that the plan did not authorize.
@@ -246,7 +246,7 @@ For each new module in the traceability table:
 
 This sequence produces a module whose shape is visible before any behavior is written. The shape is what the downstream caller compiles against; get it right first.
 
-**`@spec.*` JSDoc on new public exports (v0.2.0 dogfood).** Every new public export in a `MODULE.md`-bearing area carries `@spec.kind`, `@spec.property`, and (where applicable) `@spec.threshold` JSDoc directives that match the architect plan's Property-test gates table. The codemod reads these directives at validate time and writes the per-folder `.safer-spec/<slug>.json` sidecar accordingly. An export without `@spec.kind` is a Phase 8 validate failure (exit code 11 → routes back to `/safer:contract` per Principle 8); the route is to author the directive in the contract step, not to clear the error by hand-editing the sidecar (stop rule 4 below).
+**`@spec.*` JSDoc on new public exports (v0.2.0 dogfood).** Every new public export in a `MODULE.md`-bearing area carries `@spec.kind`, `@spec.property`, and (where applicable) `@spec.threshold` JSDoc directives that match the architect plan's Property-test gates table. The codemod reads these directives at validate time and writes the per-folder `.safer-spec/<slug>.json` sidecar accordingly. An export without `@spec.kind` is a Phase 8 validate failure (exit code 11 → routes back to `/safer:spec` per Principle 8); the route is to author the directive in the contract step, not to clear the error by hand-editing the sidecar (stop rule 4 below).
 
 ### Phase 5 — Install deps
 
@@ -319,7 +319,7 @@ Expected: `tier: staff`. Other classifications are signals:
 pnpm exec safer-spec validate --implemented
 ```
 
-Apply the routing per `/safer:verify`'s Phase 5 table: exit `11` → escalate to `/safer:contract` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`; exit `12` → escalate to `/safer:architect` (or self-route if the stub is in scope per the architect plan); exit `13` → finish the implementation (the staff PR cannot ship with `MissingImplError` rows). Editing the sidecar JSON or `@spec.*` directives by hand to clear the validate error is the Principle 7 anti-pattern (stop rule 4 below).
+Apply the routing per `/safer:verify`'s Phase 5 table: exit `11` → escalate to `/safer:spec` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`; exit `12` → escalate to `/safer:architect` (or self-route if the stub is in scope per the architect plan); exit `13` → finish the implementation (the staff PR cannot ship with `MissingImplError` rows). Editing the sidecar JSON or `@spec.*` directives by hand to clear the validate error is the Principle 7 anti-pattern (stop rule 4 below).
 
 ### Phase 8a — Pre-PR simplify pass (mandatory, stricter than senior)
 
@@ -428,10 +428,10 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults or left
 
 ## Stop rules
 
-1. **Spec revision needed.** An acceptance criterion is wrong, missing, or contradictory as the implementation surfaces it. → `ESCALATED` to `/safer:contract` via `safer-escalate --from implement-staff --to contract --cause SPEC_REVISION`.
+1. **Spec revision needed.** An acceptance criterion is wrong, missing, or contradictory as the implementation surfaces it. → `ESCALATED` to `/safer:spec` via `safer-escalate --from implement-staff --to contract --cause SPEC_REVISION`.
 2. **Unresolvable ambiguity in the plan.** The plan leaves a load-bearing question open. → `ESCALATED` to architect.
 3. **Scope drift: a new artifact has no anchor.** → Stop. Delete the artifact or escalate. The traceability table is the rule.
-4. **New public export without `@spec.*` JSDoc** (v0.2.0 dogfood; folder carries `MODULE.md`). The directive is the contract surface the codemod reads; missing it is upstream work, not an implement-staff fix. Editing the sidecar JSON or `@spec.kind` directive by hand to clear the validate error is the Principle 7 anti-pattern (paper-over). → `ESCALATED` to `/safer:contract` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`.
+4. **New public export without `@spec.*` JSDoc** (v0.2.0 dogfood; folder carries `MODULE.md`). The directive is the contract surface the codemod reads; missing it is upstream work, not an implement-staff fix. Editing the sidecar JSON or `@spec.kind` directive by hand to clear the validate error is the Principle 7 anti-pattern (paper-over). → `ESCALATED` to `/safer:spec` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`.
 5. **Dep license or maintenance status unclear.** → `NEEDS_CONTEXT` to user. Do not "probably MIT" a dep choice.
 6. **`safer-diff-scope` errors out or returns an unexpected value.** → `NEEDS_CONTEXT`. Capture the output, do not push.
 7. **Pre-existing module needs a public-surface change that the spec did not authorize.** → `ESCALATED` to architect and spec.

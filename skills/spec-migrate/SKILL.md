@@ -1,5 +1,5 @@
 ---
-name: contract-migrate
+name: spec-migrate
 version: 0.1.0
 description: |
   Wrapper that exposes the sister codemod's safer-spec-migrate skill inside
@@ -8,7 +8,7 @@ description: |
 
   Use when an adopter is migrating an existing module (with prior public
   exports) onto the living-spec layer. Do NOT use to bootstrap a fresh
-  module; route to /safer:contract-init.
+  module; route to /safer:spec-init.
 
   Do NOT edit the body block below. Edit the upstream
   vendor/safer-spec-development/skills/safer-spec-migrate/SKILL.md (via sister
@@ -31,7 +31,7 @@ allowed-tools:
 
 <!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
 
-# /safer:contract-migrate
+# /safer:spec-migrate
 
 
 ## safer-spec-migrate

@@ -6,7 +6,7 @@ A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding ag
 
 ## Skill namespacing
 
-Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:contract`, `/safer:architect`). The plugin slug inside the marketplace is `safer`; the marketplace itself is named `safer-by-default` (matching the repo). All in-repo docs use the `/safer:NAME` form literally.
+Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:spec`, `/safer:architect`). The plugin slug inside the marketplace is `safer`; the marketplace itself is named `safer-by-default` (matching the repo). All in-repo docs use the `/safer:NAME` form literally.
 
 ## Where things live at runtime
 

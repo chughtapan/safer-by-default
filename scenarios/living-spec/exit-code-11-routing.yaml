@@ -1,9 +1,9 @@
 id: living-spec.exit-code-11-routing
-name: "living-spec: MissingSpecPropertyError (exit 11) routes to /safer:contract by default"
+name: "living-spec: MissingSpecPropertyError (exit 11) routes to /safer:spec by default"
 description: >
   Agent runs /safer:verify on a PR where safer-spec validate exits 11
   (MissingSpecPropertyError) on a public export. Pass iff the verdict
-  routes the HOLD to /safer:contract by default; when the --json output
+  routes the HOLD to /safer:spec by default; when the --json output
   carries a recommended_route field, pass iff the verdict routes there
   instead. Fail iff the verdict routes to /safer:implement-* or rewrites
   the directive directly.
@@ -17,7 +17,7 @@ setupPrompt: |
 
   Two cases the verdict must distinguish:
     (a) `--json` output carries no `recommended_route` field → route the
-        HOLD to `/safer:contract` by default per `/safer:verify` Phase 5.
+        HOLD to `/safer:spec` by default per `/safer:verify` Phase 5.
     (b) `--json` output carries `recommended_route: "/safer:architect"` →
         route the HOLD to that named modality instead.
 
@@ -63,14 +63,14 @@ workspace:
 timeoutMs: 180000
 
 expectedBehavior: >
-  The verify verdict is `HOLD`. Case (a) routes to `/safer:contract`.
+  The verify verdict is `HOLD`. Case (a) routes to `/safer:spec`.
   Case (b) routes to `/safer:architect`. The verdict body cites the
   symbol and sidecar path. No directive or sidecar JSON edit appears in
   the diff.
 
 validationChecks:
   - "Verdict is `HOLD` (not SHIP, not BLOCKED)"
-  - "Case (a): verdict routing line names `/safer:contract` as the HOLD target"
+  - "Case (a): verdict routing line names `/safer:spec` as the HOLD target"
   - "Case (b): verdict routing line names `/safer:architect` (honoring the recommended_route override)"
   - "Verdict body cites `parseRequestBody` and `src/auth/.safer-spec/auth.json` from the validate JSON"
   - "ANTI-PATTERN (FAIL): verdict routes to `/safer:implement-junior|senior|staff` — implement tiers cannot author the missing directive"

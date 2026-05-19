@@ -205,7 +205,7 @@ SPEC_VALIDATE_EXIT=$?
 set -e
 ```
 
-Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec layer); `10` (version skew) → `BLOCKED` with doctor output verbatim; `11` (`MissingSpecPropertyError`) → `HOLD` route `/safer:contract` (override if `--json` carries `recommended_route`); `12` (`MissingStubError`) → `HOLD` route `/safer:architect` (or `/safer:implement-staff` if `--json` names the stub); `13` (`MissingImplError`) → `HOLD` route `/safer:implement-{junior,senior,staff}` per `--json recommended_route`; fallback to `bin/safer-diff-scope` whole-PR with a verdict-body note that routing is PR-level imprecise; `124` (timeout) → `BLOCKED` with stderr surfaced. Phase 5's verdict table carries the same rows.
+Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec layer); `10` (version skew) → `BLOCKED` with doctor output verbatim; `11` (`MissingSpecPropertyError`) → `HOLD` route `/safer:spec` (override if `--json` carries `recommended_route`); `12` (`MissingStubError`) → `HOLD` route `/safer:architect` (or `/safer:implement-staff` if `--json` names the stub); `13` (`MissingImplError`) → `HOLD` route `/safer:implement-{junior,senior,staff}` per `--json recommended_route`; fallback to `bin/safer-diff-scope` whole-PR with a verdict-body note that routing is PR-level imprecise; `124` (timeout) → `BLOCKED` with stderr surfaced. Phase 5's verdict table carries the same rows.
 
 ### Phase 3.5 — Compose gstack testing layer (rings 2 + 3)
 
@@ -273,11 +273,11 @@ A folder without `MODULE.md` skips this checklist. A folder with `MODULE.md` whe
 | All composed targets pass | no change to ring-1 verdict |
 | `safer-spec validate --implemented` exit `0` | no change to ring-1 verdict |
 | Exit `10` (version skew) | `BLOCKED`; surface doctor output verbatim |
-| Exit `11` (`MissingSpecPropertyError`) | `HOLD` → `/safer:contract` (override per `--json recommended_route`) |
+| Exit `11` (`MissingSpecPropertyError`) | `HOLD` → `/safer:spec` (override per `--json recommended_route`) |
 | Exit `12` (`MissingStubError`) | `HOLD` → `/safer:architect` (or `/safer:implement-staff` per `--json`) |
 | Exit `13` (`MissingImplError`) | `HOLD` → `/safer:implement-{junior,senior,staff}` per `--json`; fallback `bin/safer-diff-scope` whole-PR |
 | Exit `124` (validate timeout) | `BLOCKED`; surface stderr verbatim |
-| Stop rule 7 (stale sidecar) | `HOLD` → `/safer:contract` |
+| Stop rule 7 (stale sidecar) | `HOLD` → `/safer:spec` |
 
 The verdict is mechanical. No judgment call beyond flakiness detection. If the mechanics say HOLD, the verdict is HOLD regardless of how close the diff is to green.
 
@@ -373,7 +373,7 @@ Each stop rule fires on a specific condition. When fired, produce an escalation 
 4. **Missing test infrastructure.** The repo has no runnable test command and no lint command. Status: `BLOCKED` to user; the repo is not verify-ready.
 5. **Persistent flakiness.** A test passes on retry but fails again on a third run. Status: `HOLD` with "flaky test is a regression" as the finding; route to `diagnose`. Do not `SHIP_WITH_CONCERNS` for a test that is unstable at this level.
 6. **Scope mismatch mid-run.** The diff grew between review-senior's review and your checkout (the author pushed more commits). Status: `BLOCKED`; ask review-senior to re-review the new head. Do not verify a diff that has not been reviewed at the current SHA.
-7. **Stale sidecar (v0.2.0 dogfood).** `safer-spec validate` reports a sidecar `.safer-spec/<slug>.json` whose declared exports no longer match the folder's `index.ts` public surface (an export was renamed, removed, or its `@spec.kind` directive deleted in the diff). Status: `HOLD` → `/safer:contract` via `safer-escalate --from verify --to contract --cause STALE_SIDECAR`. The fix is upstream: the contract step authors the directive on the new export shape; verify does not edit sidecar JSON or `@spec.*` directives directly (Invariant 2 violation — editing the sidecar to clear the validate error is the Principle 7 anti-pattern "paper-over").
+7. **Stale sidecar (v0.2.0 dogfood).** `safer-spec validate` reports a sidecar `.safer-spec/<slug>.json` whose declared exports no longer match the folder's `index.ts` public surface (an export was renamed, removed, or its `@spec.kind` directive deleted in the diff). Status: `HOLD` → `/safer:spec` via `safer-escalate --from verify --to contract --cause STALE_SIDECAR`. The fix is upstream: the contract step authors the directive on the new export shape; verify does not edit sidecar JSON or `@spec.*` directives directly (Invariant 2 violation — editing the sidecar to clear the validate error is the Principle 7 anti-pattern "paper-over").
 
 ## Completion status
 

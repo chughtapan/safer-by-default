@@ -1,5 +1,5 @@
 ---
-name: contract-init
+name: spec-init
 version: 0.1.0
 description: |
   Wrapper that exposes the sister codemod's safer-spec-init skill inside
@@ -8,7 +8,7 @@ description: |
 
   Use when an adopter wants to bootstrap the living-spec layer for a new
   per-folder MODULE.md. Do NOT use to migrate an existing folder; route to
-  /safer:contract-migrate.
+  /safer:spec-migrate.
 
   Do NOT edit the body block below. Edit the upstream
   vendor/safer-spec-development/skills/safer-spec-init/SKILL.md (via sister
@@ -31,7 +31,7 @@ allowed-tools:
 
 <!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
 
-# /safer:contract-init
+# /safer:spec-init
 
 
 ## safer-spec-init
