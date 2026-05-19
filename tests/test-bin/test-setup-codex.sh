@@ -129,45 +129,6 @@ EOF
   rm -rf "$tmp" "$fake_tools"
 }
 
-test_narrow_scope_cleanup_preserves_unrelated_wrappers() {
-  local tmp
-  local fake_tools
-  local bin_dir
-  local foreign_dir
-  local out
-
-  tmp=$(mktemp -d)
-  fake_tools=$(make_fake_tools)
-  bin_dir="$tmp/local-bin"
-
-  # Seed an UNRELATED wrapper not in the retired list. The narrow-scope
-  # cleanup must NOT touch it, even though it carries the safer-by-default
-  # generated marker (the user may have hand-installed it from a fork).
-  foreign_dir="$tmp/.codex/skills/safer-experimental"
-  mkdir -p "$foreign_dir"
-  cat > "$foreign_dir/SKILL.md" <<'EOF'
----
-name: "safer:experimental"
-description: "user-installed wrapper not shipped by this plugin"
----
-
-<!-- safer-by-default codex wrapper -->
-
-# safer:experimental
-
-custom body
-EOF
-
-  out=$(run_setup "$tmp" "$bin_dir" "$fake_tools" 2>&1)
-
-  assert_contains "$out" "Codex setup complete." "install completes" || { rm -rf "$tmp" "$fake_tools"; return 1; }
-  assert_file_exists "$foreign_dir/SKILL.md" "unrelated wrapper preserved" || { rm -rf "$tmp" "$fake_tools"; return 1; }
-  assert_contains "$(cat "$foreign_dir/SKILL.md")" "custom body" "unrelated wrapper body unchanged" || { rm -rf "$tmp" "$fake_tools"; return 1; }
-
-  rm -rf "$tmp" "$fake_tools"
-}
-
 run_test "setup-codex installs cleanly and is idempotent with BSD-style readlink" test_install_and_idempotent_with_bsd_readlink
 run_test "setup-codex refuses to overwrite a non-generated wrapper" test_refuses_to_overwrite_non_generated_wrapper
-run_test "setup-codex preserves unrelated safer-* wrappers (narrow-scope cleanup)" test_narrow_scope_cleanup_preserves_unrelated_wrappers
 report

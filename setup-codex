@@ -341,32 +341,6 @@ for skill_dir in "$SOURCE_DIR"/skills/*; do
   [ -f "$skill_dir/SKILL.md" ] || continue
   write_wrapper "$(basename "$skill_dir")"
 done
-
-# Retired wrapper cleanup: remove known retired wrappers from earlier versions.
-# Broad-scope cleanup ("every safer-* whose suffix isn't in the current skills
-# list") risks removing locally-installed unrelated wrappers; this explicit list
-# is the narrow form. v0.2.0 (released 2026-05-18) shipped a spec→contract rename
-# that this PR reverts; users who installed v0.2.0 have orphan safer-contract*
-# wrappers that next setup-codex run should clean up.
-RETIRED_WRAPPERS=("safer-contract" "safer-contract-init" "safer-contract-migrate")
-for retired in "${RETIRED_WRAPPERS[@]}"; do
-  retired_dir="$SKILLS_DIR/$retired"
-  retired_file="$retired_dir/SKILL.md"
-  [ -d "$retired_dir" ] || continue
-  if [ "$CHECK_ONLY" -eq 1 ]; then
-    if [ -f "$retired_file" ] && grep -Fq "$MARKER" "$retired_file"; then
-      warn "stale retired wrapper present: $retired_dir (would be removed)"
-    fi
-    continue
-  fi
-  if [ -f "$retired_file" ] && grep -Fq "$MARKER" "$retired_file"; then
-    rm -rf "$retired_dir"
-    log "  ↻ removed retired wrapper: $retired_dir"
-  else
-    # Non-generated wrapper at retired path; refuse to delete.
-    warn "retired wrapper path $retired_dir exists without the generated marker; leaving in place"
-  fi
-done
 log ""
 
 log "Linking safer binaries..."
