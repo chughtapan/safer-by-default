@@ -361,7 +361,7 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults, report
 4. **New public contract needed outside the plan.** → `ESCALATED` to architect.
 5. **New package dependency needed.** → `ESCALATED` to architect. Dep choices are architect-tier.
 6. **`safer-diff-scope` reports `staff`.** → Iron rule fired via drift. Escalate with the diff-scope output.
-7. **Plan contradicts the spec.** → `ESCALATED` to spec via architect. Do not choose sides yourself.
+7. **Plan contradicts the contract.** → `ESCALATED` to contract via architect. Do not choose sides yourself.
 8. **You caught yourself revising the plan.** → Stop. Revert the plan-level change. Write the escalation artifact instead.
 
 ## Completion status
@@ -376,8 +376,8 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults, report
 
 ```bash
 safer-escalate --from implement-senior \
-  --to <architect|spec> \
-  --cause <PLAN_GAP|PATTERN_CHANGE|NEW_MODULE|NEW_PUBLIC_SURFACE|NEW_DEP|DIFF_SCOPE_STAFF|PLAN_CONTRADICTS_SPEC>
+  --to <architect|contract> \
+  --cause <PLAN_GAP|PATTERN_CHANGE|NEW_MODULE|NEW_PUBLIC_SURFACE|NEW_DEP|DIFF_SCOPE_STAFF|PLAN_CONTRADICTS_CONTRACT>
 ```
 
 Body:

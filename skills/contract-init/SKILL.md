@@ -34,7 +34,7 @@ allowed-tools:
 # /safer:contract-init
 
 
-# safer-spec-init
+## safer-spec-init
 
 You are scaffolding a folder's first `MODULE.md` + property-test stub. The codemod ships `generate` and `validate` as CLI commands; `init` is a SKILL because picking the right export to bind the stub to requires reading TypeScript correctly, and a coding agent does that more reliably than a regex / ts-morph picker baked into the CLI.
 

@@ -51,8 +51,9 @@ create_label_idempotent() {
   local color="$2"
   local description="$3"
 
-  # Check if label already exists
-  if gh label list --limit 1000 | grep -q "^$label_name"; then
+  # Check if label already exists. -Fxq for exact (fixed, full-line) match
+  # so a label like `safer:contract` does not collide with `safer:contract-init`.
+  if gh label list --limit 1000 | awk '{print $1}' | grep -Fxq "$label_name"; then
     if [ "$quiet" = false ]; then
       echo "SKIP: label '$label_name' already exists"
     fi

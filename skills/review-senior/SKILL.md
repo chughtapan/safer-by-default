@@ -236,7 +236,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 
 When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
 
-- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, contract, etc.) is the right home.
 - **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
 
 The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
@@ -254,7 +254,7 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 **Anti-patterns.**
 - "I'll add a boolean flag to handle this edge case." *(Boolean flags are the canonical shape of sidestepping a design flaw.)*
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
-- "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
+- "The contract is ambiguous; I'll pick what makes sense." *(Escalate to contract.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
 
 ### Living-spec is the ratchet's machine-readable surface
