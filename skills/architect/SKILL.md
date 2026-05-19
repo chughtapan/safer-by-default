@@ -747,7 +747,7 @@ Is the spec architect-ready? Check each:
 - Invariants name the properties that must hold.
 - Open questions, if any, are labeled as such with recommended defaults.
 
-If the spec fails any check, stop. Escalate to `/safer:spec` via `safer-escalate --from architect --to contract --cause <CAUSE>`. Do not fill the gap yourself.
+If the spec fails any check, stop. Escalate to `/safer:spec` via `safer-escalate --from architect --to spec --cause <CAUSE>`. Do not fill the gap yourself.
 
 The readiness gate applies regardless of who authored the spec — `/safer:spec` skill, the user directly, or an upstream pipeline. A spec is architect-ready or it isn't; authorship doesn't change the requirement.
 
@@ -876,7 +876,7 @@ The threshold rule: if the design doc names the implementation tier as `implemen
 Apply findings against the parent epic's `## Contract` autonomy budget:
 
 - **Findings within budget** (revising the architect plan does not introduce new modules, new deps, or other items the contract forbids in `Always-park`) → autonomously revise the design doc, re-publish, re-run `/plan-eng-review` once. If clean, proceed to codex.
-- **Findings cross the budget** (review recommends a new module the spec didn't authorize, a new dep, a new public contract beyond what was named) → escalate via `safer-escalate --to contract --cause PLAN_EXPANSION_FROM_REVIEW`. This is a ratchet-up; the orchestrator parks for amendment per the contract doctrine.
+- **Findings cross the budget** (review recommends a new module the spec didn't authorize, a new dep, a new public contract beyond what was named) → escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_REVIEW`. This is a ratchet-up; the orchestrator parks for amendment per the contract doctrine.
 - **Reject / structural concerns** the architect cannot resolve in one round → escalate to user with reasoning; do NOT transition.
 
 **Codex review-after (cross-model challenge, runs second).** After `/plan-eng-review` is clean (or skipped), run `/codex` on the (possibly revised) design doc:
@@ -886,7 +886,7 @@ Apply findings against the parent epic's `## Contract` autonomy budget:
 ```
 
 - `approve` → proceed to `review`.
-- `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to contract --cause PLAN_EXPANSION_FROM_CODEX`.
+- `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to spec --cause PLAN_EXPANSION_FROM_CODEX`.
 - `reject` → escalate to user; do NOT transition.
 
 The motivation: `/plan-eng-review` is a structured architecture-quality audit (catches missing edge cases by going through a checklist); `/codex` is a cross-model independent challenge (catches blind spots in the audit's own framing). Plan-eng-review first means codex sees the audited plan, not the raw one — codex spends its budget on what plan-eng-review missed, not on what plan-eng-review would have caught.
@@ -913,7 +913,7 @@ Report `DONE` or `DONE_WITH_CONCERNS` with the design doc URL and the draft PR U
 4. **Design needs more than 5 new modules.** → `ESCALATED` to `/safer:spec`. The spec spans more than one design effort; split it.
 5. **Dependency you want to add has no license info available.** → `NEEDS_CONTEXT` to user. Do not "probably MIT" a dependency choice.
 6. **Existing module would have to change its public surface to support this design.** → `ESCALATED` to `/safer:spec` or `/safer:architect` of that existing module. That is not your surface to revise.
-7. **New public export without a nameable `PropertyType`.** The Property-test gates table requires a PropertyType per new export in a `MODULE.md`-bearing area. If no roundtrip/idempotence/invariant/oracle-agreement shape exists, the contract is incomplete: either the export is the wrong shape for this surface, or the spec needs another acceptance criterion that names the residual. → `ESCALATED` to `/safer:spec` via `safer-escalate --from architect --to contract --cause PROPERTY_TYPE_MISSING`.
+7. **New public export without a nameable `PropertyType`.** The Property-test gates table requires a PropertyType per new export in a `MODULE.md`-bearing area. If no roundtrip/idempotence/invariant/oracle-agreement shape exists, the contract is incomplete: either the export is the wrong shape for this surface, or the spec needs another acceptance criterion that names the residual. → `ESCALATED` to `/safer:spec` via `safer-escalate --from architect --to spec --cause PROPERTY_TYPE_MISSING`.
 
 ## Completion status
 
@@ -928,7 +928,7 @@ Your final message to the caller carries exactly one status marker on the last l
 ## Escalation artifact template
 
 ```bash
-safer-escalate --from architect --to contract --cause <SPEC_GAP|AMBIGUITY|OUT_OF_SCOPE>
+safer-escalate --from architect --to spec --cause <SPEC_GAP|AMBIGUITY|OUT_OF_SCOPE>
 ```
 
 The tool populates the body from structured flags. If you need to add narrative, pipe via `--body-file`:

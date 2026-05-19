@@ -700,7 +700,7 @@ Hard rules:
 3. Every new dep in `package.json` maps to a spec constraint. The mapping goes in the PR body and the Dependencies table.
 4. Every file is reachable from a named module.
 5. No "while I'm here" edits to pre-existing modules, except barrel `export` updates that the plan authorized.
-6. **Module-count cap (inherited from architect).** Staff implements at most 5 new modules per orchestration. Architect's hard cap at the design stage carries forward to staff at the implementation stage; both modalities operate against the same authorized scope. Designs that legitimately need more than 5 new modules decompose upstream — spec authors a multi-orchestration sequence (e.g., "module batch 1 of N"), each batch ≤5 modules. Bigger work that arrives at staff under one orchestration is not authorized; escalate to spec via `safer-escalate --from implement-staff --to contract --cause module-cap-exceeded`.
+6. **Module-count cap (inherited from architect).** Staff implements at most 5 new modules per orchestration. Architect's hard cap at the design stage carries forward to staff at the implementation stage; both modalities operate against the same authorized scope. Designs that legitimately need more than 5 new modules decompose upstream — spec authors a multi-orchestration sequence (e.g., "module batch 1 of N"), each batch ≤5 modules. Bigger work that arrives at staff under one orchestration is not authorized; escalate to spec via `safer-escalate --from implement-staff --to spec --cause module-cap-exceeded`.
 
 Soft guides:
 
@@ -837,7 +837,7 @@ Expected: `tier: staff`. Other classifications are signals:
 pnpm exec safer-spec validate --implemented
 ```
 
-Apply the routing per `/safer:verify`'s Phase 5 table: exit `11` → escalate to `/safer:spec` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`; exit `12` → escalate to `/safer:architect` (or self-route if the stub is in scope per the architect plan); exit `13` → finish the implementation (the staff PR cannot ship with `MissingImplError` rows). Editing the sidecar JSON or `@spec.*` directives by hand to clear the validate error is the Principle 7 anti-pattern (stop rule 4 below).
+Apply the routing per `/safer:verify`'s Phase 5 table: exit `11` → escalate to `/safer:spec` via `safer-escalate --from implement-staff --to spec --cause MISSING_SPEC_PROPERTY`; exit `12` → escalate to `/safer:architect` (or self-route if the stub is in scope per the architect plan); exit `13` → finish the implementation (the staff PR cannot ship with `MissingImplError` rows). Editing the sidecar JSON or `@spec.*` directives by hand to clear the validate error is the Principle 7 anti-pattern (stop rule 4 below).
 
 ### Phase 8a — Pre-PR simplify pass (mandatory, stricter than senior)
 
@@ -946,10 +946,10 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults or left
 
 ## Stop rules
 
-1. **Spec revision needed.** An acceptance criterion is wrong, missing, or contradictory as the implementation surfaces it. → `ESCALATED` to `/safer:spec` via `safer-escalate --from implement-staff --to contract --cause SPEC_REVISION`.
+1. **Spec revision needed.** An acceptance criterion is wrong, missing, or contradictory as the implementation surfaces it. → `ESCALATED` to `/safer:spec` via `safer-escalate --from implement-staff --to spec --cause SPEC_REVISION`.
 2. **Unresolvable ambiguity in the plan.** The plan leaves a load-bearing question open. → `ESCALATED` to architect.
 3. **Scope drift: a new artifact has no anchor.** → Stop. Delete the artifact or escalate. The traceability table is the rule.
-4. **New public export without `@spec.*` JSDoc** (v0.2.0 dogfood; folder carries `MODULE.md`). The directive is the contract surface the codemod reads; missing it is upstream work, not an implement-staff fix. Editing the sidecar JSON or `@spec.kind` directive by hand to clear the validate error is the Principle 7 anti-pattern (paper-over). → `ESCALATED` to `/safer:spec` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`.
+4. **New public export without `@spec.*` JSDoc** (v0.2.0 dogfood; folder carries `MODULE.md`). The directive is the contract surface the codemod reads; missing it is upstream work, not an implement-staff fix. Editing the sidecar JSON or `@spec.kind` directive by hand to clear the validate error is the Principle 7 anti-pattern (paper-over). → `ESCALATED` to `/safer:spec` via `safer-escalate --from implement-staff --to spec --cause MISSING_SPEC_PROPERTY`.
 5. **Dep license or maintenance status unclear.** → `NEEDS_CONTEXT` to user. Do not "probably MIT" a dep choice.
 6. **`safer-diff-scope` errors out or returns an unexpected value.** → `NEEDS_CONTEXT`. Capture the output, do not push.
 7. **Pre-existing module needs a public-surface change that the spec did not authorize.** → `ESCALATED` to architect and spec.

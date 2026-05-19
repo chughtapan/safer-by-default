@@ -72,9 +72,9 @@ PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
   --correlation-id "$SESSION-1" \
   --body-stdin) || case $? in
     10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
-    21) safer-escalate --from contract --to orchestrate --cause recipient-retired ;;
-    20|22) safer-escalate --from contract --to orchestrate --cause peer-transport-invalid ;;
-    30|*) safer-escalate --from contract --to orchestrate --cause peer-transport-failed ;;
+    21) safer-escalate --from spec --to orchestrate --cause recipient-retired ;;
+    20|22) safer-escalate --from spec --to orchestrate --cause peer-transport-invalid ;;
+    30|*) safer-escalate --from spec --to orchestrate --cause peer-transport-failed ;;
   esac
 ```
 
@@ -265,7 +265,7 @@ Report `DONE` or `DONE_WITH_CONCERNS` (if open questions remain). Include the sp
 4. **User asks you to architect or implement.** → `NEEDS_CONTEXT`. Hand off to the correct modality; do not overstep.
 5. **The spec keeps growing beyond 2 pages.** → Re-triage. The intent is actually multiple intents; split into sub-issues and hand back to `orchestrate`.
 
-Escalation template populated via `safer-escalate --from contract --to user --cause <C>`.
+Escalation template populated via `safer-escalate --from spec --to user --cause <C>`.
 
 ## Completion status
 

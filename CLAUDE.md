@@ -2,7 +2,7 @@
 
 ## What this is
 
-A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding agent for compiler-grade craft and scope discipline. Doctrine lives in `PRINCIPLES.md`. Every skill in `skills/` is one projection of those principles onto one kind of work (contract, contract-init, contract-migrate, architect, implement-{junior,senior,staff}, diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit).
+A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding agent for compiler-grade craft and scope discipline. Doctrine lives in `PRINCIPLES.md`. Every skill in `skills/` is one projection of those principles onto one kind of work (spec, spec-init, spec-migrate, architect, implement-{junior,senior,staff}, diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit).
 
 ## Skill namespacing
 

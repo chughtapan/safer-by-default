@@ -1,13 +1,11 @@
 ## 0.2.0 — 2026-05-18
 
-v0.2.0 composes `@chughtapan/safer-spec-development` (the per-folder living-spec codemod) into `safer-by-default` as a required dependency for the maintainer's dogfood workspace. The skill formerly called `/safer:spec` is renamed `/safer:spec`; two new wrapper skills (`/safer:spec-init` and `/safer:spec-migrate`) expose the codemod's per-folder bootstrap and migration flows from inside the plugin. The codemod's typed exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the correct upstream modality, expressing Principle 8 (the ratchet) as integers a CI gate can read.
+v0.2.0 composes `@chughtapan/safer-spec-development` (the per-folder living-spec codemod) into `safer-by-default` as a required dependency for the maintainer's dogfood workspace. Two new wrapper skills (`/safer:spec-init` and `/safer:spec-migrate`) expose the codemod's per-folder bootstrap and migration flows from inside the plugin. The codemod's typed exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the correct upstream modality, expressing Principle 8 (the ratchet) as integers a CI gate can read.
 
 **v0.2.0 is dogfood-only.** External adopters stay on `safer-by-default` 0.1.x until the publish follow-up (when the codemod publishes to npm) lifts the maintainer-repo pre-flight halt and replaces the `link:`-protocol install with an `@chughtapan/safer-spec-development@~X.Y.Z` install.
 
 ### Breaking
 
-- Slash `/safer:spec` removed (hard cut, no alias). The renamed skill is `/safer:spec`. Adopters must run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` to reload; until reload, the old cache continues to surface `/safer:spec`. Post-reload, invoking `/safer:spec` returns Claude Code's "skill not found".
-- `bin/safer-setup-labels` creates `safer:spec` (the new modality label) and no longer creates `safer:spec`. Existing `safer:spec` GitHub labels on adopter repos are not migrated automatically; relabel manually (the script does not touch existing issues by design — Non-goal 3).
 - `/safer:setup` is TypeScript + vitest only in v0.2.0. Non-TS or non-vitest adopters stay on 0.1.x.
 - `/safer:setup` v0.2.0 is dogfood-only: it pre-flight halts unless the CWD is `$SBD_ROOT/dogfood/` inside a populated clone of `chughtapan/safer-by-default`. External adopters wait for the publish follow-up.
 
@@ -58,8 +56,6 @@ To pick up v0.2.0 in Claude Code:
 
 **If you're the maintainer dogfooding v0.2.0:**
 
-- After reload, `/safer:spec` returns "skill not found"; use `/safer:spec` instead.
-- Existing GitHub issues carrying the `safer:spec` label remain labeled; `bin/safer-setup-labels` no longer creates that label and does not touch existing issues. Manual relabel per repo.
 - `/safer:setup` halts on non-TypeScript / non-vitest projects with a "use safer-by-default 0.1.x" pointer. The dogfood workspace must carry `tsconfig.json` and a `vitest.config.{ts,js,mts}`.
 - `/safer:setup` halts unless invoked from `$SBD_ROOT/dogfood/` inside a populated `chughtapan/safer-by-default` clone. Initialize the submodule first: `git submodule update --init --recursive`.
 - `/safer:setup` requires pnpm. Install pnpm before running setup; the dogfood workspace's `packageManager:` field gets pinned at setup time.
