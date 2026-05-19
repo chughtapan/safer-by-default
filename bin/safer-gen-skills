@@ -79,16 +79,42 @@ validate_vendor_directives() {
       missing=1
       continue
     fi
-    # Refuse to inline a symlinked vendor SKILL.md. The supply-chain threat
-    # model: a compromised sister-repo merge could plant `SKILL.md` as a
-    # symlink pointing at `/etc/passwd` or any host-private file; awk's
-    # `getline` would follow it and inline the contents into a rendered
-    # SKILL.md. Sister-repo skills ship as regular files; a symlink at this
-    # path is a tamper signal.
-    if [ -L "$vendor_path" ]; then
-      echo "ERROR: vendor-skill $slug at $vendor_path is a symlink (referenced from $tmpl); refusing to inline" >&2
+    # Refuse to inline if any component on the path to the vendor SKILL.md
+    # is a symlink, OR if the canonicalized path escapes $VENDOR_SKILLS_ROOT.
+    # The supply-chain threat model: a compromised sister-repo merge could
+    # plant either the leaf `SKILL.md` OR an enclosing directory (e.g., the
+    # per-slug directory) as a symlink. Git represents both shapes the same
+    # way at the tree level. The leaf-only check left the harder half open;
+    # canonicalize+prefix-check closes both cases atomically.
+    local resolved_vendor_root resolved_path
+    resolved_vendor_root=$(readlink -f -- "$VENDOR_SKILLS_ROOT" 2>/dev/null) || resolved_vendor_root=""
+    resolved_path=$(readlink -f -- "$vendor_path" 2>/dev/null) || resolved_path=""
+    if [ -z "$resolved_vendor_root" ] || [ -z "$resolved_path" ]; then
+      echo "ERROR: vendor-skill $slug at $vendor_path failed to canonicalize (referenced from $tmpl); refusing to inline" >&2
       missing=1
+      continue
     fi
+    case "$resolved_path" in
+      "$resolved_vendor_root"/*) : ;;
+      *)
+        echo "ERROR: vendor-skill $slug at $vendor_path resolves outside \$VENDOR_SKILLS_ROOT (resolved=$resolved_path; referenced from $tmpl); refusing to inline" >&2
+        missing=1
+        continue
+        ;;
+    esac
+    # Even if the canonical path is inside the vendor root, refuse if any
+    # component along the way is a symlink — directory symlinks pointing
+    # *within* the same vendor root are still tamper signals (the sister
+    # repo's tree should be regular files end-to-end).
+    local cur="$vendor_path"
+    while [ "$cur" != "$VENDOR_SKILLS_ROOT" ] && [ "$cur" != "/" ] && [ -n "$cur" ]; do
+      if [ -L "$cur" ]; then
+        echo "ERROR: vendor-skill $slug has a symlink at path component $cur (referenced from $tmpl); refusing to inline" >&2
+        missing=1
+        break
+      fi
+      cur=$(dirname -- "$cur")
+    done
   done < <(grep -oE "$VENDOR_DIRECTIVE_RE" "$tmpl" | sed -E 's/^\{\{> vendor-skill:([a-z0-9-]+)\}\}$/\1/')
   return "$missing"
 }

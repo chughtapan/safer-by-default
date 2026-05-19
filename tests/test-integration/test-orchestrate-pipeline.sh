@@ -207,7 +207,7 @@ else
   PASSED=$((PASSED + 1))
 
   # Step 6a enumerate: exactly the jq the skill snippet pins.
-  MODALITY_REGEX='^safer:(implement-(junior|senior|staff)|verify|spike|research|spec)$'
+  MODALITY_REGEX='^safer:(implement-(junior|senior|staff)|verify|spike|research|contract)$'
   ENUM_JSON=$(gh issue list --repo "$REPO" --state open --limit 200 \
     --json number,title,labels,url,body \
     --jq ".[] | select(.labels | map(.name) | any(test(\"$MODALITY_REGEX\"))) | .number" \

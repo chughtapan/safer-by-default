@@ -53,7 +53,10 @@ create_label_idempotent() {
 
   # Check if label already exists. -Fxq for exact (fixed, full-line) match
   # so a label like `safer:contract` does not collide with `safer:contract-init`.
-  if gh label list --limit 1000 | awk '{print $1}' | grep -Fxq "$label_name"; then
+  # awk -F'\t' splits on the literal tab `gh label list` uses as its column
+  # delimiter, so labels that ever contain whitespace stay intact instead of
+  # being silently truncated at the first space.
+  if gh label list --limit 1000 | awk -F'\t' '{print $1}' | grep -Fxq "$label_name"; then
     if [ "$quiet" = false ]; then
       echo "SKIP: label '$label_name' already exists"
     fi

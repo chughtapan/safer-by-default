@@ -456,7 +456,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `spec` | ~2× | below Research; purely thinking-bound |
+| `contract` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -1220,7 +1220,7 @@ The `Process issues` field is mandatory. If the run hit no friction, write `Proc
 
 ## Voice (reminder)
 
-The audit is structural, not narrative. Each finding is a row in a table. Each recommendation is eight named parts. The reader is the next modality (spec, architect, implement-*); they want the structure, not your reasoning prose.
+The audit is structural, not narrative. Each finding is a row in a table. Each recommendation is eight named parts. The reader is the next modality (contract, architect, implement-*); they want the structure, not your reasoning prose.
 
 Be specific; avoid usability jargon; express friction tactfully; emphasize what works alongside what does not. The next agent applying the fix is a junior — write the recommendation as the input to their charter, not as your post-hoc reasoning.
 
