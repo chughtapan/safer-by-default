@@ -51,12 +51,10 @@ create_label_idempotent() {
   local color="$2"
   local description="$3"
 
-  # Check if label already exists. -Fxq for exact (fixed, full-line) match
-  # so labels with shared prefixes (e.g. `safer:implement-junior` vs
-  # `safer:implement-senior`) cannot collide via partial match.
-  # awk -F'\t' splits on the literal tab `gh label list` uses as its column
-  # delimiter, so labels that ever contain whitespace stay intact instead of
-  # being silently truncated at the first space.
+  # -Fxq exact-match guards against shared-prefix collisions like
+  # `safer:spec` vs `safer:spec-init`.
+  # awk -F'\t' splits on `gh label list`'s tab column delimiter so labels
+  # containing whitespace stay intact instead of truncating at the first space.
   if gh label list --limit 1000 | awk -F'\t' '{print $1}' | grep -Fxq "$label_name"; then
     if [ "$quiet" = false ]; then
       echo "SKIP: label '$label_name' already exists"

@@ -47,14 +47,6 @@ assert_symlink() {
   return 1
 }
 
-assert_absent() {
-  local path="$1"
-  local label="${2:-path absent}"
-  if [ ! -e "$path" ]; then return 0; fi
-  echo "    FAIL ($label): $path still exists"
-  return 1
-}
-
 run_setup() {
   local home_dir="$1"
   local bin_dir="$2"
