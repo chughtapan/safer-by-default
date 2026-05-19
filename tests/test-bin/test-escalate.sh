@@ -11,19 +11,19 @@ test_requires_args() {
   local rc
   "$BIN" >/dev/null 2>&1; rc=$?
   assert_nonzero "$rc" "no args should fail"
-  "$BIN" --from contract >/dev/null 2>&1; rc=$?
+  "$BIN" --from spec >/dev/null 2>&1; rc=$?
   assert_nonzero "$rc" "missing --to --cause should fail"
 }
 
 test_validates_status() {
   local rc
-  "$BIN" --from contract --to architect --cause x --status INVALID >/dev/null 2>&1; rc=$?
+  "$BIN" --from spec --to architect --cause x --status INVALID >/dev/null 2>&1; rc=$?
   assert_nonzero "$rc" "invalid --status should fail"
 }
 
 test_validates_confidence() {
   local rc
-  "$BIN" --from contract --to architect --cause x --confidence MEDIUM >/dev/null 2>&1; rc=$?
+  "$BIN" --from spec --to architect --cause x --confidence MEDIUM >/dev/null 2>&1; rc=$?
   assert_nonzero "$rc" "invalid --confidence should fail"
 }
 

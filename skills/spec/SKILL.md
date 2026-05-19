@@ -615,7 +615,7 @@ GitHub.
 gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated"; exit 1; }
 eval "$(safer-slug 2>/dev/null)" || true
 SESSION="$$-$(date +%s)"
-safer-telemetry-log --event-type safer.skill_run --modality contract --session "$SESSION" 2>/dev/null || true
+safer-telemetry-log --event-type safer.skill_run --modality spec --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
 # Update gate: halt user-initiated work when an upgrade is available.
@@ -767,7 +767,7 @@ safer-transition-label --issue "$ISSUE" --from planning --to review
 Emit the end event:
 
 ```bash
-safer-telemetry-log --event-type safer.skill_end --modality contract \
+safer-telemetry-log --event-type safer.skill_end --modality spec \
   --session "$SESSION" --outcome success --issue "$ISSUE"
 ```
 

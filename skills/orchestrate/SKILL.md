@@ -1889,7 +1889,7 @@ Read PRINCIPLES.md and skills/spec/SKILL.md at the plugin root.
 
 Acceptance: {ACCEPTANCE}
 
-Produce a contract with goals, non-goals, invariants, and explicit
+Produce a spec with goals, non-goals, invariants, and explicit
 acceptance criteria. No architecture, no libraries, no code. Publish as a
 comment on the parent epic (or sub-issue body per the skill's publication
 rule). After publishing, run /codex --mode review on the published

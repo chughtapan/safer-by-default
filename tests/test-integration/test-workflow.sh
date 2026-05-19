@@ -83,7 +83,7 @@ cat > "$TMP_BODY" <<EOF
 ## Decomposition
 | # | Modality | Depends on | Acceptance | Sub-issue |
 |---|---|---|---|---|
-| 1 | contract | — | criteria listed | TBD |
+| 1 | spec | — | criteria listed | TBD |
 | 2 | implement-junior | 1 | PR merged | TBD |
 
 [integration-test-marker: $TS_SUFFIX]
@@ -151,14 +151,14 @@ fi
 
 # --- 6. Telemetry + dashboards ---
 echo "── integration: telemetry + dashboards ──"
-"$BIN/safer-telemetry-log" --event-type safer.skill_run --modality contract --session "int-$TS_SUFFIX" --issue "$SUB_NUM" >/dev/null
-"$BIN/safer-telemetry-log" --event-type safer.skill_end --modality contract --session "int-$TS_SUFFIX" --outcome success --duration-s 15 >/dev/null
+"$BIN/safer-telemetry-log" --event-type safer.skill_run --modality spec --session "int-$TS_SUFFIX" --issue "$SUB_NUM" >/dev/null
+"$BIN/safer-telemetry-log" --event-type safer.skill_end --modality spec --session "int-$TS_SUFFIX" --outcome success --duration-s 15 >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.skill_run --modality implement-junior --session "int-$TS_SUFFIX" >/dev/null
 "$BIN/safer-telemetry-log" --event-type safer.stop_rule_fired --modality implement-junior --cause "second module touched" >/dev/null
 
 CAL=$("$BIN/safer-calibration" 7d 2>&1)
-if echo "$CAL" | grep -qE "^contract " && echo "$CAL" | grep -qE "^implement-junior "; then
-  echo "  ok  calibration shows contract and implement-junior rows"
+if echo "$CAL" | grep -qE "^spec " && echo "$CAL" | grep -qE "^implement-junior "; then
+  echo "  ok  calibration shows spec and implement-junior rows"
   PASSED=$((PASSED + 1))
 else
   echo "  FAIL: calibration output missing expected modalities:"
@@ -167,7 +167,7 @@ else
 fi
 
 VP=$("$BIN/safer-vp" 7d --repo "$REPO" 2>&1)
-if echo "$VP" | grep -q "VP Engineering" && echo "$VP" | grep -qE "^contract "; then
+if echo "$VP" | grep -q "VP Engineering" && echo "$VP" | grep -qE "^spec "; then
   echo "  ok  VP dashboard renders"
   PASSED=$((PASSED + 1))
 else
