@@ -188,10 +188,13 @@ Flakiness: if a test failed with a pattern that suggests flakiness (timeout, net
 SAFER_VALIDATE_TIMEOUT_MS="${SAFER_VALIDATE_TIMEOUT_MS:-60000}"
 # Disable set -e around the timed call so the non-zero exit is captured, not eaten.
 # verify runs under set -e; exit codes 10/11/12/13 are intentional, not crashes.
+#
+# Node with `-e <script> -- <argv...>` places user argv starting at index 1
+# (not 2 — there's no `[eval]` marker). slice(1) yields [pm, ...rest].
 set +e
 TIMEOUT_MS="$SAFER_VALIDATE_TIMEOUT_MS" node -e '
   const { spawn } = require("child_process");
-  const [pm, ...rest] = process.argv.slice(2);
+  const [pm, ...rest] = process.argv.slice(1);
   const timeoutMs = Number(process.env.TIMEOUT_MS) || 60000;
   const child = spawn(pm, rest, { stdio: "inherit" });
   const timer = setTimeout(() => { child.kill("SIGKILL"); process.exit(124); }, timeoutMs);
