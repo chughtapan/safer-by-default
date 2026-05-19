@@ -41,7 +41,7 @@ labelMap:
     project: "Tracking infra"
   - label: "community-feedback"
     project: "Community feedback agents"
-  - label: "safer:contract"
+  - label: "safer:spec"
     project: "Testing doctrine"
   - label: "moltzap-migration"
     project: "Moltzap migration"

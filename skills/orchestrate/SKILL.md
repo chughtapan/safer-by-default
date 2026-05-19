@@ -233,13 +233,12 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
 When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
 
-- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, contract, etc.) is the right home.
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
 - **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
 
 The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
@@ -257,21 +256,8 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 **Anti-patterns.**
 - "I'll add a boolean flag to handle this edge case." *(Boolean flags are the canonical shape of sidestepping a design flaw.)*
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
-- "The contract is ambiguous; I'll pick what makes sense." *(Escalate to contract.)*
+- "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
-
-### Living-spec is the ratchet's machine-readable surface
-
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
-
-| Exit | Error | Mechanical route |
-|---|---|---|
-| `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
-| `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
-| `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
-
-The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
 ---
 
@@ -364,7 +350,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Spec doc | GitHub issue, `safer:spec` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -452,7 +438,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `contract` | ~2× | below Research; purely thinking-bound |
+| `spec` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -621,7 +607,7 @@ GitHub.
 - A natural-language intent from the user, OR a parent issue URL.
 - `gh` CLI authenticated (verify with `gh auth status`).
 - Write access to the repo (you will create issues, labels, and comments).
-- The modality skills exist in the plugin (`/safer:contract`, `/safer:architect`, etc.).
+- The modality skills exist in the plugin (`/safer:spec`, `/safer:architect`, etc.).
 
 ### Preamble (run first, verbatim)
 
@@ -692,7 +678,7 @@ Orchestrate operates at the **project** level. Boundaries:
 - **N sub-tasks** — one sub-issue each.
 - **Each sub-issue** carries exactly **one modality label** and exactly **one state label** at a time.
 - **State labels:** `planning`, `review`, `plan-approved`, `implementing`, `verifying`, `done`, `abandoned`.
-- **Modality labels:** `safer:contract`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:diagnose`, `safer:spike`, `safer:research`, `safer:review-senior`, `safer:verify`.
+- **Modality labels:** `safer:spec`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:diagnose`, `safer:spike`, `safer:research`, `safer:review-senior`, `safer:verify`.
 
 If a sub-task cannot be represented in this shape, you have the wrong decomposition. Re-triage.
 
@@ -723,7 +709,7 @@ Decomposition implication: every sub-task you skip ("we'll figure it out later,"
               (VP / scrum master)
                        │
                        ▼
-                   contract
+                     spec
                        │
                        ▼
                    architect
@@ -756,7 +742,7 @@ The routing target for every sub-task. If the sub-task does not fit one row, re-
 
 | Modality | Shape in scope | Shape out of scope | Escalation trigger |
 |---|---|---|---|
-| `contract` | goals, non-goals, acceptance, invariants | architecture, libs, code | any structural commitment |
+| `spec` | goals, non-goals, acceptance, invariants | architecture, libs, code | any structural commitment |
 | `architect` | modules, interfaces, data flow, deps, all docs describing the changed surface | function bodies, docs unrelated to the design | implementation detail; doc out of scope |
 | `implement-junior` | internals of one module | exported signatures, new deps, cross-module reach | touching a 2nd module |
 | `implement-senior` | cross-module within an approved plan | new modules, new architectural patterns | plan revision needed |
@@ -780,13 +766,13 @@ Classification table:
 
 | If the intent looks like... | Route to |
 |---|---|
-| Ambiguous goal, no acceptance criteria | `/safer:contract` directly — no orchestration yet |
+| Ambiguous goal, no acceptance criteria | `/safer:spec` directly — no orchestration yet |
 | A reproducible bug, one symptom | `/safer:diagnose` directly |
 | A flagged-but-unreproduced bug (reviewer / dogfood / escalation observation, no repro in hand) | `/safer:diagnose` first — never `implement-*`. Eligible for `implement-*` only after diagnose publishes a reproduction artifact and codex returns `confirmed-root-cause`. |
 | "Can we do X?" / "Is X feasible?" | `/safer:spike` directly |
 | "How do X systems work?" / open question | `/safer:research` directly |
 | "Fix this bug and ship the fix" | Orchestrate: diagnose → implement-* → verify |
-| "Build feature X" | Orchestrate: contract → architect → implement-* → verify |
+| "Build feature X" | Orchestrate: spec → architect → implement-* → verify |
 | "Investigate and fix if tractable" | Orchestrate: diagnose → (decide) → implement-* → verify |
 | Clearly one modality, clearly done when that finishes | Decline; route directly |
 
@@ -885,7 +871,7 @@ Build the decomposition table. Columns:
 - Every sub-task has explicit acceptance criteria — what artifact, in what state, makes this sub-task `done`.
 - Dependencies are explicit. Circular dependencies are a bug in your decomposition; fix it before publishing.
 - Sub-tasks are ordered by dependency, not by guess. If A must precede B, A is sub-task #1.
-- Architecture comes before implementation. Always. If you cannot state the architecture, a `contract` or `architect` sub-task is your first dependency.
+- Architecture comes before implementation. Always. If you cannot state the architecture, a `spec` or `architect` sub-task is your first dependency.
 
 **Decomposition anti-patterns.**
 - "We'll figure out the architecture as we go." *(No. Architecture sub-task first.)*
@@ -947,7 +933,7 @@ OK'd: <ISO timestamp> by <user@github>
 
 | # | Modality | Depends on | Acceptance | Sub-issue |
 |---|---|---|---|---|
-| 1 | contract | — | Contract published as a comment on this epic; goals, non-goals, and explicit acceptance criteria present; `safer:contract` label; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
+| 1 | spec | — | SPEC.md published as a comment on this epic; goals, non-goals, and explicit acceptance criteria present; `safer:spec` label; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
 | 2 | architect | 1 | Design doc published as sub-issue body; modules named with file paths; public interfaces typed; stub files pushed to branch; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
 | 3 | implement-senior | 2 | Draft PR opened with `[impl-senior]` title prefix; all stubs replaced with bodies; `safer-diff-scope` reports `senior`; lint/typecheck/tests green locally; state `review` | <https://github.com/OWNER/REPO/issues/NNN> |
 | 4 | verify | 3 | Verify comment posted on PR #M naming each acceptance criterion and its ship/hold verdict; CI green; state `done` | <https://github.com/OWNER/REPO/issues/NNN> |
@@ -1056,10 +1042,10 @@ Poll the sub-issue until one of:
   - **If `safer-diff-scope --pr $PR` reports tier ≥ `senior` OR `public_surface_changed > 0` OR the sub-issue modality is `implement-staff`:** invoke `/safer:stamina --pr <PR>`. Stamina routes to the review family and gates on consensus; do not also invoke `/safer:review-senior` standalone.
   - **Else:** invoke `/safer:review-senior` on the PR (existing single-reviewer path).
   - **Setup/deploy path detection (additive).** If the PR diff touches any of: `railway.toml`, `vercel.json`, `Dockerfile*`, `docker-compose*.yml`, `.github/workflows/*`, `fly.toml`, `netlify.toml`, `package.json` `scripts` section, `.env*` files, `bin/setup*`, `setup/*`, `setup-codex/*`, then ALSO run `/plan-devex-review --hold-scope --artifact <PR-URL>`. Hold-scope autonomous; recommended defaults applied within the parent epic's `## Contract` autonomy budget. Findings outside the budget escalate per the same in-budget vs cross-budget rule documented in `skills/architect/SKILL.md` Phase 7 (plan-eng-review section).
-- For design-producing sub-tasks (`contract`, `architect`):
-  - **If the sub-issue modality is `contract` or `architect` (high-blast-radius by default):** invoke `/safer:stamina --plan <sub-issue-URL>`.
+- For design-producing sub-tasks (`spec`, `architect`):
+  - **If the sub-issue modality is `spec` or `architect` (high-blast-radius by default):** invoke `/safer:stamina --plan <sub-issue-URL>`.
   - **Else:** read the artifact and judge against acceptance (existing path). Ask the user if any criterion is ambiguous.
-  - **Setup/deploy path detection (additive).** If the contract or architect plan describes infra, deploy, CI, or env setup work (mentions Railway, Vercel, Docker, GitHub Actions, env vars, deploy targets, infrastructure-as-code), the contract/architect skill itself runs `/plan-devex-review --hold-scope --artifact <doc-URL>` after `/plan-eng-review` and before `/codex` (see `skills/architect/SKILL.md` Phase 7 and `skills/contract/SKILL.md` Phase 5 for the runtime contract). Orchestrate's role here is verification: confirm the gate ran by reading the sub-issue body for a `plan-devex-review:` audit-trail line. Missing → request the contract/architect re-run with the gate.
+  - **Setup/deploy path detection (additive).** If the spec or architect plan describes infra, deploy, CI, or env setup work (mentions Railway, Vercel, Docker, GitHub Actions, env vars, deploy targets, infrastructure-as-code), the spec/architect skill itself runs `/plan-devex-review --hold-scope --artifact <doc-URL>` after `/plan-eng-review` and before `/codex` (see `skills/architect/SKILL.md` Phase 7 and `skills/spec/SKILL.md` Phase 5 for the runtime contract). Orchestrate's role here is verification: confirm the gate ran by reading the sub-issue body for a `plan-devex-review:` audit-trail line. Missing → request the spec/architect re-run with the gate.
 - For exploration sub-tasks (`diagnose`, `spike`, `research`): read the writeup; judge against acceptance. **Diagnose verdict routing** (see Step 5c.5 below for the fork mechanism): if the artifact's CODEX VERDICT is `logical-fallacy`, route the sub-issue back to `planning` for a re-run with the correction; if `symptom` with N>1 directions, fork into N siblings (Step 5c.5); if `symptom` with 1 direction, re-dispatch the same diagnose with `SAFER_DIAGNOSE_DIRECTION` set; if `confirmed-root-cause`, transition to `done` and proceed to the next sub-task.
 - For verify sub-tasks: the sub-task itself is the review. Trust its verdict.
 
@@ -1070,7 +1056,7 @@ safer-transition-label --issue $N --from review --to plan-approved
 ```
 
 Then cascade forward per modality lifecycle:
-- `contract` / `architect` → `plan-approved` → (next sub-task starts, this one closes to `done`).
+- `spec` / `architect` → `plan-approved` → (next sub-task starts, this one closes to `done`).
 - `implement-*` → `plan-approved` → `implementing` (the PR is merged) → `verifying` (verify sub-task runs) → `done`.
 - `diagnose` / `spike` / `research` → `plan-approved` → `done` (these produce writeups, not code).
 
@@ -1499,7 +1485,7 @@ For each comment body, scan in priority order:
 for repo in $(jq -r '.repos[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/null || echo "$REPO"); do
   gh issue list --repo "$repo" --state open --limit 200 \
     --json number,title,labels,url,body \
-    --jq '.[] | select(.labels | map(.name) | any(test("^safer:(implement-(junior|senior|staff)|verify|spike|research|contract)$")))'
+    --jq '.[] | select(.labels | map(.name) | any(test("^safer:(implement-(junior|senior|staff)|verify|spike|research|spec)$")))'
 done > /tmp/orch-queue.jsonl
 ```
 
@@ -1717,15 +1703,15 @@ Step 6d dispatches by filling the template that matches the sub-issue's `safer:<
 | `{ISSUE_URL}` | sub-issue `url` from `gh issue list --json url` | full URL including host |
 | `{PARENT_URL}` | parent epic URL resolved from `Parent: #N` or `## Parent` in the sub-issue body | full URL; empty only if the epic is missing (which is itself a Step 6 skip case) |
 | `{ACCEPTANCE}` | the `Acceptance:` line verbatim from the sub-issue body | if the sub-issue has no such line, skip the candidate — Step 6 never synthesizes acceptance |
-| `{BRANCH_HINT}` | derived; see format below | empty string for modalities that produce no branch (`verify`, `research`, `contract`) |
+| `{BRANCH_HINT}` | derived; see format below | empty string for modalities that produce no branch (`verify`, `research`, `spec`) |
 
 `{BRANCH_HINT}` format: `<modality-short>/<issue-number>-<slug>` where
 
-- `<modality-short>` is one of `junior`, `senior`, `staff`, `verify`, `spike`, `research`, `contract` — the final token of the `safer:<modality>` label (drop the `implement-` prefix).
+- `<modality-short>` is one of `junior`, `senior`, `staff`, `verify`, `spike`, `research`, `spec` — the final token of the `safer:<modality>` label (drop the `implement-` prefix).
 - `<issue-number>` is the sub-issue number with no `#` prefix.
 - `<slug>` is the sub-issue title lowercased, non-alphanumerics collapsed to `-`, trimmed of leading/trailing `-`, and truncated to 40 characters. Example: sub-issue `#66` titled `[impl-senior] orchestrate: Step 6 work-queue scan` becomes `senior/66-impl-senior-orchestrate-step-6-work`.
 
-For `verify`, `research`, and `contract`, `{BRANCH_HINT}` is the empty string; their templates omit the `Branch: ...` line entirely.
+For `verify`, `research`, and `spec`, `{BRANCH_HINT}` is the empty string; their templates omit the `Branch: ...` line entirely.
 
 #### implement-junior
 
@@ -1875,26 +1861,26 @@ the team lead with the ledger URL when the loop converges or the budget
 runs out.
 ```
 
-#### contract
+#### spec
 
 ```
 source: orchestrate-auto-dispatch
 Dispatch with: `model: opus` per orchestrate Model routing table.
-You are a teammate on team `{TEAM}` invoking `/safer:contract`.
+You are a teammate on team `{TEAM}` invoking `/safer:spec`.
 
 Sub-issue: {ISSUE_URL}
 Parent epic: {PARENT_URL}
 
-Read PRINCIPLES.md and skills/contract/SKILL.md at the plugin root.
+Read PRINCIPLES.md and skills/spec/SKILL.md at the plugin root.
 
 Acceptance: {ACCEPTANCE}
 
-Produce a contract with goals, non-goals, invariants, and explicit
-acceptance criteria. No architecture, no libraries, no code. Publish as a
-comment on the parent epic (or sub-issue body per the skill's publication
-rule). After publishing, run /codex --mode review on the published
-artifact. The codex verdict must be `approve` before transitioning to
-`review`. If `changes-requested`, revise and re-run (one revision round). If `reject`,
+Produce a spec with goals, non-goals, invariants, and explicit acceptance
+criteria. No architecture, no libraries, no code. Publish as a comment on
+the parent epic (or sub-issue body per the skill's publication rule).
+After publishing, run /codex --mode review on the published artifact. The
+codex verdict must be `approve` before transitioning to `review`. If
+`changes-requested`, revise and re-run (one revision round). If `reject`,
 escalate to the user with codex's reasoning.
 Transition the sub-issue to `review`. Status marker + SendMessage the
 team lead with the spec URL.
@@ -1933,7 +1919,7 @@ When a sub-task reports `ESCALATED` / `BLOCKED` / `NEEDS_CONTEXT`, do not rescue
 
 | Cause | Route |
 |---|---|
-| Contract ambiguity | New `contract` sub-task, OR revise existing contract sub-task. Blocked sub-task waits. |
+| Spec ambiguity | New `spec` sub-task, OR revise existing spec sub-task. Blocked sub-task waits. |
 | Architecture mismatch | New `architect` sub-task. Blocked sub-task waits. |
 | Scope miscalibration (modality too tight) | Relabel blocked sub-task to next-tier modality. Reopen it in `planning`. |
 | Scope miscalibration (modality too loose) | Split blocked sub-task into two, each correctly scoped. |
@@ -1998,7 +1984,7 @@ Orchestrate has stop rules in two groups: **decomposition-time** stop rules (fir
 
 ### Decomposition-time stop rules (5)
 
-1. **Under-specified intent.** The intent is so vague that decomposition would be guessing. → Create a `contract` sub-task first; do not attempt further decomposition until the contract is `done`. Status: `NEEDS_CONTEXT`.
+1. **Under-specified intent.** The intent is so vague that decomposition would be guessing. → Create a `spec` sub-task first; do not attempt further decomposition until the spec is `done`. Status: `NEEDS_CONTEXT`.
 2. **Circular dependency.** Two sub-tasks mutually depend on each other. → The decomposition is wrong. Re-decompose. Status: internal; do not publish.
 3. **Three-strikes triage.** A sub-task has been re-triaged 3 times. → Project is mis-scoped. Status: `BLOCKED` to user with what was learned.
 4. **Missing modality.** You classified a sub-task into a modality that does not exist in the catalog. → Either the catalog is incomplete or your classification is wrong. Status: `NEEDS_CONTEXT` to user.
@@ -2013,7 +1999,7 @@ Six runtime conditions park even when the action is technically inside the contr
 3. **Peer-review disagreement.** `/safer:review-senior` and `/codex` split verdicts on the same PR. Park; user resolves.
 4. **Stamina returns BLOCK** on a high-blast-radius artifact. Park; user resolves the BLOCK.
 5. **LOW-confidence on a non-junior recommendation.** Anything above implement-junior with LOW-confidence is asking the user to authorize a risky bet. Park.
-6. **Three diagnose splits without convergence.** When the parent epic's `## Diagnose splits (count: N)` section reaches 3 and no fork has returned codex `confirmed-root-cause`, the bug surface is wider than diagnose can map. Park the active diagnose sub-issues at `awaiting-amendment`. Escalate-target: `/safer:contract` (the symptom needs re-statement) or `/safer:architect` (the failure is structural, not localized). Quote the codex verdicts from each fork in the stop-the-line comment; the user picks the next modality.
+6. **Three diagnose splits without convergence.** When the parent epic's `## Diagnose splits (count: N)` section reaches 3 and no fork has returned codex `confirmed-root-cause`, the bug surface is wider than diagnose can map. Park the active diagnose sub-issues at `awaiting-amendment`. Escalate-target: `/safer:spec` (the symptom needs re-statement) or `/safer:architect` (the failure is structural, not localized). Quote the codex verdicts from each fork in the stop-the-line comment; the user picks the next modality.
 
 ---
 

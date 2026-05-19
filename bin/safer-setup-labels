@@ -32,16 +32,8 @@ main() {
   local repo
   repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 
-  # Modality labels (one per skill that authors a labeled durable artifact).
-  # Idempotent: re-running adds only what's missing.
-  create_label_idempotent "safer:contract"          "0e8a16" "contract modality: spec / acceptance criteria authored by /safer:contract"
-  create_label_idempotent "safer:architect"         "1d76db" "architect modality: design doc / interface stubs by /safer:architect"
-  create_label_idempotent "safer:implement-junior"  "5319e7" "implement-junior modality: single-module internals"
-  create_label_idempotent "safer:implement-senior"  "5319e7" "implement-senior modality: cross-module within architect plan"
-  create_label_idempotent "safer:implement-staff"   "5319e7" "implement-staff modality: new modules / new public surface"
-  create_label_idempotent "safer:research"          "fbca04" "research modality: hypothesis loop ledger"
-  create_label_idempotent "safer:spike"             "fbca04" "spike modality: feasibility go/no-go verdict"
-  create_label_idempotent "safer:deferred"          "ededed" "orchestrate: hold dispatch until reason expires"
+  # Create safer:deferred label idempotently
+  create_label_idempotent "safer:deferred" "ededed" "orchestrate: hold dispatch until reason expires"
 }
 
 # Create a label if it doesn't exist; fail silently if it does.
@@ -51,12 +43,8 @@ create_label_idempotent() {
   local color="$2"
   local description="$3"
 
-  # Check if label already exists. -Fxq for exact (fixed, full-line) match
-  # so a label like `safer:contract` does not collide with `safer:contract-init`.
-  # awk -F'\t' splits on the literal tab `gh label list` uses as its column
-  # delimiter, so labels that ever contain whitespace stay intact instead of
-  # being silently truncated at the first space.
-  if gh label list --limit 1000 | awk -F'\t' '{print $1}' | grep -Fxq "$label_name"; then
+  # Check if label already exists
+  if gh label list --limit 1000 | grep -q "^$label_name"; then
     if [ "$quiet" = false ]; then
       echo "SKIP: label '$label_name' already exists"
     fi

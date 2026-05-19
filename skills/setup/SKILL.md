@@ -238,13 +238,12 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
 When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
 
-- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, contract, etc.) is the right home.
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
 - **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
 
 The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
@@ -262,21 +261,8 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 **Anti-patterns.**
 - "I'll add a boolean flag to handle this edge case." *(Boolean flags are the canonical shape of sidestepping a design flaw.)*
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
-- "The contract is ambiguous; I'll pick what makes sense." *(Escalate to contract.)*
+- "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
-
-### Living-spec is the ratchet's machine-readable surface
-
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
-
-| Exit | Error | Mechanical route |
-|---|---|---|
-| `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
-| `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
-| `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
-
-The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
 ---
 
@@ -369,7 +355,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Spec doc | GitHub issue, `safer:spec` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -457,7 +443,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `contract` | ~2× | below Research; purely thinking-bound |
+| `spec` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -921,189 +907,6 @@ If A: `$PM add -D @playwright/test`. If B or C: record skipped.
 - *"I'll skip fast-check if the user does not ask."* No. fast-check is the default; the prompt exists so the user can override, not so you can omit.
 - *"I'll pick `@testcontainers/postgresql` without detecting."* No. Install only the modules that match detected clients.
 
-### Step 4c: Wire the living-spec layer (v0.2.0, dogfood-only)
-
-v0.2.0 of `safer-by-default` requires the sister codemod `@chughtapan/safer-spec-development`. The integration is **dogfood-only**: the supported adopter is the maintainer's own clone of `chughtapan/safer-by-default` with the `vendor/safer-spec-development/` submodule populated. External adopters stay on `safer-by-default` 0.1.x; they ship under the publish follow-up (when the codemod publishes to npm). The dogfood install resolves the codemod through pnpm's `link:` protocol pointing at the submodule path.
-
-**Pre-flight halts.** Sequence so the most actionable pointer fires first when multiple conditions fail.
-
-```bash
-# Walk up from CWD to find the safer-by-default clone. Distinguish three failure modes:
-#   (i)  no safer-by-default clone found anywhere up the tree → NotInSaferByDefaultClone
-#   (ii) clone found, but vendor/safer-spec-development/package.json absent → VendorSubmoduleAbsent
-#   (iii) clone + populated submodule → SBD_ROOT set; continue.
-SBD_ROOT=""
-SBD_ROOT_VENDOR_ABSENT=""
-cur="$PWD"
-while [ "$cur" != "/" ]; do
-  if [ -f "$cur/.claude-plugin/plugin.json" ] \
-      && grep -q '"name": "safer"' "$cur/.claude-plugin/plugin.json" 2>/dev/null; then
-    if [ -f "$cur/vendor/safer-spec-development/package.json" ]; then
-      SBD_ROOT="$cur"
-      break
-    else
-      SBD_ROOT_VENDOR_ABSENT="$cur"
-      # keep walking; an outer clone might still resolve.
-    fi
-  fi
-  cur=$(dirname "$cur")
-done
-
-if [ -z "$SBD_ROOT" ] && [ -n "$SBD_ROOT_VENDOR_ABSENT" ]; then
-  cat >&2 <<MSG
-ERROR: VendorSubmoduleAbsent
-
-Found a chughtapan/safer-by-default clone at $SBD_ROOT_VENDOR_ABSENT, but
-$SBD_ROOT_VENDOR_ABSENT/vendor/safer-spec-development/package.json is missing
-(uninitialized submodule).
-
-Initialize the submodule, then retry /safer:setup:
-
-  cd $SBD_ROOT_VENDOR_ABSENT
-  git submodule update --init --recursive
-MSG
-  exit 1
-fi
-
-if [ -z "$SBD_ROOT" ]; then
-  cat >&2 <<'MSG'
-ERROR: NotInSaferByDefaultClone — /safer:setup v0.2.0 is dogfood-only.
-
-This skill runs only inside a chughtapan/safer-by-default clone with
-vendor/safer-spec-development/ populated.
-
-External adopters: stay on safer-by-default 0.1.x. v0.2.x external support
-ships in the publish follow-up (npm publish of @chughtapan/safer-spec-development).
-MSG
-  exit 1
-fi
-
-# Canonical dogfood path enforced so every clone computes the same
-# "link:../vendor/safer-spec-development" lockfile entry.
-if [ "$PWD" != "$SBD_ROOT/dogfood" ]; then
-  cat >&2 <<MSG
-ERROR: NotDogfoodCwd — /safer:setup v0.2.0 must run from \$SBD_ROOT/dogfood/.
-
-  Expected CWD: $SBD_ROOT/dogfood
-  Current CWD:  $PWD
-
-v0.2.0 does not support nested or relocated dogfood layouts. cd into the
-canonical dogfood path and retry.
-MSG
-  exit 1
-fi
-
-# v0.2.0 dogfood is pnpm-only. npm has no link: protocol; bun's link semantics
-# differ; yarn is supportable later. pnpm is the safer-by-default repo's
-# de-facto PM, and the link:-protocol install hinges on pnpm's symlink
-# behavior. External-adopter PM-agnosticism arrives with the publish
-# follow-up's npm-name install.
-if ! command -v pnpm >/dev/null 2>&1; then
-  cat >&2 <<'MSG'
-ERROR: PnpmAbsent — /safer:setup v0.2.0 dogfood requires pnpm.
-
-Install pnpm (https://pnpm.io) and retry.
-MSG
-  exit 1
-fi
-
-# TypeScript + vitest check. Non-TS / non-vitest projects stay on 0.1.x.
-if [ ! -f "tsconfig.json" ]; then
-  cat >&2 <<'MSG'
-ERROR: NotTypeScriptError (no-tsconfig) — /safer:setup v0.2.0 is TypeScript-only.
-
-The dogfood workspace must carry tsconfig.json. Non-TypeScript projects
-stay on safer-by-default 0.1.x.
-MSG
-  exit 1
-fi
-if [ ! -f "vitest.config.ts" ] && [ ! -f "vitest.config.js" ] && [ ! -f "vitest.config.mts" ]; then
-  cat >&2 <<'MSG'
-ERROR: NotTypeScriptError (no-vitest) — /safer:setup v0.2.0 requires vitest.
-
-The dogfood workspace must carry vitest.config.{ts,js,mts}. Projects on
-other test runners stay on safer-by-default 0.1.x.
-MSG
-  exit 1
-fi
-```
-
-**Pin the dogfood `packageManager` field.** Verify reads `packageManager:` from `package.json` to resolve `$PM`; setup writes pnpm there so verify's PM detection always resolves to pnpm in the dogfood workspace.
-
-```bash
-PNPM_VERSION=$(pnpm --version 2>/dev/null)
-if [ -z "$PNPM_VERSION" ]; then
-  echo "ERROR: could not read pnpm --version" >&2
-  exit 1
-fi
-# Idempotent: only write packageManager if absent or pointing elsewhere.
-node -e '
-  const fs = require("fs");
-  const path = "package.json";
-  const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
-  const want = "pnpm@" + process.argv[1];
-  if (pkg.packageManager !== want) {
-    pkg.packageManager = want;
-    fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
-    console.error("  ✓ packageManager pinned to " + want);
-  }
-' "$PNPM_VERSION"
-```
-
-**Install the codemod via pnpm `link:` protocol.** The canonical relative path is fixed; the lockfile entry is identical across every clone of the repo.
-
-```bash
-# Idempotency sentinel: if package.json already pins the codemod via link:,
-# skip the install step (re-runs are no-ops).
-HAS_LINK=$(node -e '
-  const pkg = require("./package.json");
-  const dep = (pkg.devDependencies && pkg.devDependencies["@chughtapan/safer-spec-development"]) || "";
-  process.stdout.write(dep.startsWith("link:") ? "1" : "0");
-')
-if [ "$HAS_LINK" = "0" ]; then
-  pnpm add -D "link:../vendor/safer-spec-development" \
-    || { echo "ERROR: CodemodInstallFailed" >&2; exit 1; }
-fi
-```
-
-**Probe the codemod.** Doctor failure blocks the rest of Step 4c.
-
-```bash
-mkdir -p /tmp/safer-setup
-if ! pnpm exec safer-spec doctor >/tmp/safer-setup/doctor.log 2>&1; then
-  echo "ERROR: DoctorFailed — codemod installed but safer-spec doctor failed" >&2
-  cat /tmp/safer-setup/doctor.log >&2
-  # Record for Step 11 receipt; do not proceed.
-  SPEC_LAYER_STATUS="BLOCKED"
-  SPEC_LAYER_DOCTOR=$(cat /tmp/safer-setup/doctor.log)
-  exit 1
-fi
-SPEC_LAYER_STATUS="required"
-SPEC_LAYER_DOCTOR="OK"
-```
-
-**Seed `safer-spec.config.json` (never overwrite).** Workspace monorepos repeat the seed per workspace package with a vitest config; the root `pnpm add` runs only once.
-
-```bash
-if [ ! -f "safer-spec.config.json" ]; then
-  pnpm exec safer-spec init >/dev/null 2>&1 || true
-fi
-```
-
-**Wire the vitest reporter (sentinel-bounded; mirrors Step 10b managed-CLAUDE.md section).** The patch detects `vitest.config.{ts,js,mts}` and `vitest.workspace.ts`, preserves existing reporters, and never double-applies the SAFER sentinel. Apply per workspace package when `vitest.workspace.ts` is present at the dogfood root.
-
-```bash
-# The SAFER sentinel pair brackets the wired reporter block:
-#   // <SAFER:vitest-reporter:begin>  ...managed block...  // <SAFER:vitest-reporter:end>
-# Detect: if the block already exists, do not touch. Otherwise insert after the
-# `test:` (or `reporters:`) key, preserving every existing reporter entry.
-# See workspace-monorepo paragraph in README for per-package iteration.
-```
-
-**Append `Spec layer: ${SPEC_LAYER_STATUS}` to the Step 11 receipt** alongside the existing `Testing deps:` line. Step 10b's managed `CLAUDE.md` section gains a `Spec layer: required` line so subsequent agents read it.
-
-**CF-3: post-publish sentinel lifecycle (recommended default option b).** The dogfood install above is the substituted form of the v0.2.0 integration PR. The release-mode sentinel (the literal that `bin/safer-gen-skills --check --release` greps for) is the EDIT-POINT marker the integration PR uses during development; the integration PR's final commit replaces the marker line wholesale with the dogfood `link:` block, so source committed to main is sentinel-free. When the codemod publishes to npm, the post-publish PR makes a **one-off manual SKILL.tmpl edit** to swap the dogfood `link:` block for the npm-name install (`pnpm add -D @chughtapan/safer-spec-development@~X.Y.Z`); the sentinel mechanism is NOT reintroduced because the substitution pattern is a v0.2.0-integration-specific tool, not a general lifecycle. `bin/safer-gen-skills --check --release` continues to gate against sentinel survival on every release branch. (This explanatory prose intentionally does NOT name the literal sentinel string so the release-mode gate stays green on this file.)
-
 ### Step 5: Plan the configuration shape
 
 You will write `eslint.config.js` once, in Step 7, after Step 6 installs the companion rules. Hold the shape in your head for now.
@@ -1392,6 +1195,62 @@ The `awk` pattern matches the prefix `## Project structural choices (managed by 
 
 This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
 
+### Step 10c: Install LSP host prerequisites
+
+The safer plugin's LSP entry is one wrapper at `lsp/proxy/run.sh`; the wrapper spawns `typescript-language-server` (TS code intelligence) and the `bun`-hosted architecture LSP behind a Python proxy. Setup installs the prerequisites on the user's machine and fetches the proxy.
+
+Detect what is already present:
+
+```bash
+have_ts_lsp=$(command -v typescript-language-server >/dev/null 2>&1 && echo yes || echo no)
+have_python3=$(command -v python3 >/dev/null 2>&1 && echo yes || echo no)
+have_bun=$(command -v bun >/dev/null 2>&1 && echo yes || echo no)
+```
+
+For each missing prerequisite, print the exact install command and ask via `AskUserQuestion` whether to run it:
+
+- `typescript-language-server`: `npm install -g typescript-language-server typescript`
+- `bun`: `curl -fsSL https://bun.sh/install | bash` (or the platform package manager)
+- `python3`: not installable from this skill. If missing, stop and tell the user to install Python 3 via their OS package manager, then re-run setup.
+
+These tools are global developer tooling, not project-local deps. Setup never modifies the project's `package.json` to add them.
+
+Fetch the LSP proxy script at the pinned upstream commit. The pin is recorded as the constant below; bumping the pin is a deliberate plugin PR (CHANGELOG entry) so users get reproducible behavior across installs:
+
+```bash
+LSP_PROXY_SHA="9b5a2a55aa90c96409fa18f0f7488cdb7d8c2d0b"
+LSP_PROXY_URL="https://raw.githubusercontent.com/techee/lsp-proxy/${LSP_PROXY_SHA}/lsp-proxy.py"
+LSP_PROXY_DIR="${HOME}/.cache/safer-by-default"
+LSP_PROXY_FILE="${LSP_PROXY_DIR}/lsp-proxy.py"
+
+mkdir -p "$LSP_PROXY_DIR"
+
+if [ -f "$LSP_PROXY_FILE" ]; then
+  echo "lsp-proxy.py: already present at $LSP_PROXY_FILE (skip)"
+else
+  if curl -fsSL --max-time 30 -o "${LSP_PROXY_FILE}.tmp" "$LSP_PROXY_URL"; then
+    mv "${LSP_PROXY_FILE}.tmp" "$LSP_PROXY_FILE"
+    echo "lsp-proxy.py: fetched pinned commit ${LSP_PROXY_SHA:0:7} to $LSP_PROXY_FILE"
+  else
+    rm -f "${LSP_PROXY_FILE}.tmp"
+    cat >&2 <<MSG
+ERROR: failed to fetch lsp-proxy.py.
+  URL:    $LSP_PROXY_URL
+  Target: $LSP_PROXY_FILE
+
+The plugin's LSP path is unavailable until this fetch succeeds. Retry with:
+  /safer:setup
+once network access is restored.
+MSG
+    exit 1
+  fi
+fi
+```
+
+Fail-closed is intentional: a partial install where the LSP entry in the plugin manifest points at a missing script produces "internal error" responses from CC's LSP tool with no diagnostic surface. Better to refuse to complete setup than to leave the plugin in a half-installed state.
+
+Re-runs are idempotent: the `[ -f $LSP_PROXY_FILE ]` check short-circuits the fetch when the file exists. To pull a new pinned commit after a plugin version bump, delete the file and re-run setup.
+
 ### Step 11: Print the completion summary
 
 End with a bordered block naming every decision and outcome. This is the user's receipt:
@@ -1420,6 +1279,10 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Schema library:         <SCHEMA_LIB>
   Database access:        <DB_TOOL>
   Env var access:         <ENV_VAR_ACCESS>
+  LSP host (TS):          installed | already present | user-deferred
+  LSP host (bun):         installed | already present | user-deferred
+  LSP host (python3):     present | missing (setup halted)
+  lsp-proxy.py:           fetched <sha7> | already present
 ============================================================
 ```
 
@@ -1514,7 +1377,7 @@ The next agent touching this repo reads `eslint.config.js` and `tsconfig.json`, 
 This skill is the bootstrap-stage audit. It auto-detects whether the target repo is green-field (no source past scaffolding) or brown-field (existing source) via the probe in Step 0 and adapts:
 
 - **Green-field path:** writes config + doctrine + scaffolds tooling.
-- **Brown-field path:** produces a phased migration plan and ratchets to `/safer:contract → /safer:architect → /safer:implement-*` for any code edits. Those modalities are downstream destinations. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
+- **Brown-field path:** produces a phased migration plan and ratchets to `/safer:spec → /safer:architect → /safer:implement-*` for any code edits. Those modalities are downstream destinations. The skill itself does NOT mass-edit legacy code (Principle 6 + Principle 8 enforcement).
 
 There is no `--mode` flag; the probe decides. If the probe is ambiguous, the skill stops and asks via `AskUserQuestion`. Setup may invoke `/setup-deploy` for deploy-target detection, `/setup-gbrain` for memory / MCP setup, `/setup-browser-cookies` for authenticated QA flows, `/codex --mode consult` for per-recommendation second opinions, and `/autoplan` when the audit produces a multi-step plan.
 

@@ -11,9 +11,6 @@
 # Local state (never committed; user-specific)
 ~/.safer/
 /.codex
-.claude/
-.gstack/
-node_modules/
 
 # Skill-creator workspaces (run artifacts; reproducible from evals.json)
 skills/*-workspace/

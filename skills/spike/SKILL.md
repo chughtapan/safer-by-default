@@ -7,7 +7,7 @@ description: |
   library actually do what it claims?". The output is a written verdict with
   evidence, not production code. Do NOT use when the question is open-ended
   (route to /safer:research) or when the implementation path is already known
-  (go straight to contract + architect + implement).
+  (go straight to spec + architect + implement).
 triggers:
   - can we do this
   - is this feasible
@@ -231,13 +231,12 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
 When a stop rule fires, the work does not ship via `DONE_WITH_CONCERNS`. The two receipts are not interchangeable:
 
-- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, contract, etc.) is the right home.
+- **Stop rule fires** → escalate via `safer-escalate`. The current modality cannot satisfy the principle without help; another modality (architect, spec, etc.) is the right home.
 - **`DONE_WITH_CONCERNS`** → the work shipped, but with named concerns the agent could not have prevented at this tier. Examples: an upstream test flake that no implement-tier work fixes; a plan ambiguity that doesn't block this module's internals; an unrecoverable external state (network down during dispatch).
 
 The discriminator: *could the agent have prevented this at this tier?* If yes, it's a stop rule fire. If no, it's a concern. Principle 1-4 violations the agent caught itself about to write are always preventable at any implement tier — junior, senior, staff alike — because the prevention is choosing a different shape. They are stop rule fires, not concerns.
@@ -255,21 +254,8 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 **Anti-patterns.**
 - "I'll add a boolean flag to handle this edge case." *(Boolean flags are the canonical shape of sidestepping a design flaw.)*
 - "The architect's plan doesn't cover this; I can improvise." *(Escalate to architect.)*
-- "The contract is ambiguous; I'll pick what makes sense." *(Escalate to contract.)*
+- "The spec is ambiguous; I'll pick what makes sense." *(Escalate to spec.)*
 - "I'll hardcode this for now." *(A workaround that compounds.)*
-
-### Living-spec is the ratchet's machine-readable surface
-
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
-
-| Exit | Error | Mechanical route |
-|---|---|---|
-| `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
-| `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
-| `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
-
-The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
 ---
 
@@ -362,7 +348,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Spec doc | GitHub issue, `safer:spec` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -450,7 +436,7 @@ Anti-patterns: *"The fix is obviously X"* — "obviously" is not a confidence. *
 
 | Modality | Compression | Row |
 |---|---|---|
-| `contract` | ~2× | below Research; purely thinking-bound |
+| `spec` | ~2× | below Research; purely thinking-bound |
 | `architect` | ~5× | Architecture / design |
 | `research` | ~3× | Research / exploration |
 | `diagnose` | ~3× | Research / exploration |
@@ -553,11 +539,11 @@ Then defer to user sovereignty if they insist. Name exactly what is being skippe
 - **Principle 5 (Discipline over capability) still applies.** You answer the question you were given. You do not answer a neighboring question because the code is right there.
 - **Principle 6 (Budget Gate) still applies.** Time box is a budget. If the box runs out before the verdict, the absence of a verdict is itself the verdict.
 - **Principle 7 (Brake) still applies.** When the iron rule below fires, stop. Do not "clean up" the spike into something shippable.
-- **Principle 8 (Ratchet) still applies.** If the spike is green, escalate to `architect` or `contract`. Never graduate the spike code itself into `implement-*`.
+- **Principle 8 (Ratchet) still applies.** If the spike is green, escalate to `architect` or `spec`. Never graduate the spike code itself into `implement-*`.
 
 ## Iron rule
 
-> **Spike code is throwaway. The moment it starts looking shippable, your stop rule has fired. If the spike is green, escalate to architect or contract. Never to implement.**
+> **Spike code is throwaway. The moment it starts looking shippable, your stop rule has fired. If the spike is green, escalate to architect or spec. Never to implement.**
 
 Shippable-looking spike code is worse than bad spike code. Shippable-looking code invites reuse. Reuse of spike code imports every corner the spike cut. The whole value of the modality is that the suspension of craft is paid back by not shipping the code. Ship the verdict, delete the code.
 
@@ -720,7 +706,7 @@ A HIGH verdict on a NO-GO is just as valuable as a HIGH verdict on a GO. "We pro
 If GO: name the next modality and scope.
 
 ```
-Next modality: contract  (because the architecture question is now open)
+Next modality: spec  (because the architecture question is now open)
 Scope:         define acceptance criteria for production insert path
 Salvageable:   the benchmark script can become the integration-test smoke check
 Discardable:   everything else in spike/<slug>/
@@ -763,7 +749,7 @@ cat > "$TMP" <<EOF
 <GO | NO-GO | MIXED> ; Confidence: <LOW | MED | HIGH>
 
 ## Graduation plan
-- Next modality: <contract | architect | research | none>
+- Next modality: <spec | architect | research | none>
 - Salvageable from this branch: <named files or "nothing">
 - Discardable: <branch may be deleted>
 

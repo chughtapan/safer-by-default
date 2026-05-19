@@ -2,11 +2,11 @@
 
 ## What this is
 
-A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding agent for compiler-grade craft and scope discipline. Doctrine lives in `PRINCIPLES.md`. Every skill in `skills/` is one projection of those principles onto one kind of work (contract, contract-init, contract-migrate, architect, implement-{junior,senior,staff}, diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit).
+A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding agent for compiler-grade craft and scope discipline. Doctrine lives in `PRINCIPLES.md`. Every skill in `skills/` is one projection of those principles onto one kind of work (spec, architect, implement-{junior,senior,staff}, diagnose, spike, research, review-senior, verify, orchestrate, setup, dogfood, docs-reader, stamina, ux-audit).
 
 ## Skill namespacing
 
-Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:contract`, `/safer:architect`). The plugin slug inside the marketplace is `safer`; the marketplace itself is named `safer-by-default` (matching the repo). All in-repo docs use the `/safer:NAME` form literally.
+Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:spec`, `/safer:architect`). The plugin slug inside the marketplace is `safer`; the marketplace itself is named `safer-by-default` (matching the repo). All in-repo docs use the `/safer:NAME` form literally.
 
 ## Where things live at runtime
 
@@ -25,4 +25,4 @@ Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:contract
 
 ## Skill routing
 
-- Stamina review on high-blast-radius artifact (public-surface PR, contract, architect plan) → invoke `/safer:stamina`.
+- Stamina review on high-blast-radius artifact (public-surface PR, spec, architect plan) → invoke `/safer:stamina`.

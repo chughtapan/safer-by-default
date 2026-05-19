@@ -2,7 +2,7 @@
 name: review-senior
 version: 0.2.0
 description: |
-  Dispatcher for pre-merge artifact review. Routes a PR, design doc, contract,
+  Dispatcher for pre-merge artifact review. Routes a PR, design doc, spec,
   plan, UI-touching change, or LLM-prompt change to the correct composed
   gstack skill set per the SPEC r4.1 §5(h) routing table. Does NOT itself
   read diffs or write reviews; the composed gstack skills do that. Single
@@ -57,7 +57,7 @@ gstack verdicts.
 | Artifact kind | Composed gstack skills |
 |---|---|
 | PR diff | `/review` + `/simplify` + `/codex` |
-| Plan / contract / design doc | `/plan-eng-review` + `/codex` |
+| Plan / spec / design doc | `/plan-eng-review` + `/codex` |
 | UI-touching change (PR or design doc) | add `/plan-design-review` |
 | LLM prompt change | add the repo's eval suites per `CLAUDE.md` |
 
@@ -67,7 +67,7 @@ authored it. A PR that happens to include UI copy routes under rows 1 + 3.
 A PR that introduces a new LLM prompt routes under rows 1 + 4.
 
 The routing table is additive. A UI-touching PR runs rows 1 and 3; a
-contract that describes an LLM prompt runs rows 2 and 4.
+spec that describes an LLM prompt runs rows 2 and 4.
 
 ## Craft checks the reviewer still owns (Principles 1-4)
 
@@ -198,7 +198,7 @@ Unavailability tagging:
 
 ```
 --artifact <url>   GitHub issue-comment URL, sub-issue body URL, or PR URL
---kind <pr|design|contract|plan|ui|prompt>   (optional; inferred if omitted)
+--kind <pr|design|spec|plan|ui|prompt>   (optional; inferred if omitted)
 ```
 
 `--kind` inference rules (when the flag is omitted):
@@ -207,8 +207,8 @@ Unavailability tagging:
   `{css,scss,tsx,jsx,html,svg}` or `design/**`; add 4 if it touches
   `skills/**/SKILL.md`, `prompts/**`, `eval/**`, or an LLM-prompt file).
 - URL matches `/issues/\d+#issuecomment-` → read the comment's `safer:*`
-  label on the parent issue. `safer:contract` → `contract`; `safer:architect`
-  → `design`; anything else → `plan`.
+  label on the parent issue. `safer:spec` → `spec`; `safer:architect` →
+  `design`; anything else → `plan`.
 - URL matches `/issues/\d+` → `plan`.
 
 ## Workflow
@@ -296,7 +296,7 @@ UI-touching artifacts add `/plan-design-review --artifact <URL> --hold-scope` to
 `--hold-scope` is mandatory: it tells the composed skill to run autonomous; user-facing prompts that would fire mid-run escalate to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`.
 
 For PR rows, the composed skills post their verdicts as inline comments
-or PR reviews; for design/plan/contract rows, the composed skills post
+or PR reviews; for design/plan/spec rows, the composed skills post
 threaded comments on the artifact URL.
 
 Partial-miss handling (SOME composed skills missing): emit
@@ -328,7 +328,7 @@ Combine per-skill verdicts into one artifact verdict. Rules:
 
 Publish the aggregate via `gh pr review` (for PR rows) or
 `safer-publish --kind comment --issue "$ISSUE" --body-file <file>`
-(for design/plan/contract rows).
+(for design/plan/spec rows).
 
 ### Phase 4 — Transition the sub-issue label
 
@@ -379,7 +379,7 @@ Every invocation ends with exactly one status marker on the last line:
   No. Silent skip is forbidden. Emit DONE_WITH_CONCERNS so the
   orchestrator can see that convergence is unmeasured.
 - **"I'll rewrite the routing table to cover a new case I just noticed."**
-  No. The routing table lives in SPEC r4.1 §5(h). Route to `/safer:contract`
+  No. The routing table lives in SPEC r4.1 §5(h). Route to `/safer:spec`
   if a new case is needed (Principle 8, Ratchet).
 - **"This PR is small; I'll skip `/codex`."** No. Every row in the
   routing table is mandatory for its kind. `/codex` is an independent
