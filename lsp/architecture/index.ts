@@ -16,3 +16,9 @@ export {
   ARCHITECTURE_DIRECTIVE_PARSE_ERROR_RULE_ID,
   type ArchitectureRuleId,
 } from "./analyzer/rule-ids.js";
+export {
+  discoverProjectRoots,
+  parsePnpmWorkspacePackages,
+  type WorkspaceDiscoveryResult,
+  type WorkspaceDiscoverySource,
+} from "./workspace-discovery.js";

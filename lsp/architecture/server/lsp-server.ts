@@ -25,6 +25,7 @@ import {
   TextDocumentSyncKind,
 } from "vscode-languageserver";
 import { clearWorkspaceCache } from "../analyzer/project/cache/index.js";
+import { discoverProjectRoots } from "../workspace-discovery.js";
 import { groupByUri } from "./diagnostic-converter.js";
 import { type DocumentStore, makeDocumentStore } from "./document-store.js";
 import { type WorkspaceEngine } from "./workspace-engine.js";
@@ -125,12 +126,20 @@ const registerInitialWorkspaces = (
   Effect.gen(function* () {
     const folders = params.workspaceFolders ?? [];
     for (const folder of folders) {
-      const root = fileURLToPath(folder.uri);
-      const engine = yield* deps.registry.register(root);
-      // Re-publish for any docs in this workspace when its watcher fires.
-      yield* Effect.forkScoped(
-        Stream.runForEach(engine.invalidations, () => publishAllOpen(deps, engine)),
-      );
+      const workspaceRoot = fileURLToPath(folder.uri);
+      // Monorepos (pnpm-workspace.yaml, package.json `workspaces`) carry
+      // one tsconfig per package, not one at the workspace root. Register
+      // an engine per discovered package so diagnostics actually publish
+      // when files inside `packages/*` are opened. Single-project repos
+      // fall through with `[workspaceRoot]` (pre-fix behaviour).
+      const discovered = discoverProjectRoots(workspaceRoot);
+      for (const root of discovered.projectRoots) {
+        const engine = yield* deps.registry.register(root);
+        // Re-publish for any docs in this workspace when its watcher fires.
+        yield* Effect.forkScoped(
+          Stream.runForEach(engine.invalidations, () => publishAllOpen(deps, engine)),
+        );
+      }
     }
   });
 
