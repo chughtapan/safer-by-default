@@ -139,3 +139,61 @@ it("check: exits 0 when every monorepo package is clean", () => {
   const result = spawnSync("node", [CHECK_SCRIPT], { cwd: root, encoding: "utf8" });
   expect(result.status).toBe(0);
 });
+
+it("check: applies architecture options from eslint.config.mjs", () => {
+  // Without the eslint config, the wildcard subpath in `exports`
+  // fires `no-internal-subpath-export` at error severity. With
+  // `maxWildcardExports: 5` declared via the eslint settings, the
+  // analyzer tolerates the wildcard and the run exits clean.
+  const root = makeProject({
+    "package.json": JSON.stringify({
+      name: "fixture",
+      version: "1.0.0",
+      type: "module",
+      exports: {
+        ".": { import: "./dist/index.js", types: "./dist/index.d.ts" },
+        "./*": { import: "./dist/*.js" },
+      },
+    }),
+    "src/index.ts": "export const x = 1;\n",
+    "eslint.config.mjs": `
+      export default [
+        {
+          files: ["src/**/*.ts"],
+          settings: {
+            "agent-code-guard": {
+              architecture: {
+                maxWildcardExports: 5,
+              },
+            },
+          },
+        },
+      ];
+    `,
+  });
+  const result = spawnSync("node", [CHECK_SCRIPT], { cwd: root, encoding: "utf8" });
+  expect(result.stderr).toBe("");
+  expect(result.status).toBe(0);
+  expect(result.stdout).not.toMatch(/ERROR no-internal-subpath-export/);
+});
+
+it("check: passes through when eslint.config.mjs has no architecture key", () => {
+  // Config exists but doesn't carry architecture options → analyzer
+  // sees defaults → wildcard subpath still fires.
+  const root = makeProject({
+    "package.json": JSON.stringify({
+      name: "fixture",
+      version: "1.0.0",
+      type: "module",
+      exports: {
+        ".": { import: "./dist/index.js", types: "./dist/index.d.ts" },
+        "./*": { import: "./dist/*.js" },
+      },
+    }),
+    "src/index.ts": "export const x = 1;\n",
+    "eslint.config.mjs": "export default [];",
+  });
+  const result = spawnSync("node", [CHECK_SCRIPT], { cwd: root, encoding: "utf8" });
+  expect(result.status).toBe(1);
+  expect(result.stdout).toMatch(/ERROR no-internal-subpath-export/);
+});

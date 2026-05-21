@@ -22,3 +22,7 @@ export {
   type WorkspaceDiscoveryResult,
   type WorkspaceDiscoverySource,
 } from "./workspace-discovery.js";
+export {
+  globMatches,
+  resolveArchitectureOptionsFromEslint,
+} from "./eslint-options-resolver.js";

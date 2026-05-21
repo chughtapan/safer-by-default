@@ -25,6 +25,7 @@ import {
   TextDocumentSyncKind,
 } from "vscode-languageserver";
 import { clearWorkspaceCache } from "../analyzer/project/cache/index.js";
+import { resolveArchitectureOptionsFromEslint } from "../eslint-options-resolver.js";
 import { discoverProjectRoots } from "../workspace-discovery.js";
 import { groupByUri } from "./diagnostic-converter.js";
 import { type DocumentStore, makeDocumentStore } from "./document-store.js";
@@ -134,7 +135,13 @@ const registerInitialWorkspaces = (
       // fall through with `[workspaceRoot]` (pre-fix behaviour).
       const discovered = discoverProjectRoots(workspaceRoot);
       for (const root of discovered.projectRoots) {
-        const engine = yield* deps.registry.register(root);
+        // Architecture options come from `settings["agent-code-guard"].architecture`
+        // in the project's eslint flat config. Failure → defaults.
+        const options = yield* Effect.tryPromise({
+          try: () => resolveArchitectureOptionsFromEslint(root),
+          catch: () => null,
+        }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+        const engine = yield* deps.registry.register(root, options ?? undefined);
         // Re-publish for any docs in this workspace when its watcher fires.
         yield* Effect.forkScoped(
           Stream.runForEach(engine.invalidations, () => publishAllOpen(deps, engine)),
