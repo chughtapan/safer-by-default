@@ -75,6 +75,9 @@ function emitTape(plan: Plan): string {
   out.push(`Set TypingSpeed 25ms`);
   out.push(`Set Padding 20`);
   out.push(`Set PlaybackSpeed 1.0`);
+  out.push(`Env BAT_PAGER ""`);
+  out.push(`Env BAT_STYLE "numbers,grid"`);
+  out.push(`Env PAGER cat`);
   out.push(``);
   out.push(`Hide`);
   out.push(`Type "clear"`);

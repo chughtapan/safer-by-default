@@ -5,6 +5,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
+import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY;
@@ -89,9 +90,10 @@ function makeSilenceWav(durationSec: number, outPath: string): void {
 
 function concatWavs(paths: string[], outPath: string): void {
   const listPath = `/tmp/concat-list-${process.pid}.txt`;
+  const abs = paths.map((p) => resolve(p));
   writeFileSync(
     listPath,
-    paths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n") + "\n",
+    abs.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n") + "\n",
   );
   const r = spawnSync(
     "ffmpeg",
@@ -189,15 +191,40 @@ async function main() {
     );
     await synthesize(scene.text, rawPath);
 
-    const actual = durationOfWav(rawPath);
+    let actual = durationOfWav(rawPath);
+    let fitPath = rawPath;
     if (actual > target + 0.5) {
+      const tempo = actual / target;
+      const clamped = Math.min(2.0, tempo);
       console.warn(
-        `  ⚠ scene ${scene.id} narration ${actual.toFixed(1)}s > target ${target}s — will overrun`,
+        `  ⚠ scene ${scene.id} narration ${actual.toFixed(1)}s > target ${target}s — compressing with atempo=${clamped.toFixed(2)}`,
       );
+      const fittedPath = `audio/scene_${scene.id}_fitted.wav`;
+      const r = spawnSync(
+        "ffmpeg",
+        [
+          "-y",
+          "-i",
+          rawPath,
+          "-af",
+          `atempo=${clamped.toFixed(3)}`,
+          "-c:a",
+          "pcm_s16le",
+          "-ar",
+          String(SAMPLE_RATE),
+          fittedPath,
+        ],
+        { stdio: ["ignore", "ignore", "pipe"] },
+      );
+      if (r.status !== 0) {
+        throw new Error(`ffmpeg atempo failed: ${r.stderr}`);
+      }
+      fitPath = fittedPath;
+      actual = durationOfWav(fitPath);
     }
     const padDur = Math.max(0.05, target - actual);
     makeSilenceWav(padDur, padPath);
-    concatWavs([rawPath, padPath], outPath);
+    concatWavs([fitPath, padPath], outPath);
 
     finalPaths.push(outPath);
   }
