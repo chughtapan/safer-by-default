@@ -110,90 +110,54 @@ function tapeHeader(outputPath: string): string[] {
   ];
 }
 
-function shellEscapeSingle(s: string): string {
-  // For wrapping a string in '...'  bash single quotes
-  return s.replace(/'/g, "'\\''");
-}
+function writeSlideMarkdown(scene: Scene): string {
+  // Title / outro / pr-card scenes get a curated markdown file at planner
+  // time. The tape invokes `glow` on this file so the slide content is
+  // markdown-native (proper heading styling, blockquote indent, etc.).
+  const outFile = `segments/scene_${scene.id}.md`;
 
-function prerenderSlide(scene: Scene): string {
-  // Title / outro / pr-card scenes get their styled output pre-rendered by
-  // gum at planner-time into a file, so the tape can just `cat` it. This
-  // avoids exposing the long `gum style ...` invocation in the recording.
-  const outFile = `segments/scene_${scene.id}_slide.txt`;
+  let body: string;
 
-  let cmd: string[];
   if (scene.type === "title" || scene.type === "outro") {
     const tc = scene.titleCard ?? scene.title;
     const sub = scene.subtitle ?? "";
-    const accent = scene.type === "outro" ? "#a6e3a1" : "#cba6f7";
-    const args = [
-      "style",
-      "--align", "center",
-      "--border", "double",
-      "--border-foreground", accent,
-      "--foreground", "#cdd6f4",
-      "--padding", "3 6",
-      "--margin", "4 0",
-      "--width", "70",
-      "--bold",
-    ];
-    if (sub) {
-      args.push(tc, "", sub);
-    } else {
-      args.push(tc);
-    }
-    cmd = ["gum", ...args];
+    body = sub ? `# ${tc}\n\n> ${sub}\n` : `# ${tc}\n`;
   } else if (scene.type === "pr-card") {
-    // Pipe pr-card.txt through gum style; we do the pipe in Bun.
-    const prCardPath = "segments/pr-card.txt";
-    const body = readFileSync(prCardPath, "utf8");
-    const gumProc = Bun.spawnSync({
+    // Curated PR card from gh JSON — not the full PR body, which is too noisy.
+    const proc = Bun.spawnSync({
       cmd: [
-        "gum",
-        "style",
-        "--border", "rounded",
-        "--border-foreground", "#89b4fa",
-        "--padding", "2 4",
-        "--width", "110",
+        "gh",
+        "pr",
+        "view",
+        "--json",
+        "number,title,headRefName,author,additions,deletions,files",
       ],
-      stdin: new TextEncoder().encode(body),
       stdout: "pipe",
       stderr: "pipe",
     });
-    if (gumProc.exitCode !== 0) {
+    if (proc.exitCode !== 0) {
       throw new Error(
-        `gum style failed for pr-card: ${new TextDecoder().decode(gumProc.stderr)}`,
+        `gh pr view failed for pr-card: ${new TextDecoder().decode(proc.stderr)}`,
       );
     }
-    writeFileSync(outFile, new TextDecoder().decode(gumProc.stdout));
-    return outFile;
+    const pr = JSON.parse(new TextDecoder().decode(proc.stdout));
+    body = `# PR #${pr.number}\n\n## ${pr.title}\n\nby **${pr.author.login}** on branch \`${pr.headRefName}\`\n\n- **+${pr.additions} / -${pr.deletions}** across **${pr.files.length} files**\n`;
   } else {
-    throw new Error(`prerenderSlide called on non-slide type ${scene.type}`);
+    throw new Error(`writeSlideMarkdown called on non-slide type ${scene.type}`);
   }
 
-  const proc = Bun.spawnSync({
-    cmd,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (proc.exitCode !== 0) {
-    throw new Error(
-      `gum failed for scene ${scene.id}: ${new TextDecoder().decode(proc.stderr)}`,
-    );
-  }
-  writeFileSync(outFile, new TextDecoder().decode(proc.stdout));
+  writeFileSync(outFile, body);
   return outFile;
 }
 
-function buildShowCommand(scene: Scene, prerenderedPath?: string): string {
+function buildShowCommand(scene: Scene): string {
   switch (scene.type) {
     case "title":
     case "outro":
     case "pr-card": {
-      // Tape just cats the pre-rendered slide file (short command, minimal
-      // visual noise above the styled output).
-      const path = prerenderedPath ?? `segments/scene_${scene.id}_slide.txt`;
-      return `cat spike/walkthrough/${path}`;
+      // Tape renders the pre-written markdown via glow. Width matched to
+      // the visible terminal area at 1920×1080 / FontSize 22 (~100 cols).
+      return `glow -s dark -w 100 spike/walkthrough/segments/scene_${scene.id}.md`;
     }
     case "log": {
       return scene.show ?? `git log --graph --oneline --decorate -C2 main..HEAD`;
@@ -246,42 +210,6 @@ function emitSceneTape(
   return lines.join("\n") + "\n";
 }
 
-async function prerenderPrCard(): Promise<void> {
-  // For pr-card scenes, shell out to gh to fetch and format the PR data.
-  // Write to spike/walkthrough/segments/pr-card.txt so the tape just cats it.
-  const proc = Bun.spawnSync({
-    cmd: [
-      "gh",
-      "pr",
-      "view",
-      "--json",
-      "number,title,headRefName,author,additions,deletions,files,body",
-      "--template",
-      `PR #{{.number}}: {{.title}}
-
-branch: {{.headRefName}}    by: {{.author.login}}
-diff:   +{{.additions}} / -{{.deletions}} across {{len .files}} files
-
-{{.body}}`,
-    ],
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (proc.exitCode !== 0) {
-    throw new Error(
-      `gh pr view failed for pr-card scene: ${new TextDecoder().decode(proc.stderr)}`,
-    );
-  }
-  let body = new TextDecoder().decode(proc.stdout);
-  // Truncate body to ~12 lines so the card fits the canvas at FontSize 22
-  const allLines = body.split("\n");
-  if (allLines.length > 18) {
-    body = allLines.slice(0, 18).join("\n") + "\n...";
-  }
-  writeFileSync("segments/pr-card.txt", body);
-  console.log(`  pre-rendered segments/pr-card.txt (${body.length} bytes)`);
-}
-
 // vhs's render-vs-wallclock varies. Per-scene short renders see less drift than
 // monolithic recordings. 1.15 is the starting heuristic for v3.
 const VHS_TIMESCALE = 1.15;
@@ -317,15 +245,10 @@ const durationById = new Map(
 
 if (!existsSync("segments")) mkdirSync("segments", { recursive: true });
 
-// Pre-render any pr-card scenes (needed before prerenderSlide can read pr-card.txt)
-if (plan.scenes.some((s) => s.type === "pr-card")) {
-  await prerenderPrCard();
-}
-
-// Pre-render styled slide files for title/pr-card/outro scenes
+// Pre-write markdown slide files for title/pr-card/outro scenes
 for (const s of plan.scenes) {
   if (s.type === "title" || s.type === "pr-card" || s.type === "outro") {
-    prerenderSlide(s);
+    writeSlideMarkdown(s);
   }
 }
 

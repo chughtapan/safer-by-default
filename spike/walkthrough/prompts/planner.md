@@ -16,12 +16,22 @@ A code walkthrough is a short technical talk. Use this exact structure — every
 |---|---|---|---|
 | **Hook** | 1 (the opener) | 30-50 | A vivid opening that names what's *interesting* about this PR. Not "this PR adds X" — try "we used to do X. now we do Y. here's why we flipped it." Hook the viewer in the first 8 seconds. |
 | **Thesis** | 1 (right after Hook) | 40-60 | The single sentence the viewer should be able to repeat in their own words after watching. What did this PR actually accomplish? Why does it matter to a peer engineer? Lead with the *why*, then the *what*. |
-| **Evidence** | 3-5 (the body) | 50-80 each | Each shows ONE load-bearing change with concrete code/diff and explains *why* it was made — not just *what* it does. Each evidence scene should answer "would a smart reviewer want to read this line?". Order them by impact (most surprising first), not chronology. |
+| **Evidence** | 3-5 (the body) | 50-80 each | Each shows ONE load-bearing chunk of code on screen. The narration **walks through that code**: name the variables, trace the control flow, say what each branch returns and when. Treat it like pair-programming over a shoulder. The "why" is allowed as ONE sentence per scene; the other ~80% is "here's what this code actually does, line by line." |
 | **Call to action** | 1 (the closer) | 20-40 | What should the viewer do next? Try the feature, watch a sibling video, check a specific file, leave a review comment. Be concrete — vague closers waste the runway. |
 
 Total: 6-8 scenes, 120-180 seconds of narration (≈330-500 words). Cartesia reads at ~165 wpm in practice.
 
-The Hook and Call to action are short and punchy. The Thesis is the most carefully written sentence in the whole video. Evidence scenes carry the weight — go deep, show specifics, name the trade-off you chose and the one you rejected.
+The Hook and Call to action are short and punchy. The Thesis is the most carefully written sentence in the whole video. Evidence scenes carry the weight — they **walk through the code on screen**, not the architecture in the abstract.
+
+### What Evidence narration should sound like
+
+**Good** (code-semantic — describes what's on screen):
+> *"The for loop on line 22 walks each scene in the manifest. Line 23 builds the tape path; line 24 the output path; line 26 checks the tape exists before we spawn vhs. The env hyphen i on line 35 strips environment variables so the API key in your shell never leaks into the recording. Then ffprobe on line 56 measures the rendered duration so the next stage knows how much padding to add."*
+
+**Bad** (architecture-meta — could be said with the screen blank):
+> *"Per scene isolation means scene seven aligns as tightly as scene one. We do not speed up the narrator. The eight hundred millisecond tail silence is deliberate."*
+
+The viewer should be able to follow your finger across the code as you speak. Name function names, variable names, line numbers when it helps. If your narration would still make sense with a different code excerpt under it, you wrote it wrong — make it tightly coupled to *this exact code*.
 
 ## Inputs
 
@@ -121,7 +131,8 @@ If you can't tell what's load-bearing from the diff alone, read the most recent 
 - ❌ `diff` scene that pipes >50 lines (split into code scenes with narrow ranges)
 - ❌ Title cards longer than 14 characters
 - ❌ Narration that's just the commit message read aloud
-- ❌ Narration that describes *what* without explaining *why* (Evidence scenes especially)
+- ❌ **Evidence narration that doesn't reference what's on screen** — the viewer must be able to follow your finger across the code as you talk. If you could swap the code excerpt for a different file and the narration would still make sense, it's wrong.
+- ❌ **Evidence narration that explains architecture without walking the code** — "we chose X over Y because Z" is allowed as ONE beat per scene, not the whole scene
 - ❌ Narration shorter than 25 words on an Evidence scene (you have ~25s — use it for depth, not brevity)
 - ❌ Scenes that show whole files when 20 lines would do
 - ❌ Including imports, license headers, or boilerplate in `Show:` commands
