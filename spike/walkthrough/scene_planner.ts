@@ -153,11 +153,16 @@ function writeSlideMarkdown(scene: Scene): string {
 function buildShowCommand(scene: Scene): string {
   switch (scene.type) {
     case "title":
-    case "outro":
-    case "pr-card": {
-      // Tape renders the pre-written markdown via glow. Width matched to
-      // the visible terminal area at 1920×1080 / FontSize 22 (~100 cols).
+    case "outro": {
+      // Title and outro: glow's markdown rendering reads as the "slide
+      // content" (heading + blockquote subtitle). Short and uncluttered.
       return `glow -s dark -w 100 spike/walkthrough/segments/scene_${scene.id}.md`;
+    }
+    case "pr-card": {
+      // PR card: render the markdown with gum format (preserves ANSI
+      // styling) then wrap in gum style border so it reads as a real
+      // card, not loose markdown. gum format reads markdown from stdin.
+      return `cat spike/walkthrough/segments/scene_${scene.id}.md | gum format | gum style --border rounded --border-foreground '#89b4fa' --padding '2 4' --margin '1 0' --width 110`;
     }
     case "log": {
       return scene.show ?? `git log --graph --oneline --decorate -C2 main..HEAD`;
