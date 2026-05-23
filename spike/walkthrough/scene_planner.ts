@@ -115,21 +115,85 @@ function shellEscapeSingle(s: string): string {
   return s.replace(/'/g, "'\\''");
 }
 
-function buildShowCommand(scene: Scene): string {
+function prerenderSlide(scene: Scene): string {
+  // Title / outro / pr-card scenes get their styled output pre-rendered by
+  // gum at planner-time into a file, so the tape can just `cat` it. This
+  // avoids exposing the long `gum style ...` invocation in the recording.
+  const outFile = `segments/scene_${scene.id}_slide.txt`;
+
+  let cmd: string[];
+  if (scene.type === "title" || scene.type === "outro") {
+    const tc = scene.titleCard ?? scene.title;
+    const sub = scene.subtitle ?? "";
+    const accent = scene.type === "outro" ? "#a6e3a1" : "#cba6f7";
+    const args = [
+      "style",
+      "--align", "center",
+      "--border", "double",
+      "--border-foreground", accent,
+      "--foreground", "#cdd6f4",
+      "--padding", "3 6",
+      "--margin", "4 0",
+      "--width", "70",
+      "--bold",
+    ];
+    if (sub) {
+      args.push(tc, "", sub);
+    } else {
+      args.push(tc);
+    }
+    cmd = ["gum", ...args];
+  } else if (scene.type === "pr-card") {
+    // Pipe pr-card.txt through gum style; we do the pipe in Bun.
+    const prCardPath = "segments/pr-card.txt";
+    const body = readFileSync(prCardPath, "utf8");
+    const gumProc = Bun.spawnSync({
+      cmd: [
+        "gum",
+        "style",
+        "--border", "rounded",
+        "--border-foreground", "#89b4fa",
+        "--padding", "2 4",
+        "--width", "110",
+      ],
+      stdin: new TextEncoder().encode(body),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (gumProc.exitCode !== 0) {
+      throw new Error(
+        `gum style failed for pr-card: ${new TextDecoder().decode(gumProc.stderr)}`,
+      );
+    }
+    writeFileSync(outFile, new TextDecoder().decode(gumProc.stdout));
+    return outFile;
+  } else {
+    throw new Error(`prerenderSlide called on non-slide type ${scene.type}`);
+  }
+
+  const proc = Bun.spawnSync({
+    cmd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (proc.exitCode !== 0) {
+    throw new Error(
+      `gum failed for scene ${scene.id}: ${new TextDecoder().decode(proc.stderr)}`,
+    );
+  }
+  writeFileSync(outFile, new TextDecoder().decode(proc.stdout));
+  return outFile;
+}
+
+function buildShowCommand(scene: Scene, prerenderedPath?: string): string {
   switch (scene.type) {
     case "title":
-    case "outro": {
-      const tc = scene.titleCard ?? scene.title;
-      const sub = scene.subtitle ?? "";
-      const accent = scene.type === "outro" ? "#a6e3a1" : "#cba6f7";
-      const lines = sub
-        ? `'${shellEscapeSingle(tc)}' '' '${shellEscapeSingle(sub)}'`
-        : `'${shellEscapeSingle(tc)}'`;
-      return `gum style --align center --border double --border-foreground '${accent}' --foreground '#cdd6f4' --padding '3 6' --margin '4 0' --width 70 --bold ${lines}`;
-    }
+    case "outro":
     case "pr-card": {
-      // pr-card.txt is pre-rendered by scene_planner before tape emission
-      return `cat spike/walkthrough/segments/pr-card.txt | gum style --border rounded --border-foreground '#89b4fa' --padding '2 4' --width 110`;
+      // Tape just cats the pre-rendered slide file (short command, minimal
+      // visual noise above the styled output).
+      const path = prerenderedPath ?? `segments/scene_${scene.id}_slide.txt`;
+      return `cat spike/walkthrough/${path}`;
     }
     case "log": {
       return scene.show ?? `git log --graph --oneline --decorate -C2 main..HEAD`;
@@ -167,15 +231,18 @@ function emitSceneTape(
   lines.push(``);
   for (const h of tapeHeader(outputPath)) lines.push(h);
   lines.push(``);
+
+  const cmd = buildShowCommand(scene).replace(/"/g, '\\"');
+
   lines.push(`Hide`);
   lines.push(`Type "clear"`);
   lines.push(`Enter`);
   lines.push(`Sleep 200ms`);
   lines.push(`Show`);
-  const cmd = buildShowCommand(scene).replace(/"/g, '\\"');
   lines.push(`Type "${cmd}"`);
   lines.push(`Enter`);
   lines.push(`Sleep ${sleepSec.toFixed(2)}s`);
+
   return lines.join("\n") + "\n";
 }
 
@@ -187,6 +254,8 @@ async function prerenderPrCard(): Promise<void> {
       "gh",
       "pr",
       "view",
+      "--json",
+      "number,title,headRefName,author,additions,deletions,files,body",
       "--template",
       `PR #{{.number}}: {{.title}}
 
@@ -248,9 +317,16 @@ const durationById = new Map(
 
 if (!existsSync("segments")) mkdirSync("segments", { recursive: true });
 
-// Pre-render any pr-card scenes
+// Pre-render any pr-card scenes (needed before prerenderSlide can read pr-card.txt)
 if (plan.scenes.some((s) => s.type === "pr-card")) {
   await prerenderPrCard();
+}
+
+// Pre-render styled slide files for title/pr-card/outro scenes
+for (const s of plan.scenes) {
+  if (s.type === "title" || s.type === "pr-card" || s.type === "outro") {
+    prerenderSlide(s);
+  }
 }
 
 for (const scene of plan.scenes) {

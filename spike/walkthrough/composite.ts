@@ -9,7 +9,7 @@ interface Manifest {
   scenes: { id: number; title: string; durationSec: number }[];
 }
 
-const XFADE_DURATION = 0.4; // seconds — applied between each adjacent scene
+const XFADE_DURATION = 0.4;
 const FOOTER_HEIGHT_PX = 36;
 const PR_NUMBER = process.env.PR_NUMBER ?? "?";
 const BRANCH =
@@ -28,7 +28,6 @@ const outputPath = args[2] ?? "final.mp4";
 
 const manifest: Manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
-// Probe each segment's actual rendered duration; xfade math needs exact lengths.
 function videoDuration(path: string): number {
   const r = spawnSync(
     "ffprobe",
@@ -46,97 +45,104 @@ function videoDuration(path: string): number {
   return parseFloat(r.stdout.trim());
 }
 
-const segments: { id: number; title: string; path: string; videoSec: number; audioSec: number }[] = [];
-for (const s of manifest.scenes) {
+function run(cmd: string[], label: string): void {
+  const r = spawnSync(cmd[0], cmd.slice(1), {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (r.status !== 0) {
+    const err = r.stderr ? new TextDecoder().decode(r.stderr).split("\n").slice(-15).join("\n") : "";
+    throw new Error(`${label} failed:\n${err}`);
+  }
+}
+
+// Pass 1: pad each segment to (max(video, audio) + xfade_window) at constant 30fps.
+// Doing this as a per-segment ffmpeg run sidesteps the variable-frame-rate
+// errors that tpad inside a complex xfade graph triggers.
+console.log("Pass 1: per-scene pad to audio length + xfade window");
+const paddedSegments: { id: number; path: string; lengthSec: number }[] = [];
+for (let i = 0; i < manifest.scenes.length; i++) {
+  const s = manifest.scenes[i];
   const segPath = resolve(`segments/scene_${s.id}.mp4`);
   if (!existsSync(segPath)) {
-    throw new Error(`Missing segment ${segPath} — run render_scenes.ts first`);
+    throw new Error(`Missing segment ${segPath}`);
   }
-  segments.push({
-    id: s.id,
-    title: s.title,
-    path: segPath,
-    videoSec: videoDuration(segPath),
-    audioSec: s.durationSec,
-  });
-}
+  const videoSec = videoDuration(segPath);
+  const isLast = i === manifest.scenes.length - 1;
+  const target = Math.max(videoSec, s.durationSec) + (isLast ? 0 : XFADE_DURATION);
+  const padDur = target - videoSec;
+  const paddedPath = resolve(`segments/scene_${s.id}_padded.mp4`);
 
-console.log("Segments to composite:");
-for (const s of segments) {
   console.log(
-    `  scene ${s.id} (${s.title}): video=${s.videoSec.toFixed(2)}s audio=${s.audioSec.toFixed(2)}s`,
+    `  scene ${s.id}: video=${videoSec.toFixed(2)}s audio=${s.durationSec.toFixed(2)}s → pad +${padDur.toFixed(2)}s → target ${target.toFixed(2)}s`,
   );
+
+  run(
+    [
+      "ffmpeg",
+      "-y",
+      "-i",
+      segPath,
+      "-vf",
+      `tpad=stop_mode=clone:stop_duration=${padDur.toFixed(3)},fps=30,setpts=PTS-STARTPTS`,
+      "-an",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "fast",
+      "-pix_fmt",
+      "yuv420p",
+      "-r",
+      "30",
+      "-fps_mode",
+      "cfr",
+      paddedPath,
+    ],
+    `pad scene ${s.id}`,
+  );
+  paddedSegments.push({ id: s.id, path: paddedPath, lengthSec: target });
 }
 
-// xfade chained: each adjacent pair crossfades for XFADE_DURATION seconds.
-// Offset for segment N is sum(durations[0..N-1]) - XFADE_DURATION * N.
-// Output duration is sum(videoSec) - XFADE_DURATION * (sceneCount - 1).
-//
-// We'll pad each segment with tpad clone to match max(videoSec, audioSec + XFADE) so
-// that audio crossfades cleanly into the next scene.
+// Pass 2: xfade chain across padded segments
+console.log("\nPass 2: xfade chain + drawtext footer + audio mux");
 
 const inputs: string[] = [];
-for (const s of segments) {
-  inputs.push("-i", s.path);
-}
+for (const s of paddedSegments) inputs.push("-i", s.path);
 inputs.push("-i", audioPath);
 
 const filters: string[] = [];
-
-// Pad each video segment to a normalized length per scene so xfade math is predictable.
-// Target per-scene length = max(videoSec, audioSec) so neither stream gets cut.
-const scenePadded: { id: number; label: string; lengthSec: number }[] = [];
-for (let i = 0; i < segments.length; i++) {
-  const s = segments[i];
-  const target = Math.max(s.videoSec, s.audioSec) + (i === segments.length - 1 ? 0 : XFADE_DURATION);
-  const label = `v${i}pad`;
-  filters.push(
-    `[${i}:v]tpad=stop_mode=clone:stop_duration=${(target - s.videoSec).toFixed(3)},setpts=PTS-STARTPTS[${label}]`,
-  );
-  scenePadded.push({ id: s.id, label, lengthSec: target });
-}
-
-// Chain xfade across all padded segments.
+let prevLabel = "0:v";
 let cumulativeOffset = 0;
-let prevLabel = scenePadded[0].label;
-for (let i = 1; i < scenePadded.length; i++) {
-  const curr = scenePadded[i];
-  cumulativeOffset += scenePadded[i - 1].lengthSec - XFADE_DURATION;
-  const outLabel = i === scenePadded.length - 1 ? "vstitched" : `vx${i}`;
+
+for (let i = 1; i < paddedSegments.length; i++) {
+  cumulativeOffset += paddedSegments[i - 1].lengthSec - XFADE_DURATION;
+  const outLabel = i === paddedSegments.length - 1 ? "vstitched" : `vx${i}`;
   filters.push(
-    `[${prevLabel}][${curr.label}]xfade=transition=fade:duration=${XFADE_DURATION}:offset=${cumulativeOffset.toFixed(3)}[${outLabel}]`,
+    `[${prevLabel}][${i}:v]xfade=transition=fade:duration=${XFADE_DURATION}:offset=${cumulativeOffset.toFixed(3)}[${outLabel}]`,
   );
   prevLabel = outLabel;
 }
 
-if (scenePadded.length === 1) {
-  // Single scene: just rename the pad label to vstitched
-  filters.push(`[${scenePadded[0].label}]copy[vstitched]`);
+if (paddedSegments.length === 1) {
+  filters.push(`[0:v]copy[vstitched]`);
 }
 
-// Footer overlay via drawtext — persistent across the whole stitched video
+// Footer overlay
 const footerText = `PR #${PR_NUMBER}  •  ${BRANCH}  •  spike/walkthrough`;
 const footerEscaped = footerText
   .replace(/\\/g, "\\\\")
   .replace(/:/g, "\\:")
   .replace(/'/g, "\\'");
 filters.push(
-  `[vstitched]drawtext=text='${footerEscaped}':fontsize=20:fontcolor=white@0.75:x=(w-text_w)/2:y=h-${FOOTER_HEIGHT_PX}:box=1:boxcolor=black@0.55:boxborderw=8[vout]`,
+  `[vstitched]drawtext=text='${footerEscaped}':fontsize=20:fontcolor=white@0.8:x=(w-text_w)/2:y=h-${FOOTER_HEIGHT_PX}:box=1:boxcolor=black@0.6:boxborderw=10[vout]`,
 );
 
-const filterComplex = filters.join(";\n");
-
-// Audio: just use the pre-concatenated narration.wav (which is the audio input index sceneCount).
-// We don't bother with per-scene audio xfade because the per-scene wavs already have 0.8s tail
-// silence — that already provides a soft transition window. The visual xfade is the focal change.
-
-const audioInputIndex = segments.length;
+const audioInputIndex = paddedSegments.length;
 const cmd = [
   "ffmpeg",
   "-y",
   ...inputs,
   "-filter_complex",
-  filterComplex,
+  filters.join(";"),
   "-map",
   "[vout]",
   "-map",
@@ -155,15 +161,15 @@ const cmd = [
   outputPath,
 ];
 
-console.log("\nffmpeg filter graph:");
-console.log(filterComplex);
+console.log("\nfilter graph:");
+console.log(filters.join(";\n"));
 console.log("");
 
 const r = spawnSync(cmd[0], cmd.slice(1), {
-  stdio: ["ignore", "ignore", "inherit"],
+  stdio: ["ignore", "pipe", "inherit"],
 });
 if (r.status !== 0) {
-  console.error("ffmpeg composite failed");
+  console.error("\nfinal composite failed");
   process.exit(1);
 }
 
