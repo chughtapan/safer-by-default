@@ -1,11 +1,12 @@
 # Spike verdict: narrated PR walkthrough pipeline
 
-**Verdict**: **GO** — v3 visual-polish redesign shipped. Pipeline mixes slide-style (gum) and terminal-style (bat + delta) scenes with crossfade transitions, line highlighting on code excerpts, and a persistent footer. Narration structure follows the Even-a-Geek-Can-Speak framework (Hook → Thesis → Evidence → Call to action).
+**Verdict**: **GO** — v4 ships code-semantic narration (Evidence scenes walk the visible code, naming variables and line numbers) on top of v3's visual-polish redesign. Slides now use markdown source files rendered by `glow` instead of pre-rendered `gum` boxes.
 
-**Wall-clock**: ~135 minutes total across v1, v2, v3.
+**Wall-clock**: ~150 minutes total across v1, v2, v3, v4.
 
 **Assets**:
-- **v3** (visual polish, current): https://github.com/chughtapan/safer-by-default/releases/download/untagged-d1f8aadce2f7e28c941c/final.mp4
+- **v4** (code-semantic narration, current): https://github.com/chughtapan/safer-by-default/releases/download/untagged-7c98876672e2d274f633/final.mp4
+- v3 (visual polish): https://github.com/chughtapan/safer-by-default/releases/download/untagged-d1f8aadce2f7e28c941c/final.mp4
 - v2 (audio-first): https://github.com/chughtapan/safer-by-default/releases/download/untagged-303de75c9b1a2f846dd7/final.mp4
 - v1 (duration-first): https://github.com/chughtapan/safer-by-default/releases/download/untagged-597640ef0b7282bf4809/final.mp4
 
@@ -31,6 +32,15 @@
 | Canvas size | 1280×720 | 1280×720 | 1920×1080 |
 | Scene 2 outcome | atempo'd 1.6x (audibly fast) | natural read | natural read |
 | Tail handling | `-shortest` truncated narration | `tpad` clones last frame so audio finishes | per-scene `tpad` per segment, audio plays fully |
+
+## v4 layered on top of v3
+
+| Aspect | v3 | v4 |
+|---|---|---|
+| Evidence narration | "we chose hold-the-frame over speed-the-audio because..." (architecture-meta) | "the for loop on line 201 walks every scene; line 219 pins a point eight second tail..." (code-semantic, walks visible code) |
+| Slide rendering | `gum style --align center --border double` pre-rendered to .txt, tape `cat`s it | markdown `.md` source per slide, tape invokes `glow -s dark -w 100` at render time |
+| PR card source | `gh pr view --template` (multi-line text formatted by gh) | `gh pr view --json` parsed in scene_planner.ts, curated `# PR #N` markdown written |
+| Planner prompt | "Evidence scenes explain *why* the change was made" | "Evidence narration must name variables, trace control flow; would not transfer to a different code excerpt" |
 
 ## GO criteria — scoreboard (v2)
 
@@ -70,6 +80,14 @@ V3 ships the per-scene segmentation fix called out above (`render_scenes.ts`). E
 4. **Persistent footer via `drawtext`** works but is purely additive: `drawtext=text='PR #N · branch · spike':fontsize=20:fontcolor=white@0.8:y=h-36:box=1:boxcolor=black@0.6`. The boxborderw padding matters — without it the text crowds the background box.
 
 5. **Narration framework changed outputs materially**. v2 had 80s of summary narration; v3 has 120s of structured narration following Hook → Thesis → Evidence → CTA. The Evidence scenes (50-80 words each) actually *explain trade-offs* instead of just describing code surfaces. Worth keeping as a default in the real skill.
+
+## v4 findings — code-semantic narration + markdown slides
+
+1. **Evidence narration coupling test works**. The prompt added a "would your narration still make sense under a different code excerpt?" filter. v4 narrations cite line numbers (`tts.ts:201 for loop`, `render_scenes.ts:32 spawnSync`, `composite.ts:86 tpad chain`) and identifiers (`env -i`, `ffprobe`, `atempo`). Reviewer's eyes can follow as the narrator walks the visible code.
+
+2. **glow with markdown is less visually heavy than gum boxes**. Trade-off: markdown-native (the asked-for property) but renders smaller and more understated than the double-bordered gum boxes. v3's slide aesthetic was more "presentation," v4's is more "documentation." Could combine: glow for content + gum style as the outer frame. Out of scope for this iteration; logged for the real skill's contract.
+
+3. **Pronunciation hints inside narration help Cartesia**. Planner spells out `v h s` and `t t s` as letter sequences rather than `vhs` and `tts`. Cartesia reads either reasonably but the spelled form is more reliable for short acronyms. The contract could codify this for known abbreviation lists.
 
 ## Other findings to fold into /safer:walkthrough
 
