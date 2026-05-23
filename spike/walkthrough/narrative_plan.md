@@ -1,45 +1,39 @@
-# Walkthrough: spike — narrated PR walkthrough pipeline (the meta one)
+# Walkthrough: narrated PR walkthrough pipeline — v2 audio-first redesign
 
-**Target**: spike/walkthrough @ 25ad65b · **Total duration**: ~88s · **Scenes**: 6
+**Target**: spike/walkthrough-narration @ 91dee66 · **Scenes**: 6
 
-## Scene 1 — Intro & meta (10s)
-- Title card: "SPIKE META"
+## Scene 1 — Intro and the flip
+- Title card: "V2 AUDIO 1ST"
 - Files: none
-- Show: `figlet -f slant 'SPIKE META'`
-- Highlight: this very video is the pipeline's own dogfood
-- Narration: This PR scaffolds a narrated walkthrough pipeline. The video you're watching is its first dogfood run.
+- Show: `git log --oneline main..HEAD`
+- Narration: This PR scaffolds a narrated walkthrough pipeline, ships a first end to end run, writes a verdict, and then flips the architecture. The headline is the last commit. Narration now drives timing instead of the planner guessing seconds up front.
 
-## Scene 2 — Pipeline architecture (18s)
-- Title card: "5 STAGES"
-- Files: spike/walkthrough/README.md
-- Show: `bat --line-range 49:75 spike/walkthrough/README.md`
-- Highlight: five stages — PLAN, RECORD, NARRATE, MERGE, PUBLISH — each leaving a reviewable artifact
-- Narration: Five stages. PLAN gathers evidence and dispatches a subagent. RECORD turns the markdown plan into a vhs tape. NARRATE produces SSML. MERGE and PUBLISH glue it together. Every handoff is a file on disk.
+## Scene 2 — Why v1 had to be redesigned
+- Title card: "WHY FLIP"
+- Files: spike/walkthrough/VERDICT.md
+- Show: `bat --line-range 22:37 spike/walkthrough/VERDICT.md`
+- Narration: In v1 the planner allocated per scene seconds. Both the recorder and the narrator then had to fit that guess, and the merge stage reconciled with ffmpeg atempo. Scene two got compressed one point six times. That is the inverted architecture v2 deletes.
 
-## Scene 3 — scene_planner.ts (18s)
-- Title card: "PLAN TO TAPE"
-- Files: spike/walkthrough/scene_planner.ts
-- Show: `bat --line-range 40:65 spike/walkthrough/scene_planner.ts`
-- Highlight: regex-parses scene headers, emits a vhs tape plus a per-scene duration manifest
-- Narration: scene_planner walks the markdown plan. It pulls out per-scene fields with one regex, emits a vhs tape, and writes a manifest the narrator stage needs to align audio to video.
-
-## Scene 4 — tts.ts and padding (18s)
-- Title card: "TTS + PAD"
+## Scene 3 — TTS first, measure, then manifest
+- Title card: "TTS FIRST"
 - Files: spike/walkthrough/tts.ts
-- Show: `bat --line-range 135:160 spike/walkthrough/tts.ts`
-- Highlight: synthesize per scene, then pad with silence so each scene's audio matches its on-screen duration exactly
-- Narration: tts hits Cartesia once per scene, measures the wav, then pads with silence to the manifest target. Drift accumulates fast in a ninety-second video. This kills it at the boundary.
+- Show: `bat --line-range 201:225 spike/walkthrough/tts.ts`
+- Narration: Cartesia now runs first. For each scene we synthesize the prose, append eight hundred milliseconds of tail silence so the viewer has a beat, then measure the wav with ffprobe. The measured duration is the contract every later stage reads from manifest dot json.
 
-## Scene 5 — Planner contract (14s)
-- Title card: "CONTRACT"
+## Scene 4 — Recorder sizes Sleeps from measured audio
+- Title card: "MATCH AUDIO"
+- Files: spike/walkthrough/scene_planner.ts
+- Show: `bat --line-range 68:80 spike/walkthrough/scene_planner.ts`
+- Narration: The scene planner reads the manifest and sizes each vhs Sleep to match. The one point two one factor corrects for vhs rendering about seventeen percent under wall clock. No atempo, no padding negotiation, no drift. The video lands on audio boundaries per scene.
+
+## Scene 5 — Plain prose contract for narration
+- Title card: "PLAIN PROSE"
 - Files: spike/walkthrough/prompts/planner.md
-- Show: `bat --line-range 45:60 spike/walkthrough/prompts/planner.md`
-- Highlight: lead with the load-bearing change, four to seven scenes, narration budget at 140 wpm
-- Narration: The planner's job is structure, not prose. Lead with what's load-bearing, cap at seven scenes, budget narration honestly at one-forty words per minute.
+- Show: `bat --line-range 45:62 spike/walkthrough/prompts/planner.md`
+- Narration: The planner prompt now forbids durations and forbids all markup inside narration. No SSML, no backticks, no asterisks. Cartesia reads whatever you write, literally. So you write it the way a peer engineer would say it out loud.
 
-## Scene 6 — Outro & verify (10s)
+## Scene 6 — Compare v1 and v2
 - Title card: "WATCH ME"
 - Files: none
 - Show: `figlet -f slant 'WATCH ME'`
-- Highlight: prompt the viewer to open the asset URL in the PR body and judge the output quality
-- Narration: The pipeline shipped its own walkthrough. Open the asset in the PR body and judge whether you'd actually watch this for review.
+- Narration: Two walkthroughs are linked in the PR body. Watch v1 for the atempo crunch on scene two, then watch v2 and see if the alignment problem really did go away.
