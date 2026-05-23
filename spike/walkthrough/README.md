@@ -11,12 +11,12 @@ Scope, GO criteria, graduation modality: see `VERDICT.md` (written at the end of
 - `CARTESIA_API_KEY` exported (default: from `~/.bashrc`)
 - `gh` CLI authed against this repo
 - `bun` ≥ 1.3
-- `vhs` (Charm), `ffmpeg`, `figlet`, `bat`, `ttyd` on `PATH`
+- `vhs` (Charm), `ffmpeg`, `bat`, `ttyd`, `gum`, `delta` on `PATH`
 
 Verify in one line:
 
 ```bash
-for b in bun vhs ffmpeg figlet bat ttyd gh; do command -v "$b" >/dev/null || echo "MISSING: $b"; done
+for b in bun vhs ffmpeg bat ttyd gum delta gh; do command -v "$b" >/dev/null || echo "MISSING: $b"; done
 test -n "$CARTESIA_API_KEY" || echo "MISSING: CARTESIA_API_KEY"
 ```
 
@@ -24,7 +24,7 @@ test -n "$CARTESIA_API_KEY" || echo "MISSING: CARTESIA_API_KEY"
 
 The orchestrator is the agent running the spike, not a shell script. Each stage emits a reviewable artifact on disk.
 
-**Audio-first**: NARRATE runs before RECORD. Cartesia's per-scene WAV duration is measured, then scene_planner sizes each vhs `Sleep` to match. The merge has both streams already aligned per scene, no atempo, no padding negotiation.
+**Audio-first + per-scene segmentation**: NARRATE runs first. Each scene becomes its own vhs render based on its `Type` (title, pr-card, log, code, diff, outro). `composite.ts` stitches the per-scene MP4s with crossfade transitions and overlays a persistent footer.
 
 ### Stage 1 — PLAN (gather evidence + dispatch planning subagent)
 
@@ -60,30 +60,35 @@ Smoke test:
 bun run tts.ts --text "hello from the spike" --out /tmp/hi.wav
 ```
 
-### Stage 3 — RECORD (plan + manifest → .tape → mp4)
+### Stage 3 — RENDER (plan + manifest → per-scene .tape + .mp4)
 
 ```bash
-bun run scene_planner.ts narrative_plan.md manifest.json   # writes walkthrough.tape sized to measured audio
-cd ../..   # vhs needs to run from repo root so bat paths resolve
-env -i PATH="$PATH" HOME="$HOME" TERM=xterm-256color vhs spike/walkthrough/walkthrough.tape
-mv walkthrough.mp4 spike/walkthrough/walkthrough.mp4
+bun run scene_planner.ts narrative_plan.md manifest.json   # writes segments/scene_N.tape per scene (one per Type)
+bun run render_scenes.ts manifest.json                     # invokes vhs per scene → segments/scene_N.mp4
 ```
+
+Each scene type renders differently:
+- `title`, `outro` — `gum style --align center --border double` (slide-style card)
+- `pr-card` — `gh pr view` formatted output piped through `gum style --border rounded`
+- `log` — `git log --graph --oneline --decorate -C2 main..HEAD`
+- `code` — `bat --highlight-line A:B --line-range C:D path` (highlight emphasizes the narrated lines)
+- `diff` — `git diff main...HEAD -- path | delta --paging=never`
+
+`render_scenes.ts` invokes vhs from the repo root with an `env -i` subshell. Each per-scene tape carries the v3 chrome (WindowBar Colorful, BorderRadius 12, Margin 40, MarginFill #1d1f2a, CursorBlink off, FontSize 22, 1920×1080).
 
 Smoke test before the real run:
 
 ```bash
-bun run scene_planner.ts --dry-run narrative_plan.md manifest.json
+bun run scene_planner.ts --dry-run narrative_plan.md manifest.json   # prints all tapes, no file writes
 ```
 
-### Stage 4 — MERGE (video + audio → final.mp4)
+### Stage 4 — COMPOSITE (segments → final.mp4 with crossfades + footer)
 
 ```bash
-ffmpeg -y \
-  -i walkthrough.mp4 -i narration.wav \
-  -vf "tpad=stop_mode=clone:stop_duration=2s" \
-  -c:v libx264 -c:a aac -shortest \
-  final.mp4
+PR_NUMBER=$(gh pr view --json number -q .number 2>/dev/null) bun run composite.ts manifest.json narration.wav final.mp4
 ```
+
+ffmpeg's `xfade` filter crossfades each adjacent pair of segments (0.4s); the audio is the pre-concatenated `narration.wav` from Stage 2 (per-scene 0.8s tail silence already provides the audio transition window). A persistent `drawtext` footer shows `PR #N · branch · spike/walkthrough` across the entire video.
 
 ### Stage 5 — PUBLISH (gh release + PR body)
 
@@ -117,11 +122,14 @@ Write `VERDICT.md` scoring each GO criterion. Print the asset URL in chat with a
 | `tts.ts` | 2 | Reads plan, hits Cartesia per scene, measures WAVs, writes manifest |
 | `audio/scene_N.wav` | 2 | Per-scene narration (raw Cartesia output, plus 0.8s tail silence) |
 | `narration.wav` | 2 → 4 | Concatenated narration |
-| `manifest.json` | 2 → 3 | Per-scene **measured** durations (source of truth for vhs Sleeps) |
-| `scene_planner.ts` | 3 | Plan + manifest → vhs `.tape` with measured-duration Sleeps |
-| `walkthrough.tape` | 3 → vhs | Generated tape script |
-| `walkthrough.mp4` | 3 → 4 | vhs output, silent |
-| `final.mp4` | 4 → 5 | Merged video |
+| `manifest.json` | 2 → 3,4 | Per-scene **measured** durations (source of truth for Sleeps + xfade math) |
+| `scene_planner.ts` | 3 | Plan + manifest → one `.tape` per scene under `segments/` |
+| `segments/scene_N.tape` | 3 → vhs | Per-scene vhs script |
+| `render_scenes.ts` | 3 | Iterates manifest, invokes vhs per tape, produces `segments/scene_N.mp4` |
+| `segments/scene_N.mp4` | 3 → 4 | Per-scene silent video |
+| `segments/pr-card.txt` | 3 | Pre-rendered PR card body (when a `pr-card` scene exists) |
+| `composite.ts` | 4 | ffmpeg `xfade` chain + persistent `drawtext` footer + audio mux → `final.mp4` |
+| `final.mp4` | 4 → 5 | Composited video with crossfade transitions and footer |
 | `VERDICT.md` | 6 | GO/MIXED/NO-GO with evidence |
 
 ## Re-running
