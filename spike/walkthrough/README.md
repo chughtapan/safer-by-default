@@ -24,6 +24,8 @@ test -n "$CARTESIA_API_KEY" || echo "MISSING: CARTESIA_API_KEY"
 
 The orchestrator is the agent running the spike, not a shell script. Each stage emits a reviewable artifact on disk.
 
+**Audio-first**: NARRATE runs before RECORD. Cartesia's per-scene WAV duration is measured, then scene_planner sizes each vhs `Sleep` to match. The merge has both streams already aligned per scene, no atempo, no padding negotiation.
+
 ### Stage 1 — PLAN (gather evidence + dispatch planning subagent)
 
 ```bash
@@ -36,40 +38,41 @@ PR_NUM=$(gh pr view --json number -q .number 2>/dev/null || echo "")
 [ -n "$PR_NUM" ] && gh pr view "$PR_NUM" --json reviews,comments > evidence/reviews.json || echo "[]" > evidence/reviews.json
 ```
 
-Then call the planning subagent (Agent tool, `subagent_type=general-purpose`) with `prompts/planner.md` as the system prompt and the evidence files as input. Save the returned markdown to `narrative_plan.md`.
+Then call the planning subagent (Agent tool, `subagent_type=general-purpose`) with `prompts/planner.md` as the system prompt and the evidence files as input. Save the returned markdown to `narrative_plan.md`. The plan has scenes with `Show:` and `Narration:` fields — **no durations** (those come from TTS).
 
 **Human checkpoint**: show `narrative_plan.md` to the user via AskUserQuestion. Options: ship as-is / let me edit it / abort and re-prompt. Default flow pauses here.
 
-### Stage 2 — RECORD (markdown plan → .tape → mp4)
-
-```bash
-bun run scene_planner.ts narrative_plan.md          # writes walkthrough.tape + manifest.json
-env -i PATH="$PATH" HOME="$HOME" TERM=xterm-256color vhs walkthrough.tape
-# vhs reads the `Output` directive inside the tape and writes walkthrough.mp4
-```
-
-Smoke test before the real run:
-
-```bash
-bun run scene_planner.ts --dry-run narrative_plan.md   # prints tape, no file write
-```
-
-### Stage 3 — NARRATE (subagent → SSML → Cartesia → wav)
+### Stage 2 — NARRATE (plan → per-scene wav + manifest)
 
 Voice: defaults to Cartesia's "Barbershop Man" (`a0e99841-438c-4a64-b679-ae501e7d6091`). Override by exporting `CARTESIA_VOICE_ID` from any voice on https://play.cartesia.ai/voices.
 
-Call the narration subagent (Agent tool) with `prompts/narrator.md`, `narrative_plan.md`, and `walkthrough.tape` as inputs. Save returned SSML to `transcript.ssml`.
-
-Then synthesize:
-
 ```bash
-bun run tts.ts transcript.ssml manifest.json      # writes audio/scene_N.wav and narration.wav (concatenated)
+eval "$(grep '^export CARTESIA_API_KEY=' ~/.bashrc)"
+bun run tts.ts narrative_plan.md
+# writes audio/scene_N.wav per scene + narration.wav (concatenated) + manifest.json (measured durations)
 ```
+
+Each scene's narration is sent to Cartesia as plain prose (no SSML, no markup). A 0.8s tail of silence is appended to each scene so the viewer has a beat to register the on-screen state before the next scene cuts in.
 
 Smoke test:
 
 ```bash
 bun run tts.ts --text "hello from the spike" --out /tmp/hi.wav
+```
+
+### Stage 3 — RECORD (plan + manifest → .tape → mp4)
+
+```bash
+bun run scene_planner.ts narrative_plan.md manifest.json   # writes walkthrough.tape sized to measured audio
+cd ../..   # vhs needs to run from repo root so bat paths resolve
+env -i PATH="$PATH" HOME="$HOME" TERM=xterm-256color vhs spike/walkthrough/walkthrough.tape
+mv walkthrough.mp4 spike/walkthrough/walkthrough.mp4
+```
+
+Smoke test before the real run:
+
+```bash
+bun run scene_planner.ts --dry-run narrative_plan.md manifest.json
 ```
 
 ### Stage 4 — MERGE (video + audio → final.mp4)
@@ -109,17 +112,15 @@ Write `VERDICT.md` scoring each GO criterion. Print the asset URL in chat with a
 | File | Stage | Purpose |
 |---|---|---|
 | `prompts/planner.md` | 1 | Planning subagent system prompt |
-| `prompts/narrator.md` | 3 | Narration subagent system prompt |
 | `evidence/` | 1 | Diff, commits, reviews captured for the planner |
-| `narrative_plan.md` | 1 → 2,3 | Structured story; subagent output; reviewable artifact |
-| `scene_planner.ts` | 2 | Markdown plan → vhs `.tape` + `manifest.json` |
-| `walkthrough.tape` | 2 → vhs | Generated tape script |
-| `manifest.json` | 2 → 3 | Per-scene durations for audio padding |
-| `walkthrough.mp4` | 2 → 4 | vhs output, silent |
-| `transcript.ssml` | 3 | Narration SSML with `<!-- scene: N -->` markers |
-| `tts.ts` | 3 | Cartesia WebSocket TTS |
-| `audio/scene_N.wav` | 3 | Per-scene narration |
-| `narration.wav` | 3 → 4 | Concatenated narration |
+| `narrative_plan.md` | 1 → 2,3 | Structured story (no durations); planner subagent output |
+| `tts.ts` | 2 | Reads plan, hits Cartesia per scene, measures WAVs, writes manifest |
+| `audio/scene_N.wav` | 2 | Per-scene narration (raw Cartesia output, plus 0.8s tail silence) |
+| `narration.wav` | 2 → 4 | Concatenated narration |
+| `manifest.json` | 2 → 3 | Per-scene **measured** durations (source of truth for vhs Sleeps) |
+| `scene_planner.ts` | 3 | Plan + manifest → vhs `.tape` with measured-duration Sleeps |
+| `walkthrough.tape` | 3 → vhs | Generated tape script |
+| `walkthrough.mp4` | 3 → 4 | vhs output, silent |
 | `final.mp4` | 4 → 5 | Merged video |
 | `VERDICT.md` | 6 | GO/MIXED/NO-GO with evidence |
 

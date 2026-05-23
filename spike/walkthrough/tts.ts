@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 
 const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY;
 const CARTESIA_VOICE_ID =
-  process.env.CARTESIA_VOICE_ID ?? "a0e99841-438c-4a64-b679-ae501e7d6091"; // Barbershop Man (Cartesia public voice)
+  process.env.CARTESIA_VOICE_ID ?? "a0e99841-438c-4a64-b679-ae501e7d6091"; // Barbershop Man
 const CARTESIA_VERSION = "2026-03-01";
 const CARTESIA_MODEL = "sonic-2";
 const SAMPLE_RATE = 24_000;
@@ -18,6 +18,59 @@ const SAMPLE_RATE = 24_000;
 if (!CARTESIA_API_KEY) {
   console.error("CARTESIA_API_KEY is not set — export it (see ~/.bashrc)");
   process.exit(1);
+}
+
+interface Scene {
+  id: number;
+  title: string;
+  titleCard?: string;
+  files: string[];
+  show: string;
+  narration: string;
+}
+
+function parsePlan(md: string): { title: string; scenes: Scene[] } {
+  const titleMatch = md.match(/^# Walkthrough:\s*(.+)$/m);
+  const title = titleMatch?.[1]?.trim() ?? "Walkthrough";
+
+  // Scene header: ## Scene N — name   (no duration; old format with (Ns) also tolerated)
+  const headerRe = /^## Scene (\d+)\s*[—-]\s*(.+?)(?:\s*\([^)]*\))?\s*$/gm;
+  const headers = [...md.matchAll(headerRe)];
+  const scenes: Scene[] = [];
+
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    const start = h.index! + h[0].length;
+    const end = i + 1 < headers.length ? headers[i + 1].index! : md.length;
+    const body = md.slice(start, end);
+
+    const field = (name: string): string | undefined => {
+      const re = new RegExp(`^\\s*[-*]\\s*${name}:\\s*(.+)$`, "m");
+      const m = body.match(re);
+      if (!m) return undefined;
+      let v = m[1].trim();
+      if (v.startsWith("`") && v.endsWith("`")) v = v.slice(1, -1);
+      if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+      return v;
+    };
+
+    const filesRaw = field("Files") ?? "";
+    const files =
+      filesRaw === "" || filesRaw.toLowerCase() === "none"
+        ? []
+        : filesRaw.split(",").map((s) => s.trim()).filter(Boolean);
+
+    scenes.push({
+      id: parseInt(h[1], 10),
+      title: h[2].trim(),
+      titleCard: field("Title card"),
+      files,
+      show: field("Show") ?? `echo "scene ${h[1]}: ${h[2].trim()}"`,
+      narration: field("Narration") ?? "",
+    });
+  }
+
+  return { title, scenes };
 }
 
 async function synthesize(transcript: string, outPath: string): Promise<void> {
@@ -116,21 +169,6 @@ function concatWavs(paths: string[], outPath: string): void {
   }
 }
 
-interface SceneAudio {
-  id: number;
-  text: string;
-}
-
-function parseSsml(ssml: string): SceneAudio[] {
-  const re = /<!--\s*scene:\s*(\d+)\s*-->\s*([\s\S]*?)(?=<!--\s*scene:|$)/g;
-  const out: SceneAudio[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(ssml)) !== null) {
-    out.push({ id: parseInt(m[1], 10), text: m[2].trim() });
-  }
-  return out;
-}
-
 async function main() {
   const args = process.argv.slice(2);
 
@@ -144,94 +182,68 @@ async function main() {
     return;
   }
 
-  if (args.length < 2) {
-    console.error("Usage: bun tts.ts <transcript.ssml> <manifest.json>");
-    console.error("       bun tts.ts --text 'hello world' --out /tmp/hi.wav");
-    process.exit(2);
-  }
+  const planPath = args.find((a) => !a.startsWith("--")) ?? "narrative_plan.md";
+  const md = readFileSync(planPath, "utf8");
+  const plan = parsePlan(md);
 
-  const [ssmlPath, manifestPath] = args;
-  const ssml = readFileSync(ssmlPath, "utf8");
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const scenes = parseSsml(ssml);
-
-  if (scenes.length === 0) {
+  if (plan.scenes.length === 0) {
     console.error(
-      `No scenes found in ${ssmlPath}. Expected <!-- scene: N --> markers.`,
+      `No scenes found in ${planPath}. Expected '## Scene N — name' headers.`,
     );
     process.exit(1);
   }
 
   if (!existsSync("audio")) mkdirSync("audio", { recursive: true });
 
-  const sceneDuration = new Map<number, number>(
-    manifest.scenes.map((s: { id: number; durationSec: number }) => [
-      s.id,
-      s.durationSec,
-    ]),
-  );
-
+  const sceneDurations: { id: number; title: string; durationSec: number; narration: string }[] = [];
   const finalPaths: string[] = [];
-  for (const scene of scenes) {
-    const target = sceneDuration.get(scene.id);
-    if (target === undefined) {
-      console.warn(
-        `Scene ${scene.id} has no manifest entry; skipping`,
-      );
+
+  for (const scene of plan.scenes) {
+    if (!scene.narration) {
+      console.warn(`Scene ${scene.id} has no Narration; skipping`);
       continue;
     }
 
-    const rawPath = `audio/scene_${scene.id}_raw.wav`;
-    const padPath = `audio/scene_${scene.id}_pad.wav`;
-    const outPath = `audio/scene_${scene.id}.wav`;
+    const rawPath = `audio/scene_${scene.id}.wav`;
+    const paddedPath = `audio/scene_${scene.id}_padded.wav`;
+    const silencePath = `audio/scene_${scene.id}_tail.wav`;
 
-    const wordCount = scene.text.split(/\s+/).filter(Boolean).length;
+    const wordCount = scene.narration.split(/\s+/).filter(Boolean).length;
     console.log(
-      `Scene ${scene.id}: synthesizing (~${wordCount} words, target ${target}s)`,
+      `Scene ${scene.id} (${scene.title}): synthesizing ${wordCount} words`,
     );
-    await synthesize(scene.text, rawPath);
+    await synthesize(scene.narration, rawPath);
 
-    let actual = durationOfWav(rawPath);
-    let fitPath = rawPath;
-    if (actual > target + 0.5) {
-      const tempo = actual / target;
-      const clamped = Math.min(2.0, tempo);
-      console.warn(
-        `  ⚠ scene ${scene.id} narration ${actual.toFixed(1)}s > target ${target}s — compressing with atempo=${clamped.toFixed(2)}`,
-      );
-      const fittedPath = `audio/scene_${scene.id}_fitted.wav`;
-      const r = spawnSync(
-        "ffmpeg",
-        [
-          "-y",
-          "-i",
-          rawPath,
-          "-af",
-          `atempo=${clamped.toFixed(3)}`,
-          "-c:a",
-          "pcm_s16le",
-          "-ar",
-          String(SAMPLE_RATE),
-          fittedPath,
-        ],
-        { stdio: ["ignore", "ignore", "pipe"] },
-      );
-      if (r.status !== 0) {
-        throw new Error(`ffmpeg atempo failed: ${r.stderr}`);
-      }
-      fitPath = fittedPath;
-      actual = durationOfWav(fitPath);
-    }
-    const padDur = Math.max(0.05, target - actual);
-    makeSilenceWav(padDur, padPath);
-    concatWavs([fitPath, padPath], outPath);
+    // Add 0.8s tail silence per scene so the viewer has a beat to register
+    // the on-screen state before the next scene cuts in.
+    const tailSec = 0.8;
+    makeSilenceWav(tailSec, silencePath);
+    concatWavs([rawPath, silencePath], paddedPath);
 
-    finalPaths.push(outPath);
+    const dur = durationOfWav(paddedPath);
+    console.log(`  → ${dur.toFixed(2)}s (narration + ${tailSec}s tail)`);
+    sceneDurations.push({
+      id: scene.id,
+      title: scene.title,
+      durationSec: Math.round(dur * 100) / 100,
+      narration: scene.narration,
+    });
+    finalPaths.push(paddedPath);
   }
 
   concatWavs(finalPaths, "narration.wav");
+  const totalDur = durationOfWav("narration.wav");
+
+  const manifest = {
+    title: plan.title,
+    totalDurationSec: Math.round(totalDur * 100) / 100,
+    scenes: sceneDurations,
+    note: "Durations measured from synthesized WAVs (audio-first architecture). scene_planner.ts reads these to size vhs Sleeps so video aligns to audio per scene.",
+  };
+  writeFileSync("manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+
   console.log(
-    `Wrote narration.wav (${durationOfWav("narration.wav").toFixed(1)}s across ${finalPaths.length} scenes)`,
+    `Wrote narration.wav (${totalDur.toFixed(1)}s across ${finalPaths.length} scenes) + manifest.json`,
   );
 }
 
