@@ -1,40 +1,52 @@
 # Spike verdict: narrated PR walkthrough pipeline
 
-**Verdict**: **GO WITH REDESIGN** (between GO and MIXED — pipeline works end-to-end and the asset shipped, but the time-budget architecture is inverted and the first-run scene 2 had to be atempo-compressed 1.6x to hold sync)
+**Verdict**: **GO** — v2 audio-first architecture validated. Pipeline produces a watchable narrated walkthrough end-to-end with one acceptable rough edge (vhs's variable timescale leaves the last ~7s of video as a held still frame while audio plays out; mitigated cleanly by ffmpeg tpad).
 
-**Wall-clock**: ~70 minutes (well inside the 2h budget)
+**Wall-clock**: ~75 minutes for v1 + v2 combined.
 
-**Asset**: https://github.com/chughtapan/safer-by-default/releases/download/untagged-597640ef0b7282bf4809/final.mp4
+**Assets**:
+- **v2** (audio-first, current): https://github.com/chughtapan/safer-by-default/releases/download/untagged-303de75c9b1a2f846dd7/final.mp4
+- v1 (duration-first, reference): https://github.com/chughtapan/safer-by-default/releases/download/untagged-597640ef0b7282bf4809/final.mp4
+
 **PR**: https://github.com/chughtapan/safer-by-default/pull/314
-**Branch**: spike/walkthrough-narration @ 933eaf1
+**Branch**: spike/walkthrough-narration
 
-## GO criteria — scoreboard
+## v1 vs v2
+
+| Aspect | v1 (duration-first) | v2 (audio-first) |
+|---|---|---|
+| Source of truth for per-scene duration | Planner guess in `(Ns)` | Measured WAV from Cartesia |
+| Narration markup | SSML with `<emphasis>` and `<break>` | Plain prose only, no markup |
+| Subagent stages | planner + narrator (two LLM calls) | planner only (one LLM call) |
+| Scene 2 outcome | atempo'd 1.6x (audibly fast) | natural read, no compression |
+| Audio/video alignment per scene | Forced via atempo + padding | Sleeps sized to measured audio |
+| Tail handling | `-shortest` truncated final scene narration | `tpad` clones last frame so audio finishes |
+| Architecture complexity | 5 stages of negotiation | 5 stages of straight-through pipes |
+
+## GO criteria — scoreboard (v2)
 
 | Criterion | Result | Evidence |
 |---|---|---|
-| `narrative_plan.md` reads like a story, not a commit log; load-bearing first; ≤7 scenes | ✅ | 6 scenes, leads with pipeline architecture, ends with WATCH ME CTA |
-| Final MP4 plays, audio aligns to on-screen diff, no dead air >5s | ⚠ partial | Audio plays cleanly, but scene 2 audio is atempo'd 1.6x and audible as "fast" |
-| Cartesia TTS sounds natural enough to watch | ✅ | Default voice "Barbershop Man" reads cleanly outside scene 2's atempo |
-| GH release asset returns a working public URL; pasted into PR body | ✅ | Draft release + asset URL in PR #314 body |
+| `narrative_plan.md` reads like a story, not a commit log; load-bearing first; ≤7 scenes | ✅ | 6 scenes, leads with the v2 flip, ends with v1-vs-v2 CTA |
+| Final MP4 plays, audio aligns to on-screen diff, no dead air >5s | ✅ | Audio plays naturally; per-scene Sleeps sized from measured audio; tpad covers the ~7s tail |
+| Cartesia TTS sounds natural enough to watch | ✅ | Plain prose reads cleanly across all scenes; no SSML artifacts |
+| GH release asset returns a working public URL; pasted into PR body | ✅ | v1 and v2 draft releases both linked in PR #314 body |
 | ASCII title cards render legibly | ✅ | figlet -f slant for intro/outro renders cleanly in 1280×720 |
-| Total wall-clock <2h | ✅ | ~70min |
+| Total wall-clock <2h | ✅ | ~75min combined for both runs |
 
-## Headline finding — time-budget architecture is inverted
+## Headline finding (v1) — time-budget architecture was inverted [SHIPPED in v2]
 
-The current pipeline asks the **planner** to allocate per-scene seconds, then the **recorder** uses those seconds for vhs `Sleep`, then the **narrator** is told "fit your prose into N seconds." This is backwards:
+V1 asked the planner to allocate per-scene seconds, then made both the recorder and the narrator fight to match that guess. The merge stage reconciled with atempo (1.6x on scene 2, audibly fast).
 
-- vhs `Sleep` is trivial to set to any value, and the actual rendered duration drifts ~17% from what `Sleep` advertises (88s planned → 72.6s rendered). Video duration is a known unknown until vhs runs.
-- TTS duration is also a known unknown until Cartesia runs. SSML emphases add ~50% to scene 2's read time.
-- Making BOTH durations downstream of an upstream guess means the two downstreams disagree, and the merge stage has to reconcile via lossy techniques (atempo, truncation, padding).
+V2 flipped it: narrator runs first, measures actual per-scene WAV durations, recorder sizes vhs Sleeps to match. Drift per scene goes from ±20% to ±0% (in the audio dimension). Atempo deleted. The narrator subagent was deleted entirely — the planner writes the final prose directly because there's no SSML to expand.
 
-**Correct shape**: narration is the harder thing to time precisely; record AROUND it.
+## New finding from v2 — vhs render timescale isn't constant
 
-1. **PLAN**: planner outputs scenes with `action` + `narration` only — **no `(Ns)` duration**.
-2. **NARRATE**: TTS each scene's narration first; measure actual per-scene WAV duration with ffprobe.
-3. **RECORD**: scene_planner sizes each vhs `Sleep` to `wavDuration + 1s breathing room`. vhs records exactly the right length.
-4. **MERGE**: trivial — both streams have matched length per scene.
+V1 took 88s of Sleep and produced 72.6s of video (1.21x). V2 took 95.8s of Sleep and produced 74.6s (1.28x). Same machine, same vhs version, same theme/font/typing-speed. The ratio depends on Sleep:Type proportion and possibly Chrome scheduling.
 
-Drift goes to zero. atempo compression goes away. The pipeline becomes 5 stages of straightforward functions instead of 5 stages of negotiation.
+scene_planner.ts applies a fixed `VHS_TIMESCALE = 1.21` correction. When the actual ratio drifts to 1.28, video comes in ~7s short. We absorb this with `ffmpeg tpad=stop_mode=clone:stop_duration=15s` + `-shortest` so the final frame holds while audio plays out. Not ideal but acceptable: the call-to-action figlet is on screen during the held tail.
+
+**The real fix** for `/safer:walkthrough`: record each scene as a separate MP4 (one vhs run per scene), concatenate with matched per-scene audio via ffmpeg concat demuxer. Each segment is independently timed, no fudge factor needed, drift impossible. Three-line change to the recorder.
 
 ## Other findings to fold into /safer:walkthrough
 
@@ -57,15 +69,17 @@ The contract should also decide:
 
 Per the spike doctrine and the user's autonomy-scope memory: this verdict **stops here**. Do NOT auto-invoke `/safer:contract`. Re-authorization is required.
 
-## Re-runnability
+## Re-runnability (v2)
 
 ```bash
 cd spike/walkthrough
-# evidence/ already captured from the original run
-bun run scene_planner.ts narrative_plan.md      # regenerates tape + manifest
-env -i PATH="$PATH" HOME="$HOME" TERM=xterm-256color vhs walkthrough.tape  # re-records (≈90s)
-eval "$(grep '^export CARTESIA_API_KEY=' ~/.bashrc)" && bun run tts.ts transcript.ssml manifest.json
-ffmpeg -y -i walkthrough.mp4 -i narration.wav -vf "tpad=stop_mode=clone:stop_duration=2s" -c:v libx264 -c:a aac -shortest final.mp4
+eval "$(grep '^export CARTESIA_API_KEY=' ~/.bashrc)"
+bun run tts.ts narrative_plan.md             # writes audio/scene_N.wav + manifest.json (~30s, ~$0.01)
+bun run scene_planner.ts narrative_plan.md manifest.json   # writes walkthrough.tape sized to measured audio
+cd ../.. && env -i PATH="$PATH" HOME="$HOME" TERM=xterm-256color vhs spike/walkthrough/walkthrough.tape
+mv walkthrough.mp4 spike/walkthrough/walkthrough.mp4
+cd spike/walkthrough
+ffmpeg -y -i walkthrough.mp4 -i narration.wav -filter_complex "[0:v]tpad=stop_mode=clone:stop_duration=15s[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -shortest final.mp4
 ```
 
-Total cost per re-run: ~3 min of compute + one Cartesia call (~$0.01 at current pricing).
+Total cost per re-run: ~3 min compute + one Cartesia call (~$0.01 at current pricing).
