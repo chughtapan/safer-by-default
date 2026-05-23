@@ -1,0 +1,14 @@
+node_modules/
+bun.lockb
+bun.lock
+audio/
+evidence/diff.txt
+evidence/diff-stat.txt
+evidence/commits.txt
+evidence/reviews.json
+walkthrough.tape
+walkthrough.mp4
+narration.wav
+final.mp4
+manifest.json
+transcript.ssml
