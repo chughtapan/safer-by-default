@@ -153,16 +153,13 @@ function writeSlideMarkdown(scene: Scene): string {
 function buildShowCommand(scene: Scene): string {
   switch (scene.type) {
     case "title":
-    case "outro": {
-      // Title and outro: glow's markdown rendering reads as the "slide
-      // content" (heading + blockquote subtitle). Short and uncluttered.
-      return `glow -s dark -w 100 spike/walkthrough/segments/scene_${scene.id}.md`;
-    }
+    case "outro":
     case "pr-card": {
-      // PR card: render the markdown with gum format (preserves ANSI
-      // styling) then wrap in gum style border so it reads as a real
-      // card, not loose markdown. gum format reads markdown from stdin.
-      return `cat spike/walkthrough/segments/scene_${scene.id}.md | gum format | gum style --border rounded --border-foreground '#89b4fa' --padding '2 4' --margin '1 0' --width 110`;
+      // All slide-style scenes use Charm `slides` — terminal-native
+      // markdown presenter with centered layout, proper typography,
+      // and themed code/quote/heading rendering. Slide 1 displays for
+      // the Sleep duration; vhs records it.
+      return `slides spike/walkthrough/segments/scene_${scene.id}.md`;
     }
     case "log": {
       return scene.show ?? `git log --graph --oneline --decorate -C2 main..HEAD`;
