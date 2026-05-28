@@ -311,6 +311,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication
@@ -732,6 +738,12 @@ set -e
 Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec layer); `10` (version skew) → `BLOCKED` with doctor output verbatim; `11` (`MissingSpecPropertyError`) → `HOLD` route `/safer:contract` (override if `--json` carries `recommended_route`); `12` (`MissingStubError`) → `HOLD` route `/safer:architect` (or `/safer:implement-staff` if `--json` names the stub); `13` (`MissingImplError`) → `HOLD` route `/safer:implement-{junior,senior,staff}` per `--json recommended_route`; fallback to `bin/safer-diff-scope` whole-PR with a verdict-body note that routing is PR-level imprecise; `124` (timeout) → `BLOCKED` with stderr surfaced. Phase 5's verdict table carries the same rows.
 
 ### Phase 3.5 — Compose gstack testing layer (rings 2 + 3)
+
+#### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop** verify on Claude Code AND the Workflow tool is available (ultracode mode, or the invocation opted in), you MAY execute this Phase 3.5 fan-out deterministically by running `skills/verify/phase35.workflow.js` via the `Workflow` tool, passing the acceptance text, diff scope, deploy/QA URLs, and label state. The script evaluates each target's trigger, dispatches only the fired targets in parallel (report-only forms), and folds their verdicts through the precedence table below.
+
+The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched verify teammate, for Codex, and for non-opted-in sessions. Ring 1 (Phase 3) and the final SHIP/HOLD stay in verify — the Workflow returns an advisory Phase-3.5 verdict only, applies no fixes (verify never self-edits), and escalates any composed user-prompt rather than answering it.
 
 Phase 3 owns ring 1 (the project's lint, typecheck, and test commands). Phase 3.5 dispatches ring 2 (whole-app QA) and ring 3 (cross-cutting quality dashboards) to gstack composition targets when the sub-issue's acceptance criteria, the diff scope, or the deploy state warrants. Defaults are conservative: skip a target when its trigger does not fire. Composed targets are advisory inputs to the verdict, not standalone gates.
 

@@ -488,6 +488,12 @@ After creating each sub-issue, **edit the parent epic's body** to fill in the su
 
 ### Phase 5 — Dispatch and gate
 
+#### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop team-lead** on Claude Code AND the Workflow tool is available (the session is in ultracode mode, or the invocation opted in), you MAY execute ONE dispatch wave deterministically by running `skills/orchestrate/dispatch-wave.workflow.js` via the `Workflow` tool, passing the decomposition rows + their current states. The script computes the ready set (a mirror of `skills/orchestrate/ready-set.mjs`, which carries the canonical DAG resolver + its test), dispatches every ready modality in parallel with `isolation:'worktree'`, awaits all of them, and returns their structured receipts. This replaces the Step 5d `CronCreate` poll loop, the swarm-socket / dead-pane machinery (Step 1a, Step 4 paths a-b), the per-tick cap math, and `SendMessage` marker-parsing — `parallel()` awaits completion, and the runtime's concurrency cap is the capacity limit.
+
+**Wave vs. lifecycle.** The Workflow runs ONE wave and returns receipts; it does NOT gate. Every human gate stays in this prose, between waves: the Phase 1a contract OK, the Step 5c.-1 contract-budget check, ratchet-up-always-parks, the diagnose verdict routing (5c.5), and the runtime stop conditions. The cross-session epic lifecycle — park-and-wait for a contract amendment, resume days later — is not expressible as a single Workflow run and stays the GitHub-backed prose state machine here. A dispatched teammate cannot invoke Workflow and Codex has no Workflow tool; both run the prose below, which is authoritative. (Invariant 11: the rulebook is the dispatcher; the Workflow executes it.)
+
 For each sub-issue in dependency order:
 
 **Step 5a — Invoke the modality.**

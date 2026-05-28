@@ -215,6 +215,12 @@ Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec laye
 
 ### Phase 3.5 — Compose gstack testing layer (rings 2 + 3)
 
+#### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop** verify on Claude Code AND the Workflow tool is available (ultracode mode, or the invocation opted in), you MAY execute this Phase 3.5 fan-out deterministically by running `skills/verify/phase35.workflow.js` via the `Workflow` tool, passing the acceptance text, diff scope, deploy/QA URLs, and label state. The script evaluates each target's trigger, dispatches only the fired targets in parallel (report-only forms), and folds their verdicts through the precedence table below.
+
+The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched verify teammate, for Codex, and for non-opted-in sessions. Ring 1 (Phase 3) and the final SHIP/HOLD stay in verify — the Workflow returns an advisory Phase-3.5 verdict only, applies no fixes (verify never self-edits), and escalates any composed user-prompt rather than answering it.
+
 Phase 3 owns ring 1 (the project's lint, typecheck, and test commands). Phase 3.5 dispatches ring 2 (whole-app QA) and ring 3 (cross-cutting quality dashboards) to gstack composition targets when the sub-issue's acceptance criteria, the diff scope, or the deploy state warrants. Defaults are conservative: skip a target when its trigger does not fire. Composed targets are advisory inputs to the verdict, not standalone gates.
 
 | Target | Trigger condition | Output captured | Failure propagation |

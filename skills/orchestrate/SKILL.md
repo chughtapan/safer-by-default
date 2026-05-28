@@ -313,6 +313,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication
@@ -1005,6 +1011,12 @@ EOF
 After creating each sub-issue, **edit the parent epic's body** to fill in the sub-issue number in the decomposition table. The decomposition table on the parent epic is the durable route map.
 
 ### Phase 5 — Dispatch and gate
+
+#### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop team-lead** on Claude Code AND the Workflow tool is available (the session is in ultracode mode, or the invocation opted in), you MAY execute ONE dispatch wave deterministically by running `skills/orchestrate/dispatch-wave.workflow.js` via the `Workflow` tool, passing the decomposition rows + their current states. The script computes the ready set (a mirror of `skills/orchestrate/ready-set.mjs`, which carries the canonical DAG resolver + its test), dispatches every ready modality in parallel with `isolation:'worktree'`, awaits all of them, and returns their structured receipts. This replaces the Step 5d `CronCreate` poll loop, the swarm-socket / dead-pane machinery (Step 1a, Step 4 paths a-b), the per-tick cap math, and `SendMessage` marker-parsing — `parallel()` awaits completion, and the runtime's concurrency cap is the capacity limit.
+
+**Wave vs. lifecycle.** The Workflow runs ONE wave and returns receipts; it does NOT gate. Every human gate stays in this prose, between waves: the Phase 1a contract OK, the Step 5c.-1 contract-budget check, ratchet-up-always-parks, the diagnose verdict routing (5c.5), and the runtime stop conditions. The cross-session epic lifecycle — park-and-wait for a contract amendment, resume days later — is not expressible as a single Workflow run and stays the GitHub-backed prose state machine here. A dispatched teammate cannot invoke Workflow and Codex has no Workflow tool; both run the prose below, which is authoritative. (Invariant 11: the rulebook is the dispatcher; the Workflow executes it.)
 
 For each sub-issue in dependency order:
 

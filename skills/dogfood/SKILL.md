@@ -315,6 +315,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication

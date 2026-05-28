@@ -313,6 +313,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication
@@ -673,6 +679,12 @@ Each file states: role, inputs accepted, evidence-citation rule, output schema, 
 A 5th `non-engineer-pm` persona was considered in contract Q1 and rejected for v1 (rationale: jargon-density overlaps with `cold-start-junior`; adding a persona later is cheap — one new prompt file, no new skill).
 
 ## Workflow
+
+### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop** docs-reader on Claude Code AND the Workflow tool is available (ultracode mode, or the invocation opted in), you MAY execute ONE round's dispatch + aggregate by running `skills/docs-reader/personas.workflow.js` via the `Workflow` tool, passing the resolved artifact payload. The script spawns the 4 cold-start personas in parallel and runs the severity-weighted aggregator deterministically.
+
+The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched docs-reader teammate, for Codex, and for non-opted-in sessions. The Workflow runs **exactly one round** — round 2 and round 3 remain the human gates defined below and are never auto-advanced. Cold-start isolation (each persona reads only the artifact payload), CONTRADICTION → ESCALATED, and emit-only all hold.
 
 ### Phase 1 — Resolve inputs
 

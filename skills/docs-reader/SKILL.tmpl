@@ -156,6 +156,12 @@ A 5th `non-engineer-pm` persona was considered in contract Q1 and rejected for v
 
 ## Workflow
 
+### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop** docs-reader on Claude Code AND the Workflow tool is available (ultracode mode, or the invocation opted in), you MAY execute ONE round's dispatch + aggregate by running `skills/docs-reader/personas.workflow.js` via the `Workflow` tool, passing the resolved artifact payload. The script spawns the 4 cold-start personas in parallel and runs the severity-weighted aggregator deterministically.
+
+The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched docs-reader teammate, for Codex, and for non-opted-in sessions. The Workflow runs **exactly one round** — round 2 and round 3 remain the human gates defined below and are never auto-advanced. Cold-start isolation (each persona reads only the artifact payload), CONTRADICTION → ESCALATED, and emit-only all hold.
+
 ### Phase 1 — Resolve inputs
 
 ```bash
