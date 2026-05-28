@@ -1398,6 +1398,47 @@ The `awk` pattern matches the prefix `## Project structural choices (managed by 
 
 This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
 
+### Step 10c: Provision the LSP-side prerequisites (global)
+
+The architecture LSP and the TypeScript code-intelligence server run behind the upstream `lsp-proxy.py` (see `ARCHITECTURE.md` → LSP integration). This step provisions the global, not-project-local pieces: the three binaries the proxy execs, and the pinned proxy script itself. It is the last step before the receipt because it is independent of the project's lint/strict config.
+
+**Detect the three binaries.** `python3`, `typescript-language-server`, and `bun` must be on `PATH`. Print the exact install command for any that are missing; do not auto-install — `python3` and `bun` are system-level and OS-specific, and the user decides what lands globally.
+
+```bash
+LSP_MISSING=()
+command -v python3 >/dev/null 2>&1 || LSP_MISSING+=("python3 — system package (apt install python3 / brew install python3)")
+command -v bun >/dev/null 2>&1 || LSP_MISSING+=("bun — curl -fsSL https://bun.sh/install | bash")
+command -v typescript-language-server >/dev/null 2>&1 || LSP_MISSING+=("typescript-language-server — npm install -g typescript-language-server")
+if [ ${#LSP_MISSING[@]} -gt 0 ]; then
+  echo "LSP binaries missing — install these, then re-run /safer:setup:"
+  printf '  - %s\n' "${LSP_MISSING[@]}"
+  LSP_BIN_STATUS="missing: $(printf '%s; ' "${LSP_MISSING[@]%% —*}")"
+else
+  LSP_BIN_STATUS="ok"
+fi
+```
+
+**Fetch the pinned proxy.** `lsp-proxy.py` is the upstream [techee/lsp-proxy](https://github.com/techee/lsp-proxy) script pinned at `9b5a2a5`. It is GPL v2, so it lives only in the user's local cache, never the plugin tree (distribution stays MIT). The fetch is **fail-closed** (a partial download never lands — write to a temp file and `mv` only on success) and **idempotent** (re-running re-pins to the same commit):
+
+```bash
+LSP_PROXY="$HOME/.cache/safer-by-default/lsp-proxy.py"
+LSP_PROXY_URL="https://raw.githubusercontent.com/techee/lsp-proxy/9b5a2a5/lsp-proxy.py"
+mkdir -p "$(dirname "$LSP_PROXY")"
+if curl -fsSL "$LSP_PROXY_URL" -o "$LSP_PROXY.tmp"; then
+  mv "$LSP_PROXY.tmp" "$LSP_PROXY"
+  echo "lsp-proxy.py: fetched (techee/lsp-proxy@9b5a2a5) → $LSP_PROXY"
+  LSP_PROXY_STATUS="fetched (9b5a2a5)"
+else
+  rm -f "$LSP_PROXY.tmp"
+  echo "WARN: could not fetch lsp-proxy.py from $LSP_PROXY_URL"
+  echo "  The LSP path is not provisioned. Re-run /safer:setup once network is available."
+  echo "  (Setup's other outcomes stand; skills and bin/ helpers work without the LSP path.)"
+  LSP_PROXY_STATUS="fetch-failed (re-run setup)"
+fi
+```
+
+A fetch failure does not abort setup: the lint floor, strict flags, and managed `CLAUDE.md` from the prior steps are already in place, and `lsp/proxy/run.sh` degrades with a pointer when the proxy is absent. Record `LSP path: ${LSP_PROXY_STATUS}; binaries: ${LSP_BIN_STATUS}` for the Step 11 receipt; a fetch failure or missing binary is a `DONE_WITH_CONCERNS` for the LSP path only.
+
 ### Step 11: Print the completion summary
 
 End with a bordered block naming every decision and outcome. This is the user's receipt:
@@ -1423,6 +1464,7 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Baseline decision:      A | B | C | D  (per Step 10)
   Baseline file:          .safer-baseline.json | not written
   CLAUDE.md:              created | updated  (managed section written)
+  LSP path:               proxy <fetched (9b5a2a5) | fetch-failed>; binaries <ok | missing: ...>
   Schema library:         <SCHEMA_LIB>
   Database access:        <DB_TOOL>
   Env var access:         <ENV_VAR_ACCESS>

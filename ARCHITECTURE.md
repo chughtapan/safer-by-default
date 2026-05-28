@@ -98,11 +98,11 @@ Conventions: helpers exit non-zero on missing required args; skills wrap calls w
 
 ## LSP integration
 
-The plugin manifest (`.claude-plugin/plugin.json`) declares one `lspServers` entry: `lsp/proxy/run.sh`. The wrapper templates `${CLAUDE_PLUGIN_ROOT}` into a generated config and execs `python3 ~/.cache/safer-by-default/lsp-proxy.py` (the upstream [techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`, fetched into the cache as a one-time prerequisite — see INSTALL.md). The proxy spawns two children and multiplexes them onto Claude Code's single LSP connection:
+The plugin manifest (`.claude-plugin/plugin.json`) declares one `lspServers` entry: `lsp/proxy/run.sh`. The wrapper templates `${CLAUDE_PLUGIN_ROOT}` into a generated config and execs `python3 ~/.cache/safer-by-default/lsp-proxy.py` (the upstream [techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`, fetched into the cache by `/safer:setup` Step 10c). The proxy spawns two children and multiplexes them onto Claude Code's single LSP connection:
 
 | Child | Role | Runtime |
 |---|---|---|
-| `typescript-language-server` | Primary. Handles `documentSymbol`, `goToDefinition`, `findReferences`, `hover`, and the other code-intelligence operations Claude Code's `LSP` tool exposes. Also emits TS semantic diagnostics. | `typescript-language-server --stdio` (user-installed on `PATH`; see INSTALL.md) |
+| `typescript-language-server` | Primary. Handles `documentSymbol`, `goToDefinition`, `findReferences`, `hover`, and the other code-intelligence operations Claude Code's `LSP` tool exposes. Also emits TS semantic diagnostics. | `typescript-language-server --stdio` (on `PATH`; `/safer:setup` Step 10c checks for it) |
 | Architecture LSP | Diagnostic-only sidecar. Custom Effect-shaped server backed by the architecture analyzer (folder graph, public surface, vendor type leaks, cycle detection). Reads file-header `// @agent-code-guard/architecture-exception: <rule>` directives for per-file suppressions. Diagnostics populate `codeDescription.href` linking to a `PRINCIPLES.md` heading. | `bun lsp/architecture/server/index.ts` (runs TypeScript source directly) |
 
 Why a proxy: Claude Code's LSP dispatcher errors out (`"internal error"` on every operation) when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while internally fanning notifications to all children and merging their `publishDiagnostics` output upward.
@@ -111,7 +111,7 @@ The ESLint syntax floor — `eslint-plugin-agent-code-guard` rules — is delive
 
 The architecture analyzer also exports a thin shim at `lsp/architecture/check.ts` that CI can invoke (`node lsp/architecture/check.js` post-build, or `bun lsp/architecture/check.ts` from source) to exit non-zero on error-severity findings without needing the LSP protocol.
 
-LSP-path prerequisites (global, not project-local — **user-provided**; `/safer:setup` does not install them yet): `typescript-language-server`, `python3`, `bun`, plus the pinned `lsp-proxy.py` in `~/.cache/safer-by-default/`. See INSTALL.md for the one-time fetch.
+LSP-path prerequisites (global, not project-local), provisioned by `/safer:setup` Step 10c: it fetches the pinned `lsp-proxy.py` into `~/.cache/safer-by-default/` and checks for `typescript-language-server`, `python3`, `bun` (printing install commands for any missing — those are user-installed).
 
 ## Install paths
 

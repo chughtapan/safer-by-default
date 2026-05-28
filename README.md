@@ -51,7 +51,7 @@ The plugin manifest registers one LSP entry that fans out to multiple upstream s
 
 **ESLint syntax floor** is delivered via CLI, not LSP. `/safer:setup` writes an `eslint.config.js` that loads `eslint-plugin-agent-code-guard`'s rules; `/safer:verify` runs `eslint` against the project as part of the pre-merge acceptance loop, and any pre-commit / CI integration the project already has continues to fire the same ruleset.
 
-The LSP path requires `typescript-language-server`, `python3`, and `bun` on `PATH`, plus the upstream `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) placed in `~/.cache/safer-by-default/`. These are user-provided prerequisites — `/safer:setup` does not install them yet (auto-install is a tracked follow-up). The skills and `bin/` helpers work without the LSP path; see [INSTALL.md](./INSTALL.md) for the one-time fetch.
+`/safer:setup` (Step 10c) fetches the upstream `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) into `~/.cache/safer-by-default/` and checks the LSP binaries — `typescript-language-server`, `python3`, `bun` — printing the install command for any that are missing. The skills and `bin/` helpers work without the LSP path.
 
 ## Four parts
 

@@ -72,7 +72,7 @@ To pick up v0.2.0 in Claude Code:
 
 Reason: Claude Code's LSP dispatcher returns opaque "internal error" on every operation when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while doing the multiplexing internally. Empirically confirmed with three different manifest shapes during the spike (3 servers → error; 1 server → works; 1 server-via-proxy with 2 children → all queries and diagnostics flow).
 
-**User impact: `/reload-plugins` after upgrade** (the `lspServers` manifest changed from two entries to one). The LSP path's prerequisites — `typescript-language-server`, `python3`, `bun`, and the upstream `lsp-proxy.py` (pinned at `9b5a2a5`, placed in `~/.cache/safer-by-default/lsp-proxy.py`) — are **user-provided**; automated install via `/safer:setup` is a tracked follow-up, not yet shipped. See INSTALL.md for the one-time fetch. Distribution stays MIT — the GPL v2 `lsp-proxy.py` lives in the user's local cache, never the plugin source tree.
+**User impact: re-run `/safer:setup` and `/reload-plugins` after upgrade** (the `lspServers` manifest changed from two entries to one). Setup's Step 10c fetches `lsp-proxy.py` at a pinned upstream commit (`9b5a2a5`) into `~/.cache/safer-by-default/lsp-proxy.py` (fail-closed, idempotent) and checks the LSP binaries (`typescript-language-server`, `python3`, `bun`), printing install commands for any missing. Distribution stays MIT — the GPL v2 `lsp-proxy.py` lives in the user's local cache, never the plugin source tree.
 
 ### Removed: `lsp/syntax/` and `vscode-eslint-language-server` from the LSP path
 

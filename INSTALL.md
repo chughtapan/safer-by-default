@@ -105,7 +105,7 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
 
 - `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator + the architecture LSP runtime).
 - [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
-- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path, plus the upstream `lsp-proxy.py` in the cache. These are **user-provided prerequisites** — `/safer:setup` does not install them yet (auto-install is a tracked follow-up). One-time fetch:
+- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path, plus the upstream `lsp-proxy.py` in the cache. `/safer:setup` Step 10c provisions these: it checks the three binaries (printing the install command for any missing — they are system/global, so you install them) and fetches `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) into `~/.cache/safer-by-default/`, fail-closed (a partial download never lands). If setup ran offline, fetch the proxy manually:
 
   ```bash
   mkdir -p ~/.cache/safer-by-default
@@ -113,7 +113,7 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
     -o ~/.cache/safer-by-default/lsp-proxy.py
   ```
 
-  `lsp-proxy.py` is GPL v2 and lives only in your local cache, never the plugin tree. If any of the three binaries or the proxy file is missing, `lsp/proxy/run.sh` exits with a pointer here and the rest of the plugin keeps working.
+  `lsp-proxy.py` is GPL v2 and lives only in your local cache, never the plugin tree. If any binary or the proxy file is missing, `lsp/proxy/run.sh` exits with a pointer to `/safer:setup` and the rest of the plugin keeps working.
 - **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
 
 ## LSP behavior at install time
@@ -125,7 +125,7 @@ The plugin manifest declares one `lspServers` entry pointing at `lsp/proxy/run.s
 
 Why the proxy: Claude Code's LSP dispatcher returns opaque "internal error" on every operation when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while internally fanning notifications to both children and merging their `publishDiagnostics` upward.
 
-If `~/.cache/safer-by-default/lsp-proxy.py` is missing, `lsp/proxy/run.sh` exits non-zero with a pointer to the one-time fetch in Requirements above. If `bun`, `typescript-language-server`, or `python3` is missing, the proxy fails when it tries to spawn its children. Either way, the rest of the plugin (skills, bins) keeps working.
+If `~/.cache/safer-by-default/lsp-proxy.py` is missing, `lsp/proxy/run.sh` exits non-zero with a pointer to `/safer:setup` (Step 10c fetches it). If `bun`, `typescript-language-server`, or `python3` is missing, the proxy fails when it tries to spawn its children. Either way, the rest of the plugin (skills, bins) keeps working.
 
 ESLint syntax rules from `eslint-plugin-agent-code-guard` are NOT on the LSP path; they ship via the CLI surface that `/safer:setup` writes into each project's `eslint.config.js`, and `/safer:verify` runs `eslint` as a ring-1 gate when the project has an eslint config but no `lint` script.
 

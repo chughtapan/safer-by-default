@@ -8,7 +8,7 @@
 # multiplex multiple servers claiming the same file extensions, so safer
 # presents a single server and does the multiplexing internally.
 #
-# Preconditions (user-provided; see INSTALL.md — not auto-installed by /safer:setup yet):
+# Preconditions provisioned by /safer:setup Step 10c (fetches the proxy; checks the binaries):
 #   - python3 on PATH
 #   - typescript-language-server on PATH
 #   - bun on PATH
@@ -20,7 +20,7 @@ PROXY="${HOME}/.cache/safer-by-default/lsp-proxy.py"
 
 if [ ! -f "$PROXY" ]; then
   printf 'safer: lsp-proxy.py is missing at %s\n' "$PROXY" >&2
-  printf 'safer: fetch it (techee/lsp-proxy@9b5a2a5); see INSTALL.md > Requirements.\n' >&2
+  printf 'safer: run /safer:setup to install it (Step 10c fetches it).\n' >&2
   exit 1
 fi
 
