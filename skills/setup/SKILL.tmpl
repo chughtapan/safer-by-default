@@ -157,6 +157,7 @@ PM=""
 [ -f package-lock.json ] && PM="npm"
 [ -f yarn.lock ]         && PM="yarn"
 [ -f bun.lockb ]         && PM="bun"
+[ -f bun.lock ]          && PM="bun"   # bun 1.2+ default text lockfile (bun.lockb is legacy)
 [ -z "$PM" ] && PM="pnpm"  # default, announce to user below
 echo "PM: $PM"
 
@@ -200,7 +201,7 @@ Announce to the user what you found. If `PM` fell back to the default, say so: "
 - C) Update. Run `<pm> up eslint-plugin-agent-code-guard`; re-probe; re-baseline. No config changes.
 - D) Walk away. Stop here; report no changes.
 
-If A, skip to Step 8 (probe). If C, skip to Step 8 after the upgrade. If D, stop and emit the one-line summary.
+If A, skip to Step 9 (probe). If C, skip to Step 9 after the upgrade. If D, stop and emit the one-line summary.
 
 **If `LEGACY` is set and `FLAT_CONFIG` is empty:** stop. Tell the user:
 

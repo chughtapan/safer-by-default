@@ -635,6 +635,7 @@ GitHub.
 gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated. Run: gh auth login"; exit 1; }
 eval "$(safer-slug 2>/dev/null)" || true
 SESSION="$$-$(date +%s)"
+_TEL_START=$(date +%s)
 safer-telemetry-log --event-type safer.skill_run --modality orchestrate --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
@@ -1091,7 +1092,7 @@ Then cascade forward per modality lifecycle:
 Before any label transition or downstream dispatch, load the parent epic and read its `## Contract` section. The contract is the deal between user and orchestrator. The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
 
 ```bash
-gh issue view "$PARENT" --json body --jq '.body' | awk '/^## Contract$/,/^## /{print}' | head -n -1 > /tmp/contract.md
+gh issue view "$PARENT" --json body --jq '.body' | awk '/^## Contract$/{f=1;print;next} f&&/^## /{f=0} f{print}' > /tmp/contract.md
 ```
 
 Identify the next dispatch you would do (the next sub-issue's modality, the merge of a PR, the close of an epic). Three checks fire in order:

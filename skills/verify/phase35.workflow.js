@@ -1,10 +1,12 @@
 // safer:verify — Phase 3.5 (gstack testing-layer composition) as a Claude Code Workflow.
 //
-// WHAT THIS IS. A reference Workflow script for verify's Phase 3.5: evaluate each of the 8 gstack
+// WHAT THIS IS. A reference Workflow script for verify's Phase 3.5: evaluate each of the 7 gstack
 // composition targets' trigger conditions, dispatch ONLY the targets whose trigger fires (in
 // parallel — they are independent read-only observations against a deployed/runnable artifact),
 // and fold their verdicts through the Phase-5 precedence table. It turns "the model remembers to
-// fire the right subset of 8 targets and aggregate them correctly" into deterministic control flow.
+// fire the right subset of targets and aggregate them correctly" into deterministic control flow.
+// (SKILL.md's Phase-3.5 table lists 8 rows; this runs the 7 report-only forms — /qa is excluded,
+// verify never runs a --fix variant, so its report-only sibling /qa-only stands in.)
 //
 // WHAT THIS IS NOT. This is not verify. Ring 1 (lint / typecheck / test / safer-spec validate)
 // stays in Phase 3's deterministic bash — this script is Phase 3.5 only, an advisory input to the
@@ -36,7 +38,7 @@ const labelState = args?.labelState ?? ""
 const refs = (...needles) => needles.some((n) => acceptance.includes(n))
 const touches = (...frags) => files.some((f) => frags.some((g) => String(f).includes(g)))
 
-// The 8 composition targets, each with its trigger predicate (faithful to SKILL.md Phase 3.5) and
+// The 7 report-only composition targets, each with its trigger predicate (faithful to SKILL.md Phase 3.5) and
 // the gstack invocation in its REPORT-ONLY form. `worstVerdict` documents the target's mapping
 // from finding-severity to the verify verdict it can contribute.
 const TARGETS = [
@@ -46,7 +48,7 @@ const TARGETS = [
   { name: "/design-review",   fires: () => refs("visual", "design", "ui", "look") && !!qaUrl, invoke: `gstack invoke /design-review --url ${qaUrl || "<qa-url>"} --report-only`, worstVerdict: "HOLD" },
   { name: "/devex-review",    fires: () => refs("developer experience", "dx", "api design", "cli", "docs onboarding") && !!deployUrl, invoke: `gstack invoke /devex-review --url ${deployUrl || "<deploy-url>"}`, worstVerdict: "SHIP_WITH_CONCERNS" },
   { name: "/benchmark",       fires: () => refs("performance", "benchmark", "page speed", "web vitals") && !!deployUrl, invoke: `gstack invoke /benchmark --url ${deployUrl || "<deploy-url>"} --baseline main`, worstVerdict: "HOLD" },
-  { name: "/benchmark-models",fires: () => refs("model benchmark", "skill prompt comparison"), invoke: "gstack invoke /benchmark-models --skill <name>", worstVerdict: "SHIP_WITH_CONCERNS" },
+  { name: "/benchmark-models",fires: () => refs("model benchmark", "skill prompt comparison"), invoke: "gstack invoke /benchmark-models --skill <name>", worstVerdict: "pass" }, // report-only; never blocks
 ]
 
 const VERDICT_SCHEMA = {
