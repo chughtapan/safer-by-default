@@ -81,7 +81,7 @@ After the plugin is installed:
 safer-setup-labels
 ```
 
-Creates the modality labels the skills publish under: `safer:contract`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:research`, `safer:spike`, `safer:deferred`. Lifecycle/state labels (the parent-epic label and per-stage states like `planning`, `review`, `implementing`, `verifying`, `done`) are created on demand as `/safer:orchestrate` runs a pipeline. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
+Creates the labels the skills publish under: the parent-epic marker `safer:parent` plus the modality labels `safer:contract`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:research`, `safer:spike`, `safer:deferred`. Per-stage state labels (`planning`, `review`, `implementing`, `verifying`, `done`) are created on demand as `/safer:orchestrate` runs a pipeline. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
 
 ## Working from source (developers)
 

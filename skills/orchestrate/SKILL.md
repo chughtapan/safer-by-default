@@ -908,7 +908,7 @@ Create the parent epic issue on GitHub. Use `safer-publish` (wraps `/zapbot-publ
 safer-publish --kind epic \
   --title "<compressed intent, <70 chars>" \
   --body-file /tmp/safer-epic-body.md \
-  --labels triaged
+  --labels "safer:parent,triaged"
 ```
 
 Epic body template:
@@ -2133,7 +2133,7 @@ Post the artifact as a comment on the blocked sub-issue and cross-link on the pa
 
 | Artifact | Destination | Label |
 |---|---|---|
-| Parent epic | GitHub issue (this repo) | `triaged` |
+| Parent epic | GitHub issue (this repo) | `safer:parent` (type) + `triaged` (state) |
 | Sub-issues | GitHub issues (this repo) | `safer:<modality>,planning` |
 | Progress updates | Comments on sub-issues | — |
 | State transitions | Label changes via `safer-transition-label` | — |
