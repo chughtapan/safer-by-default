@@ -26,11 +26,26 @@ export const meta = {
   phases: [{ title: "Persona read", detail: "4 cold-start opus personas in parallel" }],
 }
 
-// args = { artifact: "<full self-contained payload>", round: 1, personas?: [names] }
-// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
-function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
-const A = parseArgs(args)
-const artifact = A.artifact ?? "<artifact payload missing>"
+// args = { artifactRef?: "<url-or-abs-path>", artifact?: "<inline payload>", round: 1, personas?: [names] }
+// Normalize args. The harness delivers `args` as a JSON string, and large/nested payloads arrive
+// malformed (a stray bracket makes it unparseable). Parse defensively and FAIL LOUD — a silent
+// fallback to the placeholder would have personas review nothing.
+// Prefer `artifactRef` (a URL or absolute path) for anything non-trivial: a large artifact inlined
+// in args overflows the fragile args channel, so each persona READS the ref instead (reading the
+// one named artifact preserves cold-start isolation). Inline `artifact` is for small payloads only.
+// (See docs/workflow-composition.md → "Passing inputs".)
+function parseArgs(a) {
+  if (a == null || (typeof a === "string" && a.trim() === "")) return { ok: true, A: {} }
+  if (typeof a !== "string") return { ok: true, A: a }
+  try { return { ok: true, A: JSON.parse(a) } } catch (e) { return { ok: false, error: String(e) } }
+}
+const _p = parseArgs(args)
+if (!_p.ok) return { status: "BLOCKED", error: `args did not parse: ${_p.error}`, hint: "Pass the artifact by reference (artifactRef: a URL or absolute path) rather than inlining a large payload in args." }
+const A = _p.A
+const artifactRef = A.artifactRef ?? null
+const artifact = artifactRef
+  ? `Read the artifact under review from this reference (it is your ONLY input): ${artifactRef}`
+  : (A.artifact ?? "<artifact payload missing>")
 const round = A.round ?? 1
 
 const CANONICAL = {

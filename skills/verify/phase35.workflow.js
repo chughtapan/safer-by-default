@@ -29,9 +29,18 @@ export const meta = {
 }
 
 // args = { acceptanceText, diffScope: { files: [] }, qaUrl, deployUrl, labelState, pluginRoot }
-// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
-function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
-const A = parseArgs(args)
+// Normalize args. The harness delivers `args` as a JSON string, and large/nested payloads can
+// arrive malformed. Parse defensively and FAIL LOUD — a silent no-op would masquerade as "no
+// triggers fired". Keep args SMALL (short keyword text + a few file paths + URLs).
+// (See docs/workflow-composition.md → "Passing inputs".)
+function parseArgs(a) {
+  if (a == null || (typeof a === "string" && a.trim() === "")) return { ok: true, A: {} }
+  if (typeof a !== "string") return { ok: true, A: a }
+  try { return { ok: true, A: JSON.parse(a) } } catch (e) { return { ok: false, error: String(e) } }
+}
+const _p = parseArgs(args)
+if (!_p.ok) return { status: "BLOCKED", error: `args did not parse: ${_p.error}`, hint: "Keep verify Phase-3.5 args small + well-formed JSON." }
+const A = _p.A
 const acceptance = (A.acceptanceText ?? "").toLowerCase()
 const files = A.diffScope?.files ?? []
 const qaUrl = A.qaUrl ?? ""

@@ -58,13 +58,23 @@ const normalizeStatus = (s) => (s === "CHANGES_REQUESTED" ? "ESCALATED" : String
 //   spareRoles?: [{ role, skill }],   // for the single widen-and-retry on NEEDS_CONTEXT below ceiling
 //   targetUrl, mode: "plan"|"pr", acceptance, atCeiling: boolean, pluginRoot,
 // }
-// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
-function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
-const A = parseArgs(args)
+// Normalize args. The harness delivers `args` as a JSON string, and large/nested payloads can
+// arrive malformed (a stray bracket makes the whole thing unparseable). Parse defensively and
+// FAIL LOUD — a silent empty no-op masquerades as "nothing to review" and masks a malformed call.
+// Keep args SMALL: dispatchSet is short role+skill pairs; the acceptance + diff are NOT inlined —
+// reviewers read them from `targetUrl`. (See docs/workflow-composition.md → "Passing inputs".)
+function parseArgs(a) {
+  if (a == null || (typeof a === "string" && a.trim() === "")) return { ok: true, A: {} }
+  if (typeof a !== "string") return { ok: true, A: a }
+  try { return { ok: true, A: JSON.parse(a) } } catch (e) { return { ok: false, error: String(e) } }
+}
+const _p = parseArgs(args)
+if (!_p.ok) return { verdict: "BLOCKED", reason: `args did not parse: ${_p.error}`, reviewers: [], hint: "Keep stamina args small + well-formed; pass acceptance/diff by reference (targetUrl), not inline." }
+const A = _p.A
 const dispatchSet = A.dispatchSet ?? []
 const spareRoles = A.spareRoles ?? []
 const targetUrl = A.targetUrl ?? "<target-url>"
-const acceptance = A.acceptance ?? "(see the sub-issue / PR-linked issue)"
+const acceptance = A.acceptance ?? "read the acceptance criteria and the diff from the target above"
 const atCeiling = A.atCeiling === true
 
 const REVIEWER_SCHEMA = {

@@ -52,9 +52,20 @@ function readySet(rows) {
 //   rows: [{ subIssue, modality, dependsOn?: [], acceptance, state, url }],  // the decomposition table + live states
 //   parentEpic: "<url>", repo: "owner/name", pluginRoot: "<path>",
 // }
-// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
-function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
-const A = parseArgs(args)
+// Normalize args. The harness delivers `args` as a JSON string, and large/nested payloads can
+// arrive malformed (a stray bracket makes the whole thing unparseable). Parse defensively and
+// FAIL LOUD — a silent no-op masquerades as "no work" and masks a malformed dispatch.
+// Keep args SMALL: rows are short pointers (subIssue / modality / dependsOn / state / url). The
+// dispatched modality agent reads acceptance + context from its sub-issue, so no long text rides
+// in args. (See docs/workflow-composition.md → "Passing inputs".)
+function parseArgs(a) {
+  if (a == null || (typeof a === "string" && a.trim() === "")) return { ok: true, A: {} }
+  if (typeof a !== "string") return { ok: true, A: a }
+  try { return { ok: true, A: JSON.parse(a) } } catch (e) { return { ok: false, error: String(e) } }
+}
+const _p = parseArgs(args)
+if (!_p.ok) return { status: "BLOCKED", error: `args did not parse: ${_p.error}`, hint: "Workflow args must be small, well-formed JSON; pass large content by reference (a URL the dispatched agent fetches), not inline." }
+const A = _p.A
 const rows = A.rows ?? []
 const parentEpic = A.parentEpic ?? "<parent-epic-url>"
 const pluginRoot = A.pluginRoot ?? "the plugin root"
