@@ -105,7 +105,7 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
 
 - `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator + the architecture LSP runtime).
 - [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
-- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path, plus the upstream `lsp-proxy.py` in the cache. `/safer:setup` Step 10c provisions these: it checks the three binaries (printing the install command for any missing — they are system/global, so you install them) and fetches `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) into `~/.cache/safer-by-default/`, fail-closed (a partial download never lands). If setup ran offline, fetch the proxy manually:
+- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path, plus the upstream `lsp-proxy.py` in the cache. `/safer:setup` Step 10c provisions these: it installs `typescript-language-server` globally when missing (via `npm -g`, falling back to the detected package manager's global form), checks `python3` and `bun` (printing the install command for those — system-level, so you install them), and fetches `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) into `~/.cache/safer-by-default/`, fail-closed (a partial download never lands). If setup ran offline, fetch the proxy manually:
 
   ```bash
   mkdir -p ~/.cache/safer-by-default

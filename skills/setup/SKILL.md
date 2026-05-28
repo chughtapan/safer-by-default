@@ -1402,17 +1402,39 @@ This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
 
 The architecture LSP and the TypeScript code-intelligence server run behind the upstream `lsp-proxy.py` (see `ARCHITECTURE.md` → LSP integration). This step provisions the global, not-project-local pieces: the three binaries the proxy execs, and the pinned proxy script itself. It is the last step before the receipt because it is independent of the project's lint/strict config.
 
-**Detect the three binaries.** `python3`, `typescript-language-server`, and `bun` must be on `PATH`. Print the exact install command for any that are missing; do not auto-install — `python3` and `bun` are system-level and OS-specific, and the user decides what lands globally.
+**Detect the three binaries.** `python3`, `typescript-language-server`, and `bun` must be on `PATH`. `typescript-language-server` is a node CLI — auto-install it globally when missing (a global tool, not a project dep, so it does not touch the repo lockfile). `python3` and `bun` are system-level and OS-specific, so for those print the exact install command and let the user run it.
 
 ```bash
 LSP_MISSING=()
 command -v python3 >/dev/null 2>&1 || LSP_MISSING+=("python3 — system package (apt install python3 / brew install python3)")
 command -v bun >/dev/null 2>&1 || LSP_MISSING+=("bun — curl -fsSL https://bun.sh/install | bash")
-command -v typescript-language-server >/dev/null 2>&1 || LSP_MISSING+=("typescript-language-server — npm install -g typescript-language-server")
+
+# typescript-language-server: auto-install globally when missing. Prefer npm -g (the universal
+# node global installer, present wherever node is); fall back to the detected PM's global form.
+if ! command -v typescript-language-server >/dev/null 2>&1; then
+  if   command -v npm >/dev/null 2>&1; then TLS_INSTALL="npm install -g typescript-language-server"
+  elif [ "${PM:-}" = "bun" ];          then TLS_INSTALL="bun add -g typescript-language-server"
+  elif [ "${PM:-}" = "pnpm" ];         then TLS_INSTALL="pnpm add -g typescript-language-server"
+  elif [ "${PM:-}" = "yarn" ];         then TLS_INSTALL="yarn global add typescript-language-server"
+  else                                      TLS_INSTALL=""
+  fi
+  if [ -n "$TLS_INSTALL" ]; then
+    echo "Installing typescript-language-server globally: $TLS_INSTALL"
+    if $TLS_INSTALL; then
+      echo "typescript-language-server: installed"
+    else
+      echo "WARN: '$TLS_INSTALL' failed — install typescript-language-server manually, then re-run /safer:setup"
+      LSP_MISSING+=("typescript-language-server — $TLS_INSTALL (auto-install failed)")
+    fi
+  else
+    LSP_MISSING+=("typescript-language-server — npm install -g typescript-language-server")
+  fi
+fi
+
 if [ ${#LSP_MISSING[@]} -gt 0 ]; then
-  echo "LSP binaries missing — install these, then re-run /safer:setup:"
+  echo "LSP binaries needing manual install — then re-run /safer:setup:"
   printf '  - %s\n' "${LSP_MISSING[@]}"
-  LSP_BIN_STATUS="missing: $(printf '%s; ' "${LSP_MISSING[@]%% —*}")"
+  LSP_BIN_STATUS="needs-manual: $(printf '%s; ' "${LSP_MISSING[@]%% —*}")"
 else
   LSP_BIN_STATUS="ok"
 fi
