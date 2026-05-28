@@ -780,10 +780,11 @@ echo "$URL"
 rm -f "$TMP"
 ```
 
-Transition the sub-issue (or the bug issue) from `planning` to `review`:
+Transition the work item from `planning` to `review`. Only a dispatched run has a `planning` sub-issue to advance (`$SAFER_SUBISSUE`); a standalone diagnose issue is created directly in `review` (see the publish step) and a `SAFER_BUG_ISSUE` run only comments, so neither transitions. `$ISSUE` (resolved below) is reused by the telemetry block.
 
 ```bash
-safer-transition-label --issue "$ISSUE" --from planning --to review 2>/dev/null || true
+ISSUE="${SAFER_SUBISSUE:-${TARGET_BUG:-$(printf '%s' "$URL" | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+$')}}"
+[ -n "${SAFER_SUBISSUE:-}" ] && safer-transition-label --issue "$SAFER_SUBISSUE" --from planning --to review 2>/dev/null || true
 ```
 
 Emit the end event:

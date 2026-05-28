@@ -764,10 +764,11 @@ Apply findings against the parent epic's `## Contract` autonomy budget:
 
 A spec that ships without `/plan-eng-review` because it estimated junior-tier and the implementation later turned out to be senior-tier is a calibration miss; the next-tick auto-monitor catches this when it sees the implement-senior label assigned, and posts a one-line follow-up note suggesting the spec be revised. Not a blocker on the implementation; a signal that the spec under-described the work.
 
-Transition the sub-issue (or the spec issue) from `planning` to `review`:
+Transition the work item from `planning` to `review`, resolving the issue the same way the publish step did: a dispatched run advances its sub-issue (`$SAFER_SUBISSUE`); a standalone run advances the spec issue it just created (`$URL` is a clean issue URL in that path, born `planning`). `$ISSUE` is reused by the telemetry block below.
 
 ```bash
-safer-transition-label --issue "$ISSUE" --from planning --to review
+ISSUE="${SAFER_SUBISSUE:-$(printf '%s' "$URL" | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+$')}"
+[ -n "$ISSUE" ] && safer-transition-label --issue "$ISSUE" --from planning --to review
 ```
 
 Emit the end event:
