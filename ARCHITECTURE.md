@@ -47,7 +47,7 @@ safer-by-default/
 ├── lsp/                       ← single LSP entry declared in plugin.json (see "LSP integration" below)
 │   ├── proxy/                 ← run.sh wrapper; execs upstream lsp-proxy.py with a templated config
 │   └── architecture/          ← custom architecture analyzer + LSP server, runs via bun behind the proxy
-├── docs/                      ← contracts/ (worked-example templates) + design/ (living-spec notes)
+├── docs/                      ← contracts/ (templates) + design/ (living-spec) + workflow-composition.md
 ├── scenarios/                 ← cc-judge calibration suite
 ├── tests/                     ← test-bin/, test-integration/
 ├── setup                      ← dev-mode sanity check + legacy cleanup

@@ -170,6 +170,10 @@ Individual skills name their own gstack tool usage inline in the workflow prose 
 
 **Ship hop.** safer's `verify` modality emits SHIP/HOLD; the post-verify hop routes through gstack `/ship` (VERSION + CHANGELOG + PR). `/safer:orchestrate` handles that routing.
 
+## Composing with Claude Code workflows
+
+On Claude Code, three strong-fit skills (`stamina`, `verify`, `docs-reader`) plus `orchestrate`'s per-wave dispatch ship a runnable Workflow script that executes their fan-out deterministically — an opt-in optimization for the main-loop case. The prose rulebook stays authoritative and is the required path for Codex, dispatched teammates, and non-opted-in sessions; no Workflow advances a human gate. See [docs/workflow-composition.md](./docs/workflow-composition.md) for the deterministic-fan-out-vs-human-gate boundary, the 18-skill verdict table, and the feasibility limits.
+
 ## Companion projects
 
 This plugin does not stand alone. Two companions:
