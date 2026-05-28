@@ -57,7 +57,7 @@ const FacadeFileAllowance = Schema.Struct({
 });
 type FacadeFileAllowance = typeof FacadeFileAllowance.Type;
 
-const PackageRuntime = Schema.Literal("browser", "node", "universal");
+const PackageRuntime = Schema.Literal("browser", "node", "universal", "bun");
 type PackageRuntime = typeof PackageRuntime.Type;
 
 const Ratio = Schema.Number.pipe(Schema.between(0, 1));
