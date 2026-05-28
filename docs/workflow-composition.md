@@ -46,6 +46,44 @@ main-loop case, fenced as `### Workflow path (Claude Code, opt-in)` in each skil
 > harness's async wrapper). A standalone TS/JS parser — your editor's LSP, `node --check` — will
 > mis-flag them. Validate by running them through the Workflow tool, not `node --check`.
 
+## Passing inputs (hard-won, from dogfooding)
+
+The `args` channel is the one way to get data into a Workflow script (scripts have no filesystem
+access). Dogfooding the dispatch-wave and stamina scripts surfaced two rules that are not obvious:
+
+1. **`args` arrives as a JSON *string*, not a parsed object.** Each reference script runs a
+   `parseArgs()` shim that `JSON.parse`s it. Reading `args.rows` directly returns `undefined`.
+
+2. **Keep `args` minimal — short identifiers and URLs only.** Large or nested or prose-heavy
+   payloads get malformed in transit (a probe caught a stray `]}` at position 1118 of a 1120-char
+   payload; even ~450 chars of prose failed to parse, while ~250 chars of identifiers + URLs round-
+   trips reliably). So **do not inline heavy content** (acceptance text, diffs, artifact bodies,
+   decomposition rows with prose). Pass a *reference* — a sub-issue/PR URL, a branch name, a file
+   path — and let the dispatched `agent()` fetch the content from the forge. The scripts are built
+   this way: dispatch-wave rows carry no inline acceptance (the modality agent reads its sub-issue);
+   stamina reviewers read the acceptance + diff from `targetUrl`; docs-reader takes an `artifactRef`
+   a persona reads (reading the one named ref preserves cold-start isolation); verify keeps its
+   trigger text short.
+
+3. **The scripts fail loud on a parse error.** A malformed `args` returns an explicit `BLOCKED`
+   with the parse error and a hint — never a silent empty no-op. The silent no-op was the original
+   trap: "no ready rows / no reviewer verdicts, 0 agents" looked like "nothing to do" but actually
+   meant "your input never arrived."
+
+Validated end-to-end: `stamina/dispatch.workflow.js` with minimal args (3 role+skill pairs + a
+target URL) fans out 3 real reviewers in parallel and publishes their verdicts to the target;
+consensus reduces to `DONE_WITH_CONCERNS`.
+
+### Read-only persona dispatch: prefer `isolation:'worktree'`, not `agentType:'Explore'`
+
+A separate finding from the same dogfood, for anyone enforcing read-only / emit-only on a dispatched
+agent (e.g. docs-reader personas): `agentType:'Explore'` is the wrong lever. The adversarial review
+caught that (a) Explore's resolver drops the passed `model` (personas silently fall off opus), and
+(b) Explore is a *search* agent — its own definition says it "reads excerpts rather than whole
+files... doesn't review or audit," which mis-frames a whole-artifact persona read. Use
+`isolation:'worktree'` instead (what dispatch-wave already uses): any mutation lands in a throwaway
+worktree, while `model` and the schema and the whole-document read are preserved.
+
 ## Per-skill verdict (all 18 skills)
 
 | Skill | Fit | Why |
