@@ -27,8 +27,8 @@ const REVIEWER_STATUSES = new Set([
  *
  * Precedence (most-blocking first). The Phase-4 table lists conditions, not a total order; this
  * is the defensible total order, documented so a reader can audit it:
- *   1. Any BLOCKED            -> BLOCKED        (incomplete dispatch is not consensus)
- *   2. Any ESCALATED          -> ESCALATED      (a reviewer found a real problem; ratchet upstream)
+ *   1. Any ESCALATED          -> ESCALATED      (a reviewer found a real problem; ratchet upstream — dominates an infra BLOCKED, which a re-review resolves)
+ *   2. Any BLOCKED            -> BLOCKED        (incomplete dispatch; no consensus possible)
  *   3. Any NEEDS_CONTEXT or unrecognized tag:
  *        at ceiling           -> NEEDS_CONTEXT  (user arbitrates)
  *        below ceiling        -> WIDEN_RETRY    (orchestration widens the set by one role, once)
@@ -51,11 +51,11 @@ export function consensus(statuses, opts) {
   const has = (s) => statuses.includes(s);
   const unrecognized = statuses.filter((s) => !REVIEWER_STATUSES.has(s));
 
-  if (has("BLOCKED")) {
-    return { verdict: "BLOCKED", reason: "a reviewer did not publish a verdict (dispatch failed)" };
-  }
   if (has("ESCALATED")) {
     return { verdict: "ESCALATED", reason: "a reviewer escalated or requested changes; ratchet upstream" };
+  }
+  if (has("BLOCKED")) {
+    return { verdict: "BLOCKED", reason: "a reviewer did not publish a verdict (dispatch failed)" };
   }
   if (has("NEEDS_CONTEXT") || unrecognized.length > 0) {
     const why = unrecognized.length > 0
@@ -78,8 +78,8 @@ function selftest() {
     { in: [["DONE", "DONE_WITH_CONCERNS"], { atCeiling: false }], want: "DONE_WITH_CONCERNS" },
     { in: [["DONE", "ESCALATED"], { atCeiling: false }], want: "ESCALATED" },
     { in: [["DONE", "BLOCKED"], { atCeiling: true }], want: "BLOCKED" },
-    // BLOCKED beats ESCALATED (incomplete dispatch dominates).
-    { in: [["ESCALATED", "BLOCKED"], { atCeiling: true }], want: "BLOCKED" },
+    // ESCALATED beats BLOCKED (a real changes-requested verdict dominates an infra dispatch failure).
+    { in: [["ESCALATED", "BLOCKED"], { atCeiling: true }], want: "ESCALATED" },
     // ESCALATED beats NEEDS_CONTEXT and DONE_WITH_CONCERNS.
     { in: [["ESCALATED", "NEEDS_CONTEXT", "DONE_WITH_CONCERNS"], { atCeiling: true }], want: "ESCALATED" },
     // NEEDS_CONTEXT below ceiling -> widen+retry; at ceiling -> NEEDS_CONTEXT.

@@ -34,7 +34,7 @@ main() {
 
   # Parent-epic marker + modality labels (one per skill that authors a labeled durable artifact).
   # Idempotent: re-running adds only what's missing.
-  create_label_idempotent "safer:parent"            "b60205" "orchestrate: parent epic; carries the Contract, decomposition, and status. The update-gate keys on this to detect an in-flight pipeline."
+  create_label_idempotent "safer:parent"            "b60205" "orchestrate: parent epic; the update-gate keys on it to detect an in-flight pipeline"
   create_label_idempotent "safer:contract"          "0e8a16" "contract modality: spec / acceptance criteria authored by /safer:contract"
   create_label_idempotent "safer:architect"         "1d76db" "architect modality: design doc / interface stubs by /safer:architect"
   create_label_idempotent "safer:implement-junior"  "5319e7" "implement-junior modality: single-module internals"

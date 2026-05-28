@@ -37,8 +37,8 @@ function consensus(statuses, opts) {
   const atCeiling = opts?.atCeiling === true
   const has = (s) => statuses.includes(s)
   const unrecognized = statuses.filter((s) => !REVIEWER_STATUSES.has(s))
-  if (has("BLOCKED")) return { verdict: "BLOCKED", reason: "a reviewer did not publish a verdict (dispatch failed)" }
   if (has("ESCALATED")) return { verdict: "ESCALATED", reason: "a reviewer escalated or requested changes; ratchet upstream" }
+  if (has("BLOCKED")) return { verdict: "BLOCKED", reason: "a reviewer did not publish a verdict (dispatch failed)" }
   if (has("NEEDS_CONTEXT") || unrecognized.length > 0) {
     const why = unrecognized.length > 0 ? `unrecognized status: ${unrecognized.join(", ")}` : "a reviewer returned NEEDS_CONTEXT"
     return atCeiling
@@ -111,13 +111,16 @@ let result = consensus(reviewers.map((r) => r.status), { atCeiling })
 
 // Phase-4 "widen by one role and retry once" — only when below ceiling and a spare role exists.
 if (result.verdict === "WIDEN_RETRY") {
-  if (spareRoles.length > 0) {
-    log(`consensus split below ceiling; widening by one role (${spareRoles[0].role}) and retrying once`)
-    const extra = await dispatchAll([spareRoles[0]])
+  // Independence rule: the spare must add a NEW skill, not repeat one already in the set
+  // (same skill+model is one pass, not two). Pick the first spare with an unused skill.
+  const spare = spareRoles.find((e) => !skills.includes(e.skill))
+  if (spare) {
+    log(`consensus split below ceiling; widening by one role (${spare.role}) and retrying once`)
+    const extra = await dispatchAll([spare])
     reviewers = reviewers.concat(extra)
     result = consensus(reviewers.map((r) => r.status), { atCeiling: true }) // the retry is the final attempt
   } else {
-    result = { verdict: "NEEDS_CONTEXT", reason: `${result.reason} (no spare role available to widen)` }
+    result = { verdict: "NEEDS_CONTEXT", reason: `${result.reason} (no distinct spare role available to widen)` }
   }
 }
 
