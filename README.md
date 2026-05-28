@@ -17,6 +17,8 @@ It is not. This plugin recalibrates.
 /plugin install safer@safer-by-default
 ```
 
+> **v0.2.0 is dogfood-only.** External adopters cannot complete `/safer:setup` yet — it halts unless run from a `chughtapan/safer-by-default` clone. See [Prerequisites](#prerequisites-v020). The marketplace install and the skills themselves still load.
+
 Skills load as `safer:<name>` (`/safer:contract`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
 **Codex**:
@@ -49,7 +51,7 @@ The plugin manifest registers one LSP entry that fans out to multiple upstream s
 
 **ESLint syntax floor** is delivered via CLI, not LSP. `/safer:setup` writes an `eslint.config.js` that loads `eslint-plugin-agent-code-guard`'s rules; `/safer:verify` runs `eslint` against the project as part of the pre-merge acceptance loop, and any pre-commit / CI integration the project already has continues to fire the same ruleset.
 
-Dependencies installed by `/safer:setup`: `typescript-language-server`, `python3`, `bun`, and the upstream `lsp-proxy.py` fetched at a pinned commit into `~/.cache/safer-by-default/`.
+The LSP path requires `typescript-language-server`, `python3`, and `bun` on `PATH`, plus the upstream `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) placed in `~/.cache/safer-by-default/`. These are user-provided prerequisites — `/safer:setup` does not install them yet (auto-install is a tracked follow-up). The skills and `bin/` helpers work without the LSP path; see [INSTALL.md](./INSTALL.md) for the one-time fetch.
 
 ## Four parts
 
@@ -87,7 +89,7 @@ Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `S
 
 ## Prerequisites (v0.2.0)
 
-v0.2.0 of `safer-by-default` is **TypeScript + vitest only**. `/safer:setup` halts with a "use safer-by-default 0.1.x" pointer on non-TS / non-vitest projects. v0.2.0 is also **dogfood-only**: the supported adopter is the maintainer's own `chughtapan/safer-by-default` clone with the `vendor/safer-spec-development/` submodule populated; external adopters wait for the publish follow-up (when the codemod publishes to npm).
+v0.2.0 of `safer-by-default` is **dogfood-only**: the supported adopter is the maintainer's own `chughtapan/safer-by-default` clone with the `vendor/safer-spec-development/` submodule populated. `/safer:setup` halts first with a `NotInSaferByDefaultClone` pointer anywhere else, so external adopters wait for the publish follow-up (when the codemod publishes to npm). It is also **TypeScript + vitest only**: even inside the dogfood clone, `/safer:setup` halts with a "use safer-by-default 0.1.x" pointer on non-TS / non-vitest workspaces.
 
 `/safer:setup` pins the dogfood workspace to **pnpm** (sets `packageManager: pnpm@X.Y.Z` in `package.json`); npm and bun are not supported in v0.2.0 because their `link:`-protocol semantics differ. Yarn 1/2 could be added later but is not in scope for v0.2.0.
 
@@ -162,7 +164,7 @@ Every skill publishes its artifact to GitHub before considering itself done. Sta
 
 ## Composing with gstack
 
-safer is the SDS modality spine. [gstack](https://github.com/chughtapan/gstack) is a parallel toolbox of interactive workflow skills (`/codex`, `/qa`, `/ship`, `/plan-*`, `/health`, etc.). gstack is a hard dependency: every safer skill assumes the gstack tools it names are present. Install gstack alongside this plugin.
+safer is the SDS modality spine. [gstack](https://github.com/garrytan/gstack) is a parallel toolbox of interactive workflow skills (`/codex`, `/qa`, `/ship`, `/plan-*`, `/health`, etc.). gstack is a hard dependency: every safer skill assumes the gstack tools it names are present. Install gstack alongside this plugin.
 
 Individual skills name their own gstack tool usage inline in the workflow prose where the tool is called. There is no central routing table; the skill body is the dispatcher.
 
