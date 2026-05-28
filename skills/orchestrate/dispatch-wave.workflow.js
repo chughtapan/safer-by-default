@@ -52,9 +52,12 @@ function readySet(rows) {
 //   rows: [{ subIssue, modality, dependsOn?: [], acceptance, state, url }],  // the decomposition table + live states
 //   parentEpic: "<url>", repo: "owner/name", pluginRoot: "<path>",
 // }
-const rows = args?.rows ?? []
-const parentEpic = args?.parentEpic ?? "<parent-epic-url>"
-const pluginRoot = args?.pluginRoot ?? "the plugin root"
+// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
+function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
+const A = parseArgs(args)
+const rows = A.rows ?? []
+const parentEpic = A.parentEpic ?? "<parent-epic-url>"
+const pluginRoot = A.pluginRoot ?? "the plugin root"
 
 const STATUS_SCHEMA = {
   type: "object",

@@ -27,8 +27,11 @@ export const meta = {
 }
 
 // args = { artifact: "<full self-contained payload>", round: 1, personas?: [names] }
-const artifact = args?.artifact ?? "<artifact payload missing>"
-const round = args?.round ?? 1
+// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
+function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
+const A = parseArgs(args)
+const artifact = A.artifact ?? "<artifact payload missing>"
+const round = A.round ?? 1
 
 const CANONICAL = {
   "cold-start-junior": "A junior engineer with zero prior context. Flag anything you cannot act on without outside knowledge: missing context, presumed prerequisites, undefined jargon.",
@@ -41,7 +44,7 @@ const FAILURE_MODES = new Set([
   "noisy-output", "auth-claim-unevidenced", "secret-leak", "flag-incoherence",
   "discoverability-gap", "jargon-density",
 ])
-const names = args?.personas ?? Object.keys(CANONICAL)
+const names = A.personas ?? Object.keys(CANONICAL)
 
 const PERSONA_SCHEMA = {
   type: "object",

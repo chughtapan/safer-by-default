@@ -58,11 +58,14 @@ const normalizeStatus = (s) => (s === "CHANGES_REQUESTED" ? "ESCALATED" : String
 //   spareRoles?: [{ role, skill }],   // for the single widen-and-retry on NEEDS_CONTEXT below ceiling
 //   targetUrl, mode: "plan"|"pr", acceptance, atCeiling: boolean, pluginRoot,
 // }
-const dispatchSet = args?.dispatchSet ?? []
-const spareRoles = args?.spareRoles ?? []
-const targetUrl = args?.targetUrl ?? "<target-url>"
-const acceptance = args?.acceptance ?? "(see the sub-issue / PR-linked issue)"
-const atCeiling = args?.atCeiling === true
+// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
+function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
+const A = parseArgs(args)
+const dispatchSet = A.dispatchSet ?? []
+const spareRoles = A.spareRoles ?? []
+const targetUrl = A.targetUrl ?? "<target-url>"
+const acceptance = A.acceptance ?? "(see the sub-issue / PR-linked issue)"
+const atCeiling = A.atCeiling === true
 
 const REVIEWER_SCHEMA = {
   type: "object",

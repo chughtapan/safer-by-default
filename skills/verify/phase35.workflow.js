@@ -29,11 +29,14 @@ export const meta = {
 }
 
 // args = { acceptanceText, diffScope: { files: [] }, qaUrl, deployUrl, labelState, pluginRoot }
-const acceptance = (args?.acceptanceText ?? "").toLowerCase()
-const files = args?.diffScope?.files ?? []
-const qaUrl = args?.qaUrl ?? ""
-const deployUrl = args?.deployUrl ?? ""
-const labelState = args?.labelState ?? ""
+// The Workflow harness may deliver `args` as a JSON string rather than a parsed object; normalize.
+function parseArgs(a) { if (typeof a !== "string") return a ?? {}; try { return JSON.parse(a) } catch { return {} } }
+const A = parseArgs(args)
+const acceptance = (A.acceptanceText ?? "").toLowerCase()
+const files = A.diffScope?.files ?? []
+const qaUrl = A.qaUrl ?? ""
+const deployUrl = A.deployUrl ?? ""
+const labelState = A.labelState ?? ""
 
 const refs = (...needles) => needles.some((n) => acceptance.includes(n))
 const touches = (...frags) => files.some((f) => frags.some((g) => String(f).includes(g)))
