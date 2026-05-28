@@ -803,6 +803,18 @@ Record the returned job id on the parent epic (comment) so the next operator can
     ```bash
     SWARM_SOCKET=$(ls /tmp/tmux-$(id -u)/claude-swarm-* 2>/dev/null | head -1)
     [ -z "$SWARM_SOCKET" ] && echo "swarm_socket_missing: skipping pane stall check" && return 0
+    # The socket FILE can exist with no server listening (Conductor / non-tmux backends).
+    # Probe for a live server, not just file existence; fail loud, not silent.
+    tmux -S "$SWARM_SOCKET" list-sessions >/dev/null 2>&1 \
+      || { echo "swarm_socket_dead: skipping pane stall check (socket file present, no server listening)"; return 0; }
+    # Teammate pane ids must be tmux-native (%0, %1, ...). On non-tmux backends the
+    # roster records macOS UUIDs, which are not valid -t targets; skip rather than scan blind.
+    SAMPLE_ID=$(jq -r '.members[] | select(.name != "team-lead") | .tmuxPaneId // empty' \
+                ~/.claude/teams/<team-name>/config.json | head -1)
+    case "$SAMPLE_ID" in
+      '%'*) ;;  # tmux-native; proceed
+      ?*) echo "pane_backend: non-tmux id format ($SAMPLE_ID); pane stall check disabled this tick"; return 0 ;;
+    esac
 
     for paneId in $(jq -r '.members[] | select(.name != "team-lead") | .tmuxPaneId // empty' \
                     ~/.claude/teams/<team-name>/config.json); do
@@ -831,9 +843,11 @@ Record the returned job id on the parent epic (comment) so the next operator can
 for epic in $(jq -r '.epics[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/null); do
   # Fetch comments since last tick (cursor stored at ~/.claude/teams/<team-name>/contract-cursor-<epic>.txt)
   CURSOR=$(cat ~/.claude/teams/<team-name>/contract-cursor-${epic//\//_}.txt 2>/dev/null || echo "1970-01-01T00:00:00Z")
-  gh issue view "$epic" --json comments --jq \
-    ".comments[] | select(.createdAt > \"$CURSOR\") | select(.author.login | IN(\$collaborators[]))" \
-    --argjson collaborators "$(gh api repos/$REPO/collaborators --jq '[.[].login]')" \
+  # `gh issue view` has no --argjson (that is a jq flag); emit the raw envelope and
+  # pipe to jq, which does bind external JSON. `index` is portable across jq versions.
+  gh issue view "$epic" --json comments \
+    | jq --argjson collab "$(gh api repos/$REPO/collaborators --jq '[.[].login]')" \
+        ".comments[] | select(.createdAt > \"$CURSOR\") | select(.author.login as \$a | \$collab | index(\$a))" \
     > /tmp/new-contract-comments.jsonl
   date -u +%Y-%m-%dT%H:%M:%SZ > ~/.claude/teams/<team-name>/contract-cursor-${epic//\//_}.txt
 done
@@ -861,6 +875,19 @@ For each comment body, scan in priority order:
 
    ```bash
    ALIVE=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null | sort -u)
+   ```
+
+   On non-tmux pane backends (Conductor / macOS UUID `tmuxPaneId`s), `$ALIVE` cannot be
+   enumerated — every roster id would test as "dead" and trigger a false dead-pane cleanup.
+   Gate path (a)/(b) on a tmux-native id sample; downgrade loudly otherwise:
+
+   ```bash
+   SAMPLE_ID=$(jq -r '.members[] | select(.name != "team-lead") | .tmuxPaneId // empty' \
+               ~/.claude/teams/<team-name>/config.json | head -1)
+   case "$SAMPLE_ID" in
+     '%'*) ;;  # tmux-native; proceed with path (a)/(b)
+     ?*) echo "pane_backend: non-tmux id format ($SAMPLE_ID); Step 4 path (a)/(b) disabled this tick"; return 0 ;;
+   esac
    ```
 
    **Do NOT** use `tmux list-panes -a | awk '{print $NF}'` to harvest pane IDs. `tmux list-panes -a` prints the literal string `(active)` as the last whitespace-separated field on any pane that is currently the active pane in its window. `awk '{print $NF}'` on that output returns `(active)`, NOT the pane id, and the resulting set silently drops every active pane — producing false "dead" verdicts on the panes the loop most needs to protect. Use `-F '#{pane_id}'`. Always.

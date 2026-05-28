@@ -666,6 +666,9 @@ Common patterns:
 - Python: `pyproject.toml` tool sections, or `Makefile` targets.
 - Rust: `cargo fmt --check && cargo clippy && cargo test`.
 - Go: `go vet ./... && go test ./...`.
+- Build (`$BUILD_CMD`, when declared): a `build` script in `package.json`, `cargo build`, `go build ./...`, or a `Makefile` `build` target. Detect it only if one exists.
+
+Detect a build command as `$BUILD_CMD` when the repo declares one. Monorepo/workspace test suites commonly resolve cross-package paths (`@scope/pkg`) against built artifacts, so skipping a required build makes tests fail spuriously. Build is idempotent and a fast no-op when artifacts are current. When `$BUILD_CMD` is unset, skip it silently.
 
 If multiple test targets exist (unit, integration, e2e), run all of them unless a sub-issue criterion explicitly scopes verify to a subset. Record which you ran.
 
@@ -691,12 +694,15 @@ fi
 
 ```bash
 mkdir -p /tmp/safer-verify-$PR
+# Build first when detected: workspace/monorepo tests often resolve built packages,
+# so an unbuilt tree fails spuriously. Build is idempotent and a no-op when current.
+[ -n "${BUILD_CMD:-}" ] && { $BUILD_CMD > /tmp/safer-verify-$PR/build.log 2>&1; BUILD_EXIT=$?; }
 $LINT_CMD      > /tmp/safer-verify-$PR/lint.log      2>&1; LINT_EXIT=$?
 $TYPECHECK_CMD > /tmp/safer-verify-$PR/typecheck.log 2>&1; TYPE_EXIT=$?
 $TEST_CMD      > /tmp/safer-verify-$PR/test.log      2>&1; TEST_EXIT=$?
 ```
 
-Record exit codes. A non-zero exit from any command is a failure; aggregate all failures into the findings section. Do not short-circuit on the first failure; run every detected command so the verdict reports the full picture.
+Record exit codes (including `$BUILD_EXIT` when a build ran). A non-zero exit from any command is a failure; aggregate all failures into the findings section. Do not short-circuit on the first failure; run every detected command so the verdict reports the full picture. A failed build is a `HOLD` on its own — lint/typecheck/test results against an unbuilt tree are unreliable.
 
 Flakiness: if a test failed with a pattern that suggests flakiness (timeout, network, port bind), re-run the failing test once with the same command. Record both runs. A pass-on-retry is `SHIP_WITH_CONCERNS` with "flaky test" as the concern; never `SHIP`.
 
