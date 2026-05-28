@@ -88,7 +88,7 @@ log(`docs-reader round ${round}: dispatching ${names.length} cold-start personas
 
 const slots = await parallel(
   names.map((n) => () =>
-    agent(personaPrompt(CANONICAL[n] ?? n), { label: `persona:${n}`, model: "opus", schema: PERSONA_SCHEMA })
+    agent(personaPrompt(CANONICAL[n] ?? n), { label: `persona:${n}`, agentType: "Explore", model: "opus", schema: PERSONA_SCHEMA })
       .then((r) => ({ persona: n, ok: !!r, report: r }))
       .catch(() => ({ persona: n, ok: false, report: null })), // SYSTEM_FAILURE slot
   ),
