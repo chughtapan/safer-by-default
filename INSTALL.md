@@ -2,16 +2,11 @@
 
 Install paths, dependency requirements, and troubleshooting for safer-by-default. For the 30-second version, see the README's Quick start.
 
-## v0.2.0 prerequisites (read first)
+## Prerequisites (read first)
 
-v0.2.0 is **TypeScript + vitest only** AND **dogfood-only**. Before running any install command below, confirm:
+`/safer:setup` runs on any repository with a `package.json` or `tsconfig.json` and `gstack` installed. It detects your package manager (pnpm, npm, yarn, or bun) and wires the lint floor (`eslint-plugin-agent-code-guard` + strict `tsconfig` flags) and the LSP path on every run.
 
-- The adopter workspace is the maintainer's `chughtapan/safer-by-default` clone with the `vendor/safer-spec-development/` submodule populated (`git submodule update --init --recursive`).
-- `/safer:setup` will be invoked from `$SBD_ROOT/dogfood/` (the canonical dogfood path). This workspace is **not** committed to the repo — scaffold it first (a `package.json` plus `tsconfig.json` and `vitest.config.{ts,js,mts}`); from a fresh clone the directory is absent. Non-dogfood CWDs (and the missing directory) halt with a `NotDogfoodCwd` pointer.
-- The workspace carries `tsconfig.json` and `vitest.config.{ts,js,mts}`. Non-TS / non-vitest workspaces halt with a "use safer-by-default 0.1.x" pointer.
-- `pnpm` is installed. v0.2.0's dogfood install uses pnpm's `link:` protocol; npm and bun have different `link:` semantics and are not supported in v0.2.0.
-
-External adopters (anyone outside `chughtapan/safer-by-default`) stay on `safer-by-default` 0.1.x until the publish follow-up (when the codemod publishes to npm) lifts the dogfood pre-flight halt.
+The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from npm as of v0.4.0) is wired only when the project is **TypeScript + vitest** — it adds a vitest reporter and a per-folder `MODULE.md` gate. On other projects, `/safer:setup` skips that one step with a note and the rest of setup still applies; nothing aborts the skill. There is no longer a dogfood-only pre-flight halt and no `link:`-protocol install against a vendored submodule.
 
 ## Claude Code (canonical)
 
