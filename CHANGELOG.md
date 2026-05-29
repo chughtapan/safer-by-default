@@ -1,3 +1,20 @@
+## 0.4.1 — 2026-05-29
+
+A build-time-only change to how the living-spec wrapper-skill bodies are sourced, plus removal of docs and scenarios the 0.4.0 npm cutover superseded. No runtime behavior changes: the codemod still installs from npm, and `/safer:setup` / `/safer:verify` behave exactly as in 0.4.0.
+
+### Changed
+
+- The build-time source for the `/safer:contract-init` and `/safer:contract-migrate` wrapper bodies moves from the `vendor/safer-spec-development/` git submodule to committed snapshots under `vendor/safer-spec-skills/` (provenance pinned to `chughtapan/safer-spec-development@c63ad4882d`, npm `0.2.0`; see that directory's `README.md` for refresh steps). `bin/safer-gen-skills` reads the snapshots; the submodule and `.gitmodules` are removed. The full submodule dragged `node_modules/`, `dist/`, and a lockfile onto disk to serve two markdown files — the snapshot is the whole build-time dependency, with no submodule init and no sha that can drift from the published package.
+
+### Removed
+
+- `docs/design/v0.2.0-living-spec.md` — the v0.2.0 design doc describing the dogfood-only submodule + `link:`-protocol approach, superseded by the 0.4.0 npm cutover.
+- Three living-spec calibration scenarios that asserted behavior 0.4.0 removed:
+  - `nontypescript-setup-rejected` — Step 4c no longer halts on non-TypeScript/non-vitest projects; it skips that one step with a note and the rest of setup applies.
+  - `version-skew-blocked` — version skew now surfaces via `validate` exit `10`, not the removed `safer-spec doctor` probe (a 0.2.0 stub).
+  - `local-vs-global-safer-spec-resolution` — resolution moved from `pnpm exec` to `node_modules/.bin/` (package-manager-agnostic).
+  - The exit-`10`→`BLOCKED` routing and the local-not-global resolution guarantee are both still live in 0.4.0 under the new mechanisms; scenarios covering them under the current shape are follow-up work.
+
 ## 0.4.0 — 2026-05-29
 
 v0.4.0 lifts the dogfood-only restriction on the living-spec path (`/safer:setup` and `/safer:verify`). The sister codemod `@chughtapan/safer-spec-development` is now published to npm (0.2.0), so the layer installs from the registry instead of a `link:`-protocol symlink into a vendored submodule, and both skills work on **any** repository — not just the maintainer's clone.

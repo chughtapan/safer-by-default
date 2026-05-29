@@ -1,40 +1,9 @@
 ---
-name: contract-migrate
-version: 0.1.0
-description: |
-  Wrapper that exposes the sister codemod's safer-spec-migrate skill inside
-  safer-by-default. The body of this skill is inlined at bin/safer-gen-skills
-  time from vendor/safer-spec-skills/safer-spec-migrate/SKILL.md.
-
-  Use when an adopter is migrating an existing module (with prior public
-  exports) onto the living-spec layer. Do NOT use to bootstrap a fresh
-  module; route to /safer:contract-init.
-
-  Do NOT edit the body block below. Refresh the snapshot at
-  vendor/safer-spec-skills/safer-spec-migrate/SKILL.md (see that dir's README for
-  source pin + steps) and re-run bin/safer-gen-skills.
-triggers:
-  - migrate module to living-spec
-  - upgrade folder to MODULE.md
-  - retrofit spec layer
-  - port to safer-spec
-disable-model-invocation: true
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
-  - AskUserQuestion
+name: safer-spec-migrate
+description: Walk committed `MODULE.md` + sidecar files for safer-spec format-version transitions. Emit a per-file diff for human review; idempotent — running twice on already-migrated files is a no-op. Use this when CHANGELOG signposts a `SPEC_FORMAT_VERSION` bump and your repo's committed files still carry the old version.
 ---
 
-<!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
-
-# /safer:contract-migrate
-
-
-## safer-spec-migrate
+# safer-spec-migrate
 
 You are migrating a project's committed safer-spec artifacts (`MODULE.md`, `.safer-spec/<slug>.json`) from one `SPEC_FORMAT_VERSION` to another. `generate` and `validate` are CLI commands; `migrate` is a SKILL because the diff between format versions involves judgment (which fields to drop, how to merge new sections, what to flag for the human) that a coding agent does more reliably than a versioned codegen path baked into the CLI.
 

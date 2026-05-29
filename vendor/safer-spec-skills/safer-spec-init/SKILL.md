@@ -1,40 +1,9 @@
 ---
-name: contract-init
-version: 0.1.0
-description: |
-  Wrapper that exposes the sister codemod's safer-spec-init skill inside
-  safer-by-default. The body of this skill is inlined at bin/safer-gen-skills
-  time from vendor/safer-spec-skills/safer-spec-init/SKILL.md.
-
-  Use when an adopter wants to bootstrap the living-spec layer for a new
-  per-folder MODULE.md. Do NOT use to migrate an existing folder; route to
-  /safer:contract-migrate.
-
-  Do NOT edit the body block below. Refresh the snapshot at
-  vendor/safer-spec-skills/safer-spec-init/SKILL.md (see that dir's README for
-  source pin + steps) and re-run bin/safer-gen-skills.
-triggers:
-  - bootstrap module spec
-  - init the living-spec
-  - new module-level contract
-  - seed sidecar
-disable-model-invocation: true
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Edit
-  - Grep
-  - Glob
-  - AskUserQuestion
+name: safer-spec-init
+description: Scaffold the first `MODULE.md` + property-test stub for a single folder. Use this when an existing or fresh folder needs to be onboarded to the safer-spec contract — the agent reads the folder's `index.ts` (if any), picks the right runtime-named export to bind a placeholder test against, and writes both files. Targets TTHW < 10 minutes.
 ---
 
-<!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
-
-# /safer:contract-init
-
-
-## safer-spec-init
+# safer-spec-init
 
 You are scaffolding a folder's first `MODULE.md` + property-test stub. The codemod ships `generate` and `validate` as CLI commands; `init` is a SKILL because picking the right export to bind the stub to requires reading TypeScript correctly, and a coding agent does that more reliably than a regex / ts-morph picker baked into the CLI.
 
