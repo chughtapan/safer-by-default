@@ -26,6 +26,8 @@ import { dependencyWatermarks } from "./dependency-watermark.js";
 const CACHE_VERSION = 2;
 const CACHE_DIR_SEGMENTS = ["node_modules", ".cache", "agent-code-guard"];
 const CACHE_FILE = "report.json";
+// sha256 hex is 64 chars; the first 32 (128 bits) suffice as a content watermark.
+const HASH_PREFIX_LENGTH = 32;
 
 function discardCacheError(_captured: unknown): null {
   // Disk cache is best-effort. A malformed file, permission error, or
@@ -131,7 +133,7 @@ export function computeFileWatermark(
   for (const filePath of fileNames) {
     try {
       const buf = fs.readFileSync(filePath);
-      const hash = createHash("sha256").update(buf).digest("hex").slice(0, 32);
+      const hash = createHash("sha256").update(buf).digest("hex").slice(0, HASH_PREFIX_LENGTH);
       watermarks.push({ path: filePath, hash });
     } catch (error) {
       discardCacheError(error);
@@ -178,7 +180,7 @@ function enumerateProjectFiles(options: ResolvedArchitectureOptions): readonly s
  * @returns Hex-truncated sha256 over the canonicalized options JSON.
  */
 export function hashOptions(options: ResolvedArchitectureOptions): string {
-  return createHash("sha256").update(JSON.stringify(options)).digest("hex").slice(0, 32);
+  return createHash("sha256").update(JSON.stringify(options)).digest("hex").slice(0, HASH_PREFIX_LENGTH);
 }
 
 /**
@@ -194,8 +196,9 @@ export function watermarksMatch(
   after: readonly FileWatermark[],
 ): boolean {
   if (before.length !== after.length) return false;
-  for (let i = 0; i < before.length; i++) {
-    if (before[i].path !== after[i].path || before[i].hash !== after[i].hash) return false;
+  for (const [i, b] of before.entries()) {
+    const a = after[i];
+    if (a === undefined || b.path !== a.path || b.hash !== a.hash) return false;
   }
   return true;
 }

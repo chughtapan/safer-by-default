@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["check.ts", "**/*.test.ts", "analyzer/project/api/index.ts"],
+  "project": ["**/*.ts"],
+  "ignore": ["dogfood-fixtures/**", "dist/**"]
+}

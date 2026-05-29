@@ -16,15 +16,60 @@
  * own end-to-end smoke test at .github/workflows/lsp-proxy-smoke.yml;
  * this dogfood targets the two diagnostic surfaces themselves.
  *
- * Run: `pnpm dogfood` from `lsp/architecture/`. Exits non-zero on
- * failure.
+ * Effect-native, mirroring `server/index.ts`: child-process and stdio
+ * stay imperative at the edge, every async path is an Effect (JSON-RPC
+ * request/response via `Effect.async` over a pending-resume map), failures
+ * travel a typed `JsonRpcFailure`/`HarnessError` channel instead of raw
+ * throws, and orchestration runs through `Effect.gen`.
+ *
+ * Run: `pnpm dogfood` from `lsp/architecture/`. Exits non-zero on failure.
  */
 
-import assert from "node:assert/strict";
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { Data, Effect } from "effect";
+
+const STDERR_TAIL_BYTES = 4_000;
+const HEADER_SEPARATOR = "\r\n\r\n";
+const JSONRPC_INTERNAL_ERROR = -32_603;
+const LSP_PROCESS_EXITED_CODE = -32_099;
+const SHUTDOWN_GRACE_MS = 1_000;
+const PUSH_POLL_INTERVAL_MS = 200;
+const PULL_POLL_INTERVAL_MS = 300;
+const DIAGNOSTIC_DEADLINE_MS = 30_000;
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+const DECIMAL_RADIX = 10;
+const DID_OPEN_VERSION = 1;
+const NO_EXIT_CODE = -1;
+
+const PRINCIPLES_URL_PREFIX =
+  "https://github.com/chughtapan/safer-by-default/blob/main/PRINCIPLES.md";
+
+/** A JSON-RPC response carrying an error, or a child process that exited mid-request. */
+class JsonRpcFailure extends Data.TaggedError("JsonRpcFailure")<{
+  readonly code: number;
+  readonly message: string;
+}> {}
+
+/** A failed harness assertion (the dogfood's own checks). */
+class HarnessError extends Data.TaggedError("HarnessError")<{
+  readonly message: string;
+}> {}
+
+const out = (text: string): Effect.Effect<void> =>
+  Effect.sync(() => {
+    process.stdout.write(text);
+  });
+
+const err = (text: string): Effect.Effect<void> =>
+  Effect.sync(() => {
+    process.stderr.write(text);
+  });
+
+const expect = (condition: boolean, message: string): Effect.Effect<void, HarnessError> =>
+  condition ? Effect.void : Effect.fail(new HarnessError({ message }));
 
 const SCRIPT_DIR = import.meta.dirname;
 // Walk up from SCRIPT_DIR until we find `.claude-plugin/plugin.json`.
@@ -39,6 +84,7 @@ function findPluginRoot(start: string): string {
     }
     cur = path.dirname(cur);
   }
+  // eslint-disable-next-line agent-code-guard/no-raw-throw-new-error -- module-init invariant: the harness cannot run outside the plugin tree, and this resolves at load time before any Effect context exists.
   throw new Error(`plugin root (containing .claude-plugin/plugin.json) not found above ${start}`);
 }
 const PLUGIN_ROOT = findPluginRoot(SCRIPT_DIR);
@@ -47,16 +93,6 @@ const FIXTURE_FILE = path.join(FIXTURE_ROOT, "src", "auth", "client.ts");
 const FIXTURE_TEXT = fs.readFileSync(FIXTURE_FILE, "utf8");
 const FIXTURE_URI = pathToFileURL(FIXTURE_FILE).toString();
 const FIXTURE_WORKSPACE_URI = pathToFileURL(FIXTURE_ROOT).toString();
-
-const PRINCIPLES_URL_PREFIX =
-  "https://github.com/chughtapan/safer-by-default/blob/main/PRINCIPLES.md";
-
-class JsonRpcError extends Error {
-  constructor(readonly code: number, message: string) {
-    super(message);
-    this.name = "JsonRpcError";
-  }
-}
 
 interface LspServerEntry {
   readonly name: string;
@@ -89,11 +125,6 @@ interface InitializeResult {
   readonly capabilities?: ServerCapabilities;
 }
 
-interface PendingRequest {
-  resolve: (value: unknown) => void;
-  reject: (err: unknown) => void;
-}
-
 interface JsonRpcMessage {
   readonly jsonrpc?: "2.0";
   readonly id?: number | string;
@@ -104,6 +135,9 @@ interface JsonRpcMessage {
 }
 
 type ServerRequestHandler = (method: string, params: unknown) => unknown;
+
+/** A pending request's resume callback: a JSON-RPC response resolves it. */
+type ResumeResponse = (response: Effect.Effect<unknown, JsonRpcFailure>) => void;
 
 // Hardcoded architecture-LSP entry. Bypasses the proxy layer; the proxy
 // has its own smoke test (.github/workflows/lsp-proxy-smoke.yml). The
@@ -121,11 +155,21 @@ function substituteRoot(arg: string): string {
   return arg.replaceAll("${CLAUDE_PLUGIN_ROOT}", PLUGIN_ROOT);
 }
 
+function lspPath(): string {
+  // Prepend the fixture's `node_modules/.bin` so the syntax launcher's
+  // child `vscode-eslint-language-server` resolves to the fixture's
+  // own install. The architecture LSP does not depend on PATH.
+  const fixtureBin = path.join(FIXTURE_ROOT, "node_modules", ".bin");
+  // eslint-disable-next-line agent-code-guard/no-process-env-at-runtime -- reading PATH to prepend the fixture's local bin for spawned children; this is subprocess plumbing, not application config.
+  const current = process.env.PATH ?? "";
+  return `${fixtureBin}${path.delimiter}${current}`;
+}
+
 class LspClient {
   readonly name: string;
   readonly diagnostics: PublishDiagnostics[] = [];
   readonly #proc: ChildProcessWithoutNullStreams;
-  readonly #pending = new Map<number | string, PendingRequest>();
+  readonly #pending = new Map<number | string, ResumeResponse>();
   readonly #onServerRequest: ServerRequestHandler;
   #nextId = 1;
   #buffer = Buffer.alloc(0);
@@ -138,41 +182,48 @@ class LspClient {
     this.#proc = spawn(entry.command, resolvedArgs, {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: FIXTURE_ROOT,
+      // eslint-disable-next-line agent-code-guard/no-process-env-at-runtime -- forwarding the parent environment to the spawned LSP child (PATH gets the fixture's node_modules/.bin prepended); subprocess plumbing, not application config.
       env: { ...process.env, PATH: lspPath() },
     });
-    this.#proc.stdout.on("data", (chunk: Buffer) => this.#handleChunk(chunk));
+    this.#proc.stdout.on("data", (chunk: Buffer) => {
+      this.#handleChunk(chunk);
+    });
     this.#proc.stderr.on("data", (chunk: Buffer) => {
       const text = chunk.toString("utf8");
-      this.#stderrTail = (this.#stderrTail + text).slice(-4000);
+      this.#stderrTail = (this.#stderrTail + text).slice(-STDERR_TAIL_BYTES);
     });
-    this.#proc.on("exit", () => this.#failPending("LSP process exited"));
+    this.#proc.on("exit", () => {
+      this.#failPending("LSP process exited");
+    });
   }
 
   #failPending(reason: string): void {
-    for (const pending of this.#pending.values()) {
-      pending.reject(new JsonRpcError(-32099, reason));
+    for (const resume of this.#pending.values()) {
+      resume(Effect.fail(new JsonRpcFailure({ code: LSP_PROCESS_EXITED_CODE, message: reason })));
     }
     this.#pending.clear();
   }
 
-  request(method: string, params: unknown): Promise<unknown> {
-    const id = this.#nextId++;
-    this.#write({ jsonrpc: "2.0", id, method, params });
-    return new Promise((resolve, reject) => {
-      this.#pending.set(id, { resolve, reject });
+  request(method: string, params: unknown): Effect.Effect<unknown, JsonRpcFailure> {
+    return Effect.async<unknown, JsonRpcFailure>((resume) => {
+      const id = this.#nextId++;
+      this.#pending.set(id, resume);
+      this.#write({ jsonrpc: "2.0", id, method, params });
     });
   }
 
-  notify(method: string, params: unknown): void {
-    this.#write({ jsonrpc: "2.0", method, params });
+  notify(method: string, params: unknown): Effect.Effect<void> {
+    return Effect.sync(() => {
+      this.#write({ jsonrpc: "2.0", method, params });
+    });
   }
 
   stderrTail(): string {
     return this.#stderrTail;
   }
 
-  awaitExit(timeoutMs: number): Promise<number | null> {
-    return new Promise((resolve) => {
+  awaitExit(timeoutMs: number): Effect.Effect<number | null> {
+    return Effect.async<number | null>((resume) => {
       // SIGTERM first to give the LSP a chance to flush; if it lingers
       // past `timeoutMs`, SIGKILL it. Orphaned eslint-server children
       // spawned by `launch.js` get cleaned by the kernel once their
@@ -180,12 +231,12 @@ class LspClient {
       const termTimer = setTimeout(() => this.#proc.kill("SIGTERM"), timeoutMs);
       const killTimer = setTimeout(() => {
         this.#proc.kill("SIGKILL");
-        resolve(null);
-      }, timeoutMs + 1_000);
+        resume(Effect.succeed(null));
+      }, timeoutMs + SHUTDOWN_GRACE_MS);
       this.#proc.on("exit", (code) => {
         clearTimeout(termTimer);
         clearTimeout(killTimer);
-        resolve(code);
+        resume(Effect.succeed(code));
       });
     });
   }
@@ -196,36 +247,39 @@ class LspClient {
 
   #write(message: JsonRpcMessage): void {
     const body = JSON.stringify(message);
-    const header = `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n`;
+    const header = `Content-Length: ${Buffer.byteLength(body, "utf8")}${HEADER_SEPARATOR}`;
     this.#proc.stdin.write(header + body);
   }
 
   #handleChunk(chunk: Buffer): void {
     this.#buffer = Buffer.concat([this.#buffer, chunk]);
     while (true) {
-      const headerEnd = this.#buffer.indexOf("\r\n\r\n");
+      const headerEnd = this.#buffer.indexOf(HEADER_SEPARATOR);
       if (headerEnd < 0) return;
       const header = this.#buffer.subarray(0, headerEnd).toString("utf8");
       const match = /Content-Length: (\d+)/.exec(header);
       if (match === null || match[1] === undefined) {
-        throw new Error(
-          `[${this.name}] malformed LSP frame; missing Content-Length: ${header}`,
+        // A malformed frame in a 'data' handler must not crash the
+        // process; fail every in-flight request so main() exits
+        // non-zero gracefully instead of throwing into an event loop.
+        process.stderr.write(
+          `[${this.name}] malformed LSP frame; missing Content-Length: ${header}\n`,
         );
+        this.#failPending("malformed LSP frame (missing Content-Length)");
+        this.#buffer = Buffer.alloc(0);
+        return;
       }
-      const length = parseInt(match[1], 10);
-      const bodyStart = headerEnd + 4;
+      const length = Number.parseInt(match[1], DECIMAL_RADIX);
+      const bodyStart = headerEnd + HEADER_SEPARATOR.length;
       if (this.#buffer.length < bodyStart + length) return;
       const body = this.#buffer.subarray(bodyStart, bodyStart + length).toString("utf8");
       this.#buffer = this.#buffer.subarray(bodyStart + length);
       let parsed: JsonRpcMessage;
       try {
         parsed = JSON.parse(body) as JsonRpcMessage;
-      } catch (err) {
-        // A malformed frame in a 'data' event handler would otherwise
-        // crash the process and hang every in-flight request. Surface
-        // it and fail the pending pool so main() can exit non-zero.
+      } catch (parseError) {
         process.stderr.write(
-          `[${this.name}] malformed JSON-RPC body: ${(err as Error).message}\n`,
+          `[${this.name}] malformed JSON-RPC body: ${(parseError as Error).message}\n`,
         );
         this.#failPending("malformed JSON-RPC frame");
         continue;
@@ -240,109 +294,108 @@ class LspClient {
       return;
     }
     if (msg.method !== undefined && msg.id !== undefined) {
-      // Server-to-client request. Reply once; a thrown handler closes
-      // over a pending request and would hang the eslint LSP.
-      try {
-        const result = this.#onServerRequest(msg.method, msg.params);
-        this.#write({ jsonrpc: "2.0", id: msg.id, result });
-      } catch (err) {
-        this.#write({
-          jsonrpc: "2.0",
-          id: msg.id,
-          error: { code: -32603, message: (err as Error).message },
-        });
-      }
+      this.#replyToServerRequest(msg.id, msg.method, msg.params);
       return;
     }
     if (msg.method !== undefined && msg.id === undefined) {
-      if (msg.method === "window/logMessage") {
-        const lm = msg.params as { type?: number; message?: string } | undefined;
-        process.stderr.write(`[${this.name}] log(${lm?.type ?? "?"}): ${lm?.message ?? ""}\n`);
-      }
+      this.#logNotification(msg.method, msg.params);
       return;
     }
     if (msg.id !== undefined) {
-      const pending = this.#pending.get(msg.id);
-      if (pending !== undefined) {
-        this.#pending.delete(msg.id);
-        if (msg.error !== undefined) pending.reject(msg.error);
-        else pending.resolve(msg.result);
-      }
+      this.#resolveResponse(msg.id, msg.error, msg.result);
+    }
+  }
+
+  // Server-to-client request. Reply once; a thrown handler closes over a
+  // pending request and would hang the eslint LSP, so failures reply with
+  // a JSON-RPC error frame rather than escaping the handler.
+  #replyToServerRequest(id: number | string, method: string, params: unknown): void {
+    try {
+      const result = this.#onServerRequest(method, params);
+      this.#write({ jsonrpc: "2.0", id, result });
+    } catch (handlerError) {
+      this.#write({
+        jsonrpc: "2.0",
+        id,
+        error: { code: JSONRPC_INTERNAL_ERROR, message: (handlerError as Error).message },
+      });
+    }
+  }
+
+  #logNotification(method: string, params: unknown): void {
+    if (method === "window/logMessage") {
+      const lm = params as { type?: number; message?: string } | undefined;
+      process.stderr.write(`[${this.name}] log(${lm?.type ?? "?"}): ${lm?.message ?? ""}\n`);
+    }
+  }
+
+  #resolveResponse(
+    id: number | string,
+    error: { code: number; message: string } | undefined,
+    result: unknown,
+  ): void {
+    const resume = this.#pending.get(id);
+    if (resume === undefined) return;
+    this.#pending.delete(id);
+    if (error !== undefined) {
+      resume(Effect.fail(new JsonRpcFailure({ code: error.code, message: error.message })));
+    } else {
+      resume(Effect.succeed(result));
     }
   }
 }
 
-function lspPath(): string {
-  // Prepend the fixture's `node_modules/.bin` so the syntax launcher's
-  // child `vscode-eslint-language-server` resolves to the fixture's
-  // own install. The architecture LSP does not depend on PATH.
-  const fixtureBin = path.join(FIXTURE_ROOT, "node_modules", ".bin");
-  const current = process.env.PATH ?? "";
-  return `${fixtureBin}${path.delimiter}${current}`;
-}
-
-async function initialize(client: LspClient): Promise<InitializeResult> {
-  const result = (await client.request("initialize", {
-    processId: process.pid,
-    rootUri: FIXTURE_WORKSPACE_URI,
-    workspaceFolders: [{ uri: FIXTURE_WORKSPACE_URI, name: "two-lsp-fixture" }],
-    capabilities: {
-      textDocument: {
-        publishDiagnostics: { codeDescriptionSupport: true },
-        diagnostic: { dynamicRegistration: false, relatedDocumentSupport: false },
+function initialize(client: LspClient): Effect.Effect<InitializeResult, JsonRpcFailure> {
+  return Effect.gen(function* () {
+    const result = (yield* client.request("initialize", {
+      processId: process.pid,
+      rootUri: FIXTURE_WORKSPACE_URI,
+      workspaceFolders: [{ uri: FIXTURE_WORKSPACE_URI, name: "two-lsp-fixture" }],
+      capabilities: {
+        textDocument: {
+          publishDiagnostics: { codeDescriptionSupport: true },
+          diagnostic: { dynamicRegistration: false, relatedDocumentSupport: false },
+        },
+        workspace: {
+          workspaceFolders: true,
+          configuration: true,
+        },
       },
-      workspace: {
-        workspaceFolders: true,
-        configuration: true,
+      initializationOptions: {
+        // Older vscode-eslint-language-server builds gate flat config
+        // behind this flag; newer ones auto-detect.
+        experimental: { useFlatConfig: true },
+        validate: "on",
       },
-    },
-    initializationOptions: {
-      // Older vscode-eslint-language-server builds gate flat config
-      // behind this flag; newer ones auto-detect.
-      experimental: { useFlatConfig: true },
-      validate: "on",
-    },
-  })) as InitializeResult;
-  client.notify("initialized", {});
-  return result;
+    })) as InitializeResult;
+    yield* client.notify("initialized", {});
+    return result;
+  });
 }
 
 function supportsPullDiagnostics(capabilities: ServerCapabilities | undefined): boolean {
   return capabilities?.diagnosticProvider !== undefined;
 }
 
-async function pullDiagnostics(
+function pullDiagnostics(
   client: LspClient,
   fileUri: string,
-): Promise<readonly Diagnostic[]> {
-  const report = (await client.request("textDocument/diagnostic", {
-    textDocument: { uri: fileUri },
-  })) as DocumentDiagnosticReport | null;
-  return report?.items ?? [];
+): Effect.Effect<readonly Diagnostic[], JsonRpcFailure> {
+  return Effect.gen(function* () {
+    const report = (yield* client.request("textDocument/diagnostic", {
+      textDocument: { uri: fileUri },
+    })) as DocumentDiagnosticReport | null;
+    return report?.items ?? [];
+  });
 }
 
-async function shutdown(client: LspClient): Promise<void> {
-  try {
-    await client.request("shutdown", null);
-    client.notify("exit", null);
-  } catch (err) {
-    process.stderr.write(
-      `[dogfood] ${client.name}: shutdown failed: ${formatJsonRpcError(err)}\n`,
-    );
-  }
-}
-
-function formatJsonRpcError(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === "object" && err !== null) {
-    const o = err as { code?: number; message?: string };
-    return `code=${o.code ?? "?"} message=${o.message ?? "(none)"}`;
-  }
-  return String(err);
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function shutdown(client: LspClient): Effect.Effect<void> {
+  return client.request("shutdown", null).pipe(
+    Effect.zipRight(client.notify("exit", null)),
+    Effect.catchAll((failure) =>
+      err(`[dogfood] ${client.name}: shutdown failed: ${failure.message}\n`),
+    ),
+  );
 }
 
 function findDiagnostic(
@@ -357,41 +410,37 @@ function findDiagnostic(
   return null;
 }
 
-async function waitForRule(
+function waitForRule(
   client: LspClient,
   predicate: (d: Diagnostic) => boolean,
   deadline: number,
-): Promise<Diagnostic | null> {
-  while (Date.now() < deadline) {
+): Effect.Effect<Diagnostic | null> {
+  return Effect.gen(function* () {
+    if (Date.now() >= deadline) return null;
     const hit = findDiagnostic(client, predicate);
     if (hit !== null) return hit;
-    await sleep(200);
-  }
-  return null;
+    yield* Effect.sleep(`${PUSH_POLL_INTERVAL_MS} millis`);
+    return yield* waitForRule(client, predicate, deadline);
+  });
 }
 
-function assertPrinciplesUrl(client: string, code: string, href: string | undefined): void {
-  assert.ok(
-    typeof href === "string" && href.startsWith(PRINCIPLES_URL_PREFIX),
-    `${client}: codeDescription.href for ${code} should start with ${PRINCIPLES_URL_PREFIX}; got ${String(href)}`,
-  );
-}
-
-function reportDiagnostics(client: LspClient): void {
-  process.stdout.write(`\n[${client.name}] diagnostics received:\n`);
-  for (const pub of client.diagnostics) {
-    const rel = path.relative(FIXTURE_ROOT, fileURLToPath(pub.uri));
-    process.stdout.write(`  ${rel}: ${pub.diagnostics.length} diagnostic(s)\n`);
-    for (const d of pub.diagnostics) {
-      process.stdout.write(
-        `    code=${String(d.code)} href=${d.codeDescription?.href ?? "(none)"}\n`,
-      );
+function reportDiagnostics(client: LspClient): Effect.Effect<void> {
+  return Effect.sync(() => {
+    process.stdout.write(`\n[${client.name}] diagnostics received:\n`);
+    for (const pub of client.diagnostics) {
+      const rel = path.relative(FIXTURE_ROOT, fileURLToPath(pub.uri));
+      process.stdout.write(`  ${rel}: ${pub.diagnostics.length} diagnostic(s)\n`);
+      for (const d of pub.diagnostics) {
+        process.stdout.write(
+          `    code=${String(d.code)} href=${d.codeDescription?.href ?? "(none)"}\n`,
+        );
+      }
     }
-  }
-  const stderr = client.stderrTail().trim();
-  if (stderr.length > 0) {
-    process.stdout.write(`[${client.name}] stderr tail:\n${stderr}\n`);
-  }
+    const stderr = client.stderrTail().trim();
+    if (stderr.length > 0) {
+      process.stdout.write(`[${client.name}] stderr tail:\n${stderr}\n`);
+    }
+  });
 }
 
 interface EslintWorkspaceConfig {
@@ -471,132 +520,184 @@ interface ExercisedServer {
   readonly fileUri: string;
 }
 
-async function exerciseServer(entry: LspServerEntry): Promise<ExercisedServer> {
-  process.stdout.write(`\n==> spawning ${entry.name}\n`);
-  const client = new LspClient(entry, handleServerRequest);
-  const init = await initialize(client);
-
-  client.notify("textDocument/didOpen", {
-    textDocument: {
-      uri: FIXTURE_URI,
-      languageId: "typescript",
-      version: 1,
-      text: FIXTURE_TEXT,
-    },
+function exerciseServer(entry: LspServerEntry): Effect.Effect<ExercisedServer, JsonRpcFailure> {
+  return Effect.gen(function* () {
+    yield* out(`\n==> spawning ${entry.name}\n`);
+    const client = yield* Effect.sync(() => new LspClient(entry, handleServerRequest));
+    const init = yield* initialize(client);
+    yield* client.notify("textDocument/didOpen", {
+      textDocument: {
+        uri: FIXTURE_URI,
+        languageId: "typescript",
+        version: DID_OPEN_VERSION,
+        text: FIXTURE_TEXT,
+      },
+    });
+    return { client, capabilities: init.capabilities, fileUri: FIXTURE_URI };
   });
-  return { client, capabilities: init.capabilities, fileUri: FIXTURE_URI };
 }
 
 function pullSignature(items: readonly Diagnostic[]): string {
-  return items.map((d) => String(d.code)).sort().join("|");
+  return items
+    .map((d) => String(d.code))
+    .sort()
+    .join("|");
 }
 
-async function collectFromServer(
+// Pull-mode servers (eslint LSP) never publish; poll until the rule
+// appears or the deadline elapses. Dedupe identical-result pushes so
+// `reportDiagnostics` doesn't echo the same payload every cycle.
+function pollPull(
   server: ExercisedServer,
   ruleCode: string,
   deadline: number,
-): Promise<Diagnostic | null> {
-  if (!supportsPullDiagnostics(server.capabilities)) {
-    return waitForRule(server.client, (d) => d.code === ruleCode, deadline);
-  }
-  // Pull-mode servers (eslint LSP) never publish; poll until the rule
-  // appears or the deadline elapses. Dedupe identical-result pushes so
-  // `reportDiagnostics` doesn't echo the same payload every cycle.
-  let lastSig = "";
-  while (Date.now() < deadline) {
-    const items = await pullDiagnostics(server.client, server.fileUri).catch(
-      () => [] as readonly Diagnostic[],
+  lastSig: string,
+): Effect.Effect<Diagnostic | null> {
+  return Effect.gen(function* () {
+    if (Date.now() >= deadline) return null;
+    const items = yield* pullDiagnostics(server.client, server.fileUri).pipe(
+      Effect.orElseSucceed(() => [] as readonly Diagnostic[]),
     );
-    const sig = pullSignature(items);
-    if (items.length > 0 && sig !== lastSig) {
-      server.client.diagnostics.push({ uri: server.fileUri, diagnostics: items });
-      lastSig = sig;
+    let sig = lastSig;
+    if (items.length > 0) {
+      const nextSig = pullSignature(items);
+      if (nextSig !== lastSig) {
+        server.client.diagnostics.push({ uri: server.fileUri, diagnostics: items });
+        sig = nextSig;
+      }
     }
     const hit = items.find((d) => d.code === ruleCode);
     if (hit !== undefined) return hit;
-    await sleep(300);
-  }
-  return null;
+    yield* Effect.sleep(`${PULL_POLL_INTERVAL_MS} millis`);
+    return yield* pollPull(server, ruleCode, deadline, sig);
+  });
 }
 
-async function runEslintCli(): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  // Runs the fixture's own eslint binary (installed at `dogfood-fixtures/two-lsp/node_modules/.bin/eslint`)
-  // against the violating fixture file. PATH carries the local node_modules/.bin so subprocesses can find it.
-  return new Promise((resolve) => {
-    const child = spawn("eslint", [FIXTURE_FILE], {
+function collectFromServer(
+  server: ExercisedServer,
+  ruleCode: string,
+  deadline: number,
+): Effect.Effect<Diagnostic | null> {
+  if (!supportsPullDiagnostics(server.capabilities)) {
+    return waitForRule(server.client, (d) => d.code === ruleCode, deadline);
+  }
+  return pollPull(server, ruleCode, deadline, "");
+}
+
+interface EslintRun {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+function runEslintCli(): Effect.Effect<EslintRun> {
+  // Runs the fixture's own eslint binary (installed at
+  // `dogfood-fixtures/two-lsp/node_modules/.bin/eslint`) against the
+  // violating fixture file. PATH carries the local node_modules/.bin so
+  // subprocesses can find it.
+  return Effect.async<EslintRun>((resume) => {
+    // Spawn the fixture's own eslint by absolute path rather than a PATH
+    // lookup, so the command resolves to a fixed, in-tree executable.
+    const eslintBin = path.join(FIXTURE_ROOT, "node_modules", ".bin", "eslint");
+    const child = spawn(eslintBin, [FIXTURE_FILE], {
       cwd: FIXTURE_ROOT,
+      // eslint-disable-next-line agent-code-guard/no-process-env-at-runtime -- forwarding the parent environment to the spawned eslint child (PATH gets the fixture's node_modules/.bin prepended); subprocess plumbing, not application config.
       env: { ...process.env, PATH: lspPath() },
     });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (b: Buffer) => { stdout += b.toString("utf8"); });
-    child.stderr.on("data", (b: Buffer) => { stderr += b.toString("utf8"); });
-    child.on("exit", (code) => resolve({ exitCode: code ?? -1, stdout, stderr }));
+    child.stdout.on("data", (b: Buffer) => {
+      stdout += b.toString("utf8");
+    });
+    child.stderr.on("data", (b: Buffer) => {
+      stderr += b.toString("utf8");
+    });
+    child.on("exit", (code) => resume(Effect.succeed({ exitCode: code ?? NO_EXIT_CODE, stdout, stderr })));
   });
 }
 
-async function main(): Promise<void> {
-  assert.ok(fs.existsSync(FIXTURE_FILE), `fixture file not found: ${FIXTURE_FILE}`);
+const main: Effect.Effect<number, HarnessError | JsonRpcFailure> = Effect.gen(function* () {
+  yield* expect(fs.existsSync(FIXTURE_FILE), `fixture file not found: ${FIXTURE_FILE}`);
 
   // 1. Architecture LSP — diagnostic surface that ships behind the proxy.
-  const architecture = await exerciseServer(architectureLspEntry());
+  const architecture = yield* exerciseServer(architectureLspEntry());
 
   // 30 s covers fresh-CI cold-start: ts.Program load can run several seconds on first call.
-  const deadline = Date.now() + 30_000;
-  const archHit = await collectFromServer(
+  const deadline = Date.now() + DIAGNOSTIC_DEADLINE_MS;
+  const archHit = yield* collectFromServer(
     architecture,
     "no-cross-domain-sibling-import",
     deadline,
   );
 
-  reportDiagnostics(architecture.client);
+  yield* reportDiagnostics(architecture.client);
 
   let exitCode = 0;
-  try {
-    assert.ok(
+  yield* Effect.gen(function* () {
+    yield* expect(
       archHit !== null,
       "architecture LSP did not publish a no-cross-domain-sibling-import diagnostic within 30s",
     );
-    assertPrinciplesUrl(
-      "architecture",
-      "no-cross-domain-sibling-import",
-      archHit.codeDescription?.href,
+    const href = archHit?.codeDescription?.href ?? "";
+    yield* expect(
+      href.startsWith(PRINCIPLES_URL_PREFIX),
+      `architecture: codeDescription.href for no-cross-domain-sibling-import should start with ${PRINCIPLES_URL_PREFIX}; got ${href || "(none)"}`,
     );
-    process.stdout.write("\n[dogfood] architecture LSP published the expected diagnostic ✓\n");
-  } catch (err) {
-    process.stderr.write(`\n[dogfood] FAIL (architecture LSP): ${(err as Error).message}\n`);
-    exitCode = 1;
-  }
+    yield* out("\n[dogfood] architecture LSP published the expected diagnostic ✓\n");
+  }).pipe(
+    Effect.catchAll((failure) =>
+      err(`\n[dogfood] FAIL (architecture LSP): ${failure.message}\n`).pipe(
+        Effect.zipRight(
+          Effect.sync(() => {
+            exitCode = 1;
+          }),
+        ),
+      ),
+    ),
+  );
 
-  await shutdown(architecture.client);
-  const archCode = await architecture.client.awaitExit(5_000);
+  yield* shutdown(architecture.client);
+  const archCode = yield* architecture.client.awaitExit(SHUTDOWN_TIMEOUT_MS);
   if (archCode !== 0) {
-    process.stderr.write(
-      `[dogfood] architecture LSP did not exit cleanly (code=${String(archCode)})\n`,
-    );
+    yield* err(`[dogfood] architecture LSP did not exit cleanly (code=${String(archCode)})\n`);
     exitCode = 1;
   }
-  architecture.client.killHard();
+  yield* Effect.sync(() => architecture.client.killHard());
 
   // 2. ESLint CLI — syntax-floor surface that ships via /safer:verify and
   // any pre-commit/CI integration the project has.
-  const eslintResult = await runEslintCli();
-  try {
-    assert.ok(
+  const eslintResult = yield* runEslintCli();
+  yield* Effect.gen(function* () {
+    yield* expect(
       eslintResult.exitCode !== 0,
       `eslint exited 0 on a fixture with a known violation; stdout:\n${eslintResult.stdout}\nstderr:\n${eslintResult.stderr}`,
     );
-    assert.ok(
+    yield* expect(
       eslintResult.stdout.includes("agent-code-guard/record-cast"),
       `eslint output missing record-cast rule; stdout:\n${eslintResult.stdout}`,
     );
-    process.stdout.write("[dogfood] eslint CLI surfaced agent-code-guard/record-cast ✓\n");
-  } catch (err) {
-    process.stderr.write(`[dogfood] FAIL (eslint CLI): ${(err as Error).message}\n`);
-    exitCode = 1;
-  }
+    yield* out("[dogfood] eslint CLI surfaced agent-code-guard/record-cast ✓\n");
+  }).pipe(
+    Effect.catchAll((failure) =>
+      err(`[dogfood] FAIL (eslint CLI): ${failure.message}\n`).pipe(
+        Effect.zipRight(
+          Effect.sync(() => {
+            exitCode = 1;
+          }),
+        ),
+      ),
+    ),
+  );
 
-  process.exit(exitCode);
-}
+  return exitCode;
+});
 
-await main();
+const program = main.pipe(
+  Effect.tap((code) => Effect.sync(() => process.exit(code))),
+  Effect.catchAll((failure) =>
+    err(`[dogfood] fatal: ${failure.message}\n`).pipe(
+      Effect.zipRight(Effect.sync(() => process.exit(1))),
+    ),
+  ),
+);
+Effect.runPromise(program);

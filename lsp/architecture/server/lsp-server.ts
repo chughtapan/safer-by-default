@@ -101,7 +101,7 @@ const publishAllOpen = (
     if (inWorkspace.length > 0) yield* publishForUris(deps, engine, inWorkspace);
   });
 
-const handleInitialize = (params: InitializeParams): InitializeResult => ({
+const handleInitialize = (_params: InitializeParams): InitializeResult => ({
   capabilities: {
     textDocumentSync: {
       openClose: true,
