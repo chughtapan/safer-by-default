@@ -17,7 +17,7 @@ It is not. This plugin recalibrates.
 /plugin install safer@safer-by-default
 ```
 
-> **v0.2.0 is dogfood-only.** External adopters cannot complete `/safer:setup` yet — it halts unless run from a `chughtapan/safer-by-default` clone. See [Prerequisites](#prerequisites-v020). The marketplace install and the skills themselves still load.
+> **`/safer:setup` works on any TypeScript + vitest repository.** As of v0.4.0 the living-spec codemod (`@chughtapan/safer-spec-development`) is published to npm, so setup installs it from the registry — the earlier dogfood-only halt is gone. On other projects, setup still runs the lint floor and LSP path and skips only the living-spec layer. See [Prerequisites](#prerequisites).
 
 Skills load as `safer:<name>` (`/safer:contract`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
@@ -87,11 +87,11 @@ The doctrine factors into four orthogonal axes. The first two govern *what code 
 
 Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `SKILL.md` for one projection of the principles onto one kind of work.
 
-## Prerequisites (v0.2.0)
+## Prerequisites
 
-v0.2.0 of `safer-by-default` is **dogfood-only**: the supported adopter is the maintainer's own `chughtapan/safer-by-default` clone with the `vendor/safer-spec-development/` submodule populated. `/safer:setup` halts first with a `NotInSaferByDefaultClone` pointer anywhere else, so external adopters wait for the publish follow-up (when the codemod publishes to npm). It is also **TypeScript + vitest only**: even inside the dogfood clone, `/safer:setup` halts with a "use safer-by-default 0.1.x" pointer on non-TS / non-vitest workspaces.
+`/safer:setup` runs on any repository with a `package.json` or `tsconfig.json` and `gstack` installed. It wires the lint floor (`eslint-plugin-agent-code-guard` + strict `tsconfig` flags) and the LSP path on every run, using whichever package manager it detects (pnpm, npm, yarn, or bun).
 
-`/safer:setup` pins the dogfood workspace to **pnpm** (sets `packageManager: pnpm@X.Y.Z` in `package.json`); npm and bun are not supported in v0.2.0 because their `link:`-protocol semantics differ. Yarn 1/2 could be added later but is not in scope for v0.2.0.
+The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from npm) is wired only on **TypeScript + vitest** projects, since it adds a vitest reporter and a per-folder `MODULE.md` gate. On other projects setup skips that one step with a note and the rest still applies. The layer is optional and never aborts setup.
 
 ## Skill catalog
 
@@ -154,7 +154,7 @@ user intent
 
 ### Workspace monorepos
 
-`/safer:setup` Step 4c installs the codemod **once** at the dogfood workspace root (`$SBD_ROOT/dogfood/`); the `link:`-protocol install populates the workspace's `node_modules/.bin`. If the dogfood layout has `vitest.workspace.ts` or per-package `vitest.config.{ts,js,mts}` files, setup repeats the **wire+seed** step (reporter patch + `safer-spec.config.json` seed) per workspace package, but the codemod install runs only at the workspace root.
+`/safer:setup` Step 4c installs the codemod **once** at the workspace root (`<pm> add -D @chughtapan/safer-spec-development@~0.2.0`), populating `node_modules/.bin`. If the layout has `vitest.workspace.ts` or per-package `vitest.config.{ts,js,mts}` files, setup repeats the **wire+seed** step (reporter patch + `safer-spec.config.json` seed) per workspace package, but the codemod install runs only at the workspace root.
 
 **Parent epic + sub-issues:** The orchestrate skill breaks one user intent into a GitHub issue (parent epic) and creates child sub-issues for each work unit (contract, architecture, implementation, review). Each sub-issue tracks one modality of work.
 

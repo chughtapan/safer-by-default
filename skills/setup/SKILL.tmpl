@@ -404,188 +404,84 @@ If A: `$PM add -D @playwright/test`. If B or C: record skipped.
 - *"I'll skip fast-check if the user does not ask."* No. fast-check is the default; the prompt exists so the user can override, not so you can omit.
 - *"I'll pick `@testcontainers/postgresql` without detecting."* No. Install only the modules that match detected clients.
 
-### Step 4c: Wire the living-spec layer (v0.2.0, dogfood-only)
+### Step 4c: Wire the living-spec layer (optional)
 
-v0.2.0 of `safer-by-default` requires the sister codemod `@chughtapan/safer-spec-development`. The integration is **dogfood-only**: the supported adopter is the maintainer's own clone of `chughtapan/safer-by-default` with the `vendor/safer-spec-development/` submodule populated. External adopters stay on `safer-by-default` 0.1.x; they ship under the publish follow-up (when the codemod publishes to npm). The dogfood install resolves the codemod through pnpm's `link:` protocol pointing at the submodule path.
+The living-spec layer is the per-folder `MODULE.md` + `.safer-spec/<slug>.json` sidecar codemod (`@chughtapan/safer-spec-development`), validated by `safer-spec validate`, whose typed exit codes route HOLD verdicts through `/safer:verify` (PRINCIPLES.md Part 2, "Living-spec is the ratchet's machine-readable surface"). As of v0.4.0 the codemod is published to npm, so this step installs it from the registry and applies to **any** TypeScript + vitest project. The v0.2.0/v0.3.0 dogfood-only pre-flight halt and the `link:`-protocol install against the vendored submodule are gone.
 
-**Pre-flight halts.** Sequence so the most actionable pointer fires first when multiple conditions fail.
+**This step is optional and never aborts setup.** It applies only to TypeScript projects that test with vitest (the layer wires a vitest reporter and a per-folder `MODULE.md` gate). If the project is not TS+vitest, or the install fails, the step records a skip and the lint floor, strict flags, and LSP path from the other steps still stand. Nothing here exits the skill.
+
+**Applicability check (skip, never exit).**
 
 ```bash
-# Walk up from CWD to find the safer-by-default clone. Distinguish three failure modes:
-#   (i)  no safer-by-default clone found anywhere up the tree → NotInSaferByDefaultClone
-#   (ii) clone found, but vendor/safer-spec-development/package.json absent → VendorSubmoduleAbsent
-#   (iii) clone + populated submodule → SBD_ROOT set; continue.
-SBD_ROOT=""
-SBD_ROOT_VENDOR_ABSENT=""
-cur="$PWD"
-while [ "$cur" != "/" ]; do
-  if [ -f "$cur/.claude-plugin/plugin.json" ] \
-      && grep -q '"name": "safer"' "$cur/.claude-plugin/plugin.json" 2>/dev/null; then
-    if [ -f "$cur/vendor/safer-spec-development/package.json" ]; then
-      SBD_ROOT="$cur"
-      break
-    else
-      SBD_ROOT_VENDOR_ABSENT="$cur"
-      # keep walking; an outer clone might still resolve.
-    fi
+SPEC_LAYER_STATUS=""
+SPEC_LAYER_SKIP_REASON=""
+if [ ! -f tsconfig.json ]; then
+  SPEC_LAYER_SKIP_REASON="not a TypeScript project (no tsconfig.json)"
+elif [ ! -f vitest.config.ts ] && [ ! -f vitest.config.js ] && [ ! -f vitest.config.mts ]; then
+  SPEC_LAYER_SKIP_REASON="the living-spec reporter targets vitest, and no vitest.config.{ts,js,mts} is present"
+fi
+if [ -n "$SPEC_LAYER_SKIP_REASON" ]; then
+  echo "Step 4c: living-spec layer skipped — $SPEC_LAYER_SKIP_REASON."
+  echo "  (The lint floor, strict flags, and LSP path from the other steps still apply.)"
+  SPEC_LAYER_STATUS="skipped ($SPEC_LAYER_SKIP_REASON)"
+fi
+```
+
+Run every block below **only when `$SPEC_LAYER_SKIP_REASON` is empty**. Each block re-checks the flag so a mid-step failure (install or doctor) cleanly skips the rest without aborting setup.
+
+**Install the codemod from npm.** Pinned to the `~0.2.0` tilde range (Spec Invariant 3: codemod and plugin version-lock in pairs). Uses the package manager detected in Step 1; idempotent — skips when the dependency is already declared.
+
+```bash
+if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
+  HAS_CODEMOD=$(node -e '
+    const pkg = require("./package.json");
+    const dep = (pkg.devDependencies && pkg.devDependencies["@chughtapan/safer-spec-development"])
+              || (pkg.dependencies && pkg.dependencies["@chughtapan/safer-spec-development"]) || "";
+    process.stdout.write(dep ? "1" : "0");
+  ' 2>/dev/null || echo "0")
+  if [ "$HAS_CODEMOD" = "0" ]; then
+    $PM add -D @chughtapan/safer-spec-development@~0.2.0 || {
+      echo "WARN: living-spec install failed; skipping the rest of Step 4c (lint floor stands)." >&2
+      SPEC_LAYER_SKIP_REASON="install failed"
+      SPEC_LAYER_STATUS="skipped (install failed)"
+    }
   fi
-  cur=$(dirname "$cur")
-done
-
-if [ -z "$SBD_ROOT" ] && [ -n "$SBD_ROOT_VENDOR_ABSENT" ]; then
-  cat >&2 <<MSG
-ERROR: VendorSubmoduleAbsent
-
-Found a chughtapan/safer-by-default clone at $SBD_ROOT_VENDOR_ABSENT, but
-$SBD_ROOT_VENDOR_ABSENT/vendor/safer-spec-development/package.json is missing
-(uninitialized submodule).
-
-Initialize the submodule, then retry /safer:setup:
-
-  cd $SBD_ROOT_VENDOR_ABSENT
-  git submodule update --init --recursive
-MSG
-  exit 1
-fi
-
-if [ -z "$SBD_ROOT" ]; then
-  cat >&2 <<'MSG'
-ERROR: NotInSaferByDefaultClone — /safer:setup v0.2.0 is dogfood-only.
-
-This skill runs only inside a chughtapan/safer-by-default clone with
-vendor/safer-spec-development/ populated.
-
-External adopters: stay on safer-by-default 0.1.x. v0.2.x external support
-ships in the publish follow-up (npm publish of @chughtapan/safer-spec-development).
-MSG
-  exit 1
-fi
-
-# Canonical dogfood path enforced so every clone computes the same
-# "link:../vendor/safer-spec-development" lockfile entry.
-if [ "$PWD" != "$SBD_ROOT/dogfood" ]; then
-  cat >&2 <<MSG
-ERROR: NotDogfoodCwd — /safer:setup v0.2.0 must run from \$SBD_ROOT/dogfood/.
-
-  Expected CWD: $SBD_ROOT/dogfood
-  Current CWD:  $PWD
-
-v0.2.0 does not support nested or relocated dogfood layouts. cd into the
-canonical dogfood path and retry.
-MSG
-  exit 1
-fi
-
-# v0.2.0 dogfood is pnpm-only. npm has no link: protocol; bun's link semantics
-# differ; yarn is supportable later. pnpm is the safer-by-default repo's
-# de-facto PM, and the link:-protocol install hinges on pnpm's symlink
-# behavior. External-adopter PM-agnosticism arrives with the publish
-# follow-up's npm-name install.
-if ! command -v pnpm >/dev/null 2>&1; then
-  cat >&2 <<'MSG'
-ERROR: PnpmAbsent — /safer:setup v0.2.0 dogfood requires pnpm.
-
-Install pnpm (https://pnpm.io) and retry.
-MSG
-  exit 1
-fi
-
-# TypeScript + vitest check. Non-TS / non-vitest projects stay on 0.1.x.
-if [ ! -f "tsconfig.json" ]; then
-  cat >&2 <<'MSG'
-ERROR: NotTypeScriptError (no-tsconfig) — /safer:setup v0.2.0 is TypeScript-only.
-
-The dogfood workspace must carry tsconfig.json. Non-TypeScript projects
-stay on safer-by-default 0.1.x.
-MSG
-  exit 1
-fi
-if [ ! -f "vitest.config.ts" ] && [ ! -f "vitest.config.js" ] && [ ! -f "vitest.config.mts" ]; then
-  cat >&2 <<'MSG'
-ERROR: NotTypeScriptError (no-vitest) — /safer:setup v0.2.0 requires vitest.
-
-The dogfood workspace must carry vitest.config.{ts,js,mts}. Projects on
-other test runners stay on safer-by-default 0.1.x.
-MSG
-  exit 1
 fi
 ```
 
-**Pin the dogfood `packageManager` field.** Verify reads `packageManager:` from `package.json` to resolve `$PM`; setup writes pnpm there so verify's PM detection always resolves to pnpm in the dogfood workspace.
+**Probe the codemod (liveness).** Confirm the CLI installed and runs. A non-running CLI is a concern, not a skill-fatal error: it records the layer as wired-but-unhealthy and skips the rest of Step 4c. The `safer-spec` bin is invoked from `node_modules/.bin/` directly, which is package-manager-agnostic. (`safer-spec doctor` — the intended health + version-skew probe — is not implemented in the published codemod yet, so this uses `--version` for liveness; upgrade the probe to `doctor` once the sister package ships it.)
 
 ```bash
-PNPM_VERSION=$(pnpm --version 2>/dev/null)
-if [ -z "$PNPM_VERSION" ]; then
-  echo "ERROR: could not read pnpm --version" >&2
-  exit 1
+if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
+  if ./node_modules/.bin/safer-spec --version >/dev/null 2>&1; then
+    SPEC_LAYER_STATUS="installed"
+  else
+    echo "WARN: safer-spec installed but the CLI did not run; skipping the rest of Step 4c (lint floor stands)." >&2
+    SPEC_LAYER_STATUS="DONE_WITH_CONCERNS (CLI did not run)"
+    SPEC_LAYER_SKIP_REASON="CLI did not run"
+  fi
 fi
-# Idempotent: only write packageManager if absent or pointing elsewhere.
-node -e '
-  const fs = require("fs");
-  const path = "package.json";
-  const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
-  const want = "pnpm@" + process.argv[1];
-  if (pkg.packageManager !== want) {
-    pkg.packageManager = want;
-    fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
-    console.error("  ✓ packageManager pinned to " + want);
-  }
-' "$PNPM_VERSION"
 ```
 
-**Install the codemod via pnpm `link:` protocol.** The canonical relative path is fixed; the lockfile entry is identical across every clone of the repo.
+**Seed `safer-spec.config.json` (never overwrite).** Workspace monorepos repeat the seed per workspace package that carries a vitest config.
 
 ```bash
-# Idempotency sentinel: if package.json already pins the codemod via link:,
-# skip the install step (re-runs are no-ops).
-HAS_LINK=$(node -e '
-  const pkg = require("./package.json");
-  const dep = (pkg.devDependencies && pkg.devDependencies["@chughtapan/safer-spec-development"]) || "";
-  process.stdout.write(dep.startsWith("link:") ? "1" : "0");
-')
-if [ "$HAS_LINK" = "0" ]; then
-  pnpm add -D "link:../vendor/safer-spec-development" \
-    || { echo "ERROR: CodemodInstallFailed" >&2; exit 1; }
+if [ -z "$SPEC_LAYER_SKIP_REASON" ] && [ ! -f "safer-spec.config.json" ]; then
+  ./node_modules/.bin/safer-spec init >/dev/null 2>&1 || true
 fi
 ```
 
-**Probe the codemod.** Doctor failure blocks the rest of Step 4c.
-
-```bash
-mkdir -p /tmp/safer-setup
-if ! pnpm exec safer-spec doctor >/tmp/safer-setup/doctor.log 2>&1; then
-  echo "ERROR: DoctorFailed — codemod installed but safer-spec doctor failed" >&2
-  cat /tmp/safer-setup/doctor.log >&2
-  # Record for Step 11 receipt; do not proceed.
-  SPEC_LAYER_STATUS="BLOCKED"
-  SPEC_LAYER_DOCTOR=$(cat /tmp/safer-setup/doctor.log)
-  exit 1
-fi
-SPEC_LAYER_STATUS="required"
-SPEC_LAYER_DOCTOR="OK"
-```
-
-**Seed `safer-spec.config.json` (never overwrite).** Workspace monorepos repeat the seed per workspace package with a vitest config; the root `pnpm add` runs only once.
-
-```bash
-if [ ! -f "safer-spec.config.json" ]; then
-  pnpm exec safer-spec init >/dev/null 2>&1 || true
-fi
-```
-
-**Wire the vitest reporter (sentinel-bounded; mirrors Step 10b managed-CLAUDE.md section).** The patch detects `vitest.config.{ts,js,mts}` and `vitest.workspace.ts`, preserves existing reporters, and never double-applies the SAFER sentinel. Apply per workspace package when `vitest.workspace.ts` is present at the dogfood root.
+**Wire the vitest reporter (sentinel-bounded; mirrors the Step 10b managed-`CLAUDE.md` section).** The patch detects `vitest.config.{ts,js,mts}` and `vitest.workspace.ts`, preserves existing reporters, and never double-applies the SAFER sentinel. Apply per workspace package when `vitest.workspace.ts` is present.
 
 ```bash
 # The SAFER sentinel pair brackets the wired reporter block:
 #   // <SAFER:vitest-reporter:begin>  ...managed block...  // <SAFER:vitest-reporter:end>
 # Detect: if the block already exists, do not touch. Otherwise insert after the
 # `test:` (or `reporters:`) key, preserving every existing reporter entry.
-# See workspace-monorepo paragraph in README for per-package iteration.
 ```
 
-**Append `Spec layer: ${SPEC_LAYER_STATUS}` to the Step 11 receipt** alongside the existing `Testing deps:` line. Step 10b's managed `CLAUDE.md` section gains a `Spec layer: required` line so subsequent agents read it.
+**Record for the receipt.** `SPEC_LAYER_STATUS` is one of `installed`, `skipped (<reason>)`, or `DONE_WITH_CONCERNS (<reason>)`. Step 10b writes it into the managed `CLAUDE.md` section (the `Spec layer:` line) and Step 11 prints it in the receipt. A skip or concern affects only the living-spec layer; the rest of setup's verdict is independent.
 
-**CF-3: post-publish sentinel lifecycle (recommended default option b).** The dogfood install above is the substituted form of the v0.2.0 integration PR. The release-mode sentinel (the literal that `bin/safer-gen-skills --check --release` greps for) is the EDIT-POINT marker the integration PR uses during development; the integration PR's final commit replaces the marker line wholesale with the dogfood `link:` block, so source committed to main is sentinel-free. When the codemod publishes to npm, the post-publish PR makes a **one-off manual SKILL.tmpl edit** to swap the dogfood `link:` block for the npm-name install (`pnpm add -D @chughtapan/safer-spec-development@~X.Y.Z`); the sentinel mechanism is NOT reintroduced because the substitution pattern is a v0.2.0-integration-specific tool, not a general lifecycle. `bin/safer-gen-skills --check --release` continues to gate against sentinel survival on every release branch. (This explanatory prose intentionally does NOT name the literal sentinel string so the release-mode gate stays green on this file.)
 
 ### Step 5: Plan the configuration shape
 
@@ -817,6 +713,7 @@ cat > "$SECTION_FILE" <<EOF
 - ESLint floor: eslint-plugin-agent-code-guard@${PLUGIN_VERSION}
 - Effect runtime: ${EFFECT_RUNTIME}
 - Env var access: ${ENV_VAR_ACCESS}
+- Spec layer: ${SPEC_LAYER_STATUS:-skipped}
 EOF
 ```
 
@@ -964,6 +861,7 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Baseline file:          .safer-baseline.json | not written
   CLAUDE.md:              created | updated  (managed section written)
   LSP path:               proxy <fetched (9b5a2a5) | fetch-failed>; binaries <ok | missing: ...>
+  Spec layer:             <installed | skipped (reason) | DONE_WITH_CONCERNS (reason)>
   Schema library:         <SCHEMA_LIB>
   Database access:        <DB_TOOL>
   Env var access:         <ENV_VAR_ACCESS>
