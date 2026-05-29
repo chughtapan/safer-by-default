@@ -1,6 +1,6 @@
 ## 0.4.0 — 2026-05-29
 
-v0.4.0 lifts the dogfood-only restriction on `/safer:setup`. The sister codemod `@chughtapan/safer-spec-development` is now published to npm (0.2.0), so the living-spec layer installs from the registry instead of a `link:`-protocol symlink into a vendored submodule, and `/safer:setup` runs on **any** repository — not just the maintainer's clone.
+v0.4.0 lifts the dogfood-only restriction on the living-spec path (`/safer:setup` and `/safer:verify`). The sister codemod `@chughtapan/safer-spec-development` is now published to npm (0.2.0), so the layer installs from the registry instead of a `link:`-protocol symlink into a vendored submodule, and both skills work on **any** repository — not just the maintainer's clone.
 
 The prior gate had two defects, both fixed here: the dogfood-only pre-flight `exit 1` halts killed the *entire* skill (lint floor, strict flags, LSP provisioning included) even though only the living-spec wiring depended on the codemod; and the path they mandated (`$SBD_ROOT/dogfood/`) was never committed, so setup was unrunnable even for the maintainer.
 
@@ -9,11 +9,12 @@ The prior gate had two defects, both fixed here: the dogfood-only pre-flight `ex
 - **`/safer:setup` Step 4c is no longer dogfood-only and never aborts the skill.** It now:
   - installs the codemod from npm (`<pm> add -D @chughtapan/safer-spec-development@~0.2.0`) using the detected package manager, replacing the pnpm-only `link:../vendor/safer-spec-development` install;
   - drops the `NotInSaferByDefaultClone` / `NotDogfoodCwd` / `VendorSubmoduleAbsent` / `PnpmAbsent` pre-flight halts entirely;
-  - treats "not a TypeScript + vitest project" and "install/doctor failed" as a **skip-with-note** for the living-spec layer alone — the lint floor, strict flags, and LSP path still apply. Nothing in Step 4c exits the skill.
+  - treats "not a TypeScript + vitest project" and "install or CLI-liveness failure" as a **skip-with-note** for the living-spec layer alone — the lint floor, strict flags, and LSP path still apply. Nothing in Step 4c exits the skill.
   - invokes `safer-spec` via `node_modules/.bin/` directly, so it is package-manager-agnostic;
   - probes liveness with `safer-spec --version` rather than `safer-spec doctor`, because `doctor` is an unimplemented stub in the published 0.2.0 (as is `explain`). The probe upgrades to `doctor` once the sister package implements it.
 - The Step 11 receipt and the managed `CLAUDE.md` section gain a `Spec layer:` line (`installed` / `skipped (<reason>)` / `DONE_WITH_CONCERNS (<reason>)`).
 - README and INSTALL prerequisites rewritten: setup works on any repo; the living-spec layer is the only TS+vitest-gated, optional step.
+- **`/safer:verify` no longer depends on the stubbed `doctor` or on pnpm/dogfood assumptions.** Phase 2's blocking `pnpm exec safer-spec doctor` probe is replaced by a `node_modules/.bin/safer-spec` presence check (`SPEC_LAYER_PRESENT`); the Phase 3 validate gate runs `./node_modules/.bin/safer-spec validate --implemented` (PM-agnostic) only when the layer is present, and skips cleanly otherwise. Version skew still surfaces via validate's exit `10` — the redundant doctor probe is gone, so verify no longer blocks every living-spec run on the unimplemented stub.
 
 ### Dependencies
 
