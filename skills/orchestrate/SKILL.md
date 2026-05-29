@@ -313,6 +313,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication
@@ -629,6 +635,7 @@ GitHub.
 gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated. Run: gh auth login"; exit 1; }
 eval "$(safer-slug 2>/dev/null)" || true
 SESSION="$$-$(date +%s)"
+_TEL_START=$(date +%s)
 safer-telemetry-log --event-type safer.skill_run --modality orchestrate --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
@@ -901,7 +908,7 @@ Create the parent epic issue on GitHub. Use `safer-publish` (wraps `/zapbot-publ
 safer-publish --kind epic \
   --title "<compressed intent, <70 chars>" \
   --body-file /tmp/safer-epic-body.md \
-  --labels triaged
+  --labels "safer:parent,triaged"
 ```
 
 Epic body template:
@@ -1006,6 +1013,12 @@ After creating each sub-issue, **edit the parent epic's body** to fill in the su
 
 ### Phase 5 — Dispatch and gate
 
+#### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop team-lead** on Claude Code AND the Workflow tool is available (the session is in ultracode mode, or the invocation opted in), you MAY execute ONE dispatch wave deterministically by running `skills/orchestrate/dispatch-wave.workflow.js` via the `Workflow` tool, passing the decomposition rows + their current states. The script computes the ready set (a mirror of `skills/orchestrate/ready-set.mjs`, which carries the canonical DAG resolver + its test), dispatches every ready modality in parallel with `isolation:'worktree'`, awaits all of them, and returns their structured receipts. This replaces the Step 5d `CronCreate` poll loop, the swarm-socket / dead-pane machinery (Step 1a, Step 4 paths a-b), the per-tick cap math, and `SendMessage` marker-parsing — `parallel()` awaits completion, and the runtime's concurrency cap is the capacity limit.
+
+**Wave vs. lifecycle.** The Workflow runs ONE wave and returns receipts; it does NOT gate. Every human gate stays in this prose, between waves: the Phase 1a contract OK, the Step 5c.-1 contract-budget check, ratchet-up-always-parks, the diagnose verdict routing (5c.5), and the runtime stop conditions. The cross-session epic lifecycle — park-and-wait for a contract amendment, resume days later — is not expressible as a single Workflow run and stays the GitHub-backed prose state machine here. A dispatched teammate cannot invoke Workflow and Codex has no Workflow tool; both run the prose below, which is authoritative. (Invariant 11: the rulebook is the dispatcher; the Workflow executes it.)
+
 For each sub-issue in dependency order:
 
 **Step 5a — Invoke the modality.**
@@ -1079,7 +1092,7 @@ Then cascade forward per modality lifecycle:
 Before any label transition or downstream dispatch, load the parent epic and read its `## Contract` section. The contract is the deal between user and orchestrator. The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
 
 ```bash
-gh issue view "$PARENT" --json body --jq '.body' | awk '/^## Contract$/,/^## /{print}' | head -n -1 > /tmp/contract.md
+gh issue view "$PARENT" --json body --jq '.body' | awk '/^## Contract$/{f=1;print;next} f&&/^## /{f=0} f{print}' > /tmp/contract.md
 ```
 
 Identify the next dispatch you would do (the next sub-issue's modality, the merge of a PR, the close of an epic). Three checks fire in order:
@@ -1321,6 +1334,18 @@ Record the returned job id on the parent epic (comment) so the next operator can
     ```bash
     SWARM_SOCKET=$(ls /tmp/tmux-$(id -u)/claude-swarm-* 2>/dev/null | head -1)
     [ -z "$SWARM_SOCKET" ] && echo "swarm_socket_missing: skipping pane stall check" && return 0
+    # The socket FILE can exist with no server listening (Conductor / non-tmux backends).
+    # Probe for a live server, not just file existence; fail loud, not silent.
+    tmux -S "$SWARM_SOCKET" list-sessions >/dev/null 2>&1 \
+      || { echo "swarm_socket_dead: skipping pane stall check (socket file present, no server listening)"; return 0; }
+    # Teammate pane ids must be tmux-native (%0, %1, ...). On non-tmux backends the
+    # roster records macOS UUIDs, which are not valid -t targets; skip rather than scan blind.
+    SAMPLE_ID=$(jq -r '.members[] | select(.name != "team-lead") | .tmuxPaneId // empty' \
+                ~/.claude/teams/<team-name>/config.json | head -1)
+    case "$SAMPLE_ID" in
+      '%'*) ;;  # tmux-native; proceed
+      ?*) echo "pane_backend: non-tmux id format ($SAMPLE_ID); pane stall check disabled this tick"; return 0 ;;
+    esac
 
     for paneId in $(jq -r '.members[] | select(.name != "team-lead") | .tmuxPaneId // empty' \
                     ~/.claude/teams/<team-name>/config.json); do
@@ -1349,9 +1374,11 @@ Record the returned job id on the parent epic (comment) so the next operator can
 for epic in $(jq -r '.epics[]?' ~/.claude/teams/<team-name>/config.json 2>/dev/null); do
   # Fetch comments since last tick (cursor stored at ~/.claude/teams/<team-name>/contract-cursor-<epic>.txt)
   CURSOR=$(cat ~/.claude/teams/<team-name>/contract-cursor-${epic//\//_}.txt 2>/dev/null || echo "1970-01-01T00:00:00Z")
-  gh issue view "$epic" --json comments --jq \
-    ".comments[] | select(.createdAt > \"$CURSOR\") | select(.author.login | IN(\$collaborators[]))" \
-    --argjson collaborators "$(gh api repos/$REPO/collaborators --jq '[.[].login]')" \
+  # `gh issue view` has no --argjson (that is a jq flag); emit the raw envelope and
+  # pipe to jq, which does bind external JSON. `index` is portable across jq versions.
+  gh issue view "$epic" --json comments \
+    | jq --argjson collab "$(gh api repos/$REPO/collaborators --jq '[.[].login]')" \
+        ".comments[] | select(.createdAt > \"$CURSOR\") | select(.author.login as \$a | \$collab | index(\$a))" \
     > /tmp/new-contract-comments.jsonl
   date -u +%Y-%m-%dT%H:%M:%SZ > ~/.claude/teams/<team-name>/contract-cursor-${epic//\//_}.txt
 done
@@ -1379,6 +1406,19 @@ For each comment body, scan in priority order:
 
    ```bash
    ALIVE=$(tmux list-panes -a -F '#{pane_id}' 2>/dev/null | sort -u)
+   ```
+
+   On non-tmux pane backends (Conductor / macOS UUID `tmuxPaneId`s), `$ALIVE` cannot be
+   enumerated — every roster id would test as "dead" and trigger a false dead-pane cleanup.
+   Gate path (a)/(b) on a tmux-native id sample; downgrade loudly otherwise:
+
+   ```bash
+   SAMPLE_ID=$(jq -r '.members[] | select(.name != "team-lead") | .tmuxPaneId // empty' \
+               ~/.claude/teams/<team-name>/config.json | head -1)
+   case "$SAMPLE_ID" in
+     '%'*) ;;  # tmux-native; proceed with path (a)/(b)
+     ?*) echo "pane_backend: non-tmux id format ($SAMPLE_ID); Step 4 path (a)/(b) disabled this tick"; return 0 ;;
+   esac
    ```
 
    **Do NOT** use `tmux list-panes -a | awk '{print $NF}'` to harvest pane IDs. `tmux list-panes -a` prints the literal string `(active)` as the last whitespace-separated field on any pane that is currently the active pane in its window. `awk '{print $NF}'` on that output returns `(active)`, NOT the pane id, and the resulting set silently drops every active pane — producing false "dead" verdicts on the panes the loop most needs to protect. Use `-F '#{pane_id}'`. Always.
@@ -2093,7 +2133,7 @@ Post the artifact as a comment on the blocked sub-issue and cross-link on the pa
 
 | Artifact | Destination | Label |
 |---|---|---|
-| Parent epic | GitHub issue (this repo) | `triaged` |
+| Parent epic | GitHub issue (this repo) | `safer:parent` (type) + `triaged` (state) |
 | Sub-issues | GitHub issues (this repo) | `safer:<modality>,planning` |
 | Progress updates | Comments on sub-issues | — |
 | State transitions | Label changes via `safer-transition-label` | — |

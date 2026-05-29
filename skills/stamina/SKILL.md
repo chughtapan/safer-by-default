@@ -313,6 +313,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication
@@ -694,6 +700,12 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 `safer-diff-scope` is the mechanical classifier for PR mode. Expected output fields: `{tier, files, modules, exports, new_deps, rationale}`. Any other output is a `NEEDS_CONTEXT` stop.
 
 ## Workflow
+
+### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop** invoker (stamina Mode A — the user or the orchestrate team-lead) on Claude Code AND the Workflow tool is available (the session is in ultracode mode, or the invocation opted in), you MAY execute Phases 2-4 deterministically by running `skills/stamina/dispatch.workflow.js` via the `Workflow` tool, passing the resolved dispatch set, N, mode, target URL, and `atCeiling`. The script fans the reviewers out in parallel and applies the Phase-4 consensus reducer (a mirror of `skills/stamina/consensus.mjs`, which carries the canonical reducer + its test).
+
+The Workflow **executes the rulebook below**; it is not a second dispatcher (review-senior Invariant 11 holds). The prose below is **authoritative** and is the required path for a stamina dispatched as a teammate (Mode B — teammates cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. The Workflow returns the consensus verdict only — it never merges, transitions a label, or chains to verify; any BLOCKED/ESCALATED ratchets upstream and NEEDS_CONTEXT parks. Classification (which N, which set) and the CI gate (Phase 0) stay in this prose.
 
 ### Phase 0 — CI status gate (PR mode only)
 

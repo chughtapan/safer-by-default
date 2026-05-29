@@ -177,6 +177,12 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 
 ## Workflow
 
+### Workflow path (Claude Code, opt-in)
+
+When you are the **main-loop** invoker (stamina Mode A — the user or the orchestrate team-lead) on Claude Code AND the Workflow tool is available (the session is in ultracode mode, or the invocation opted in), you MAY execute Phases 2-4 deterministically by running `skills/stamina/dispatch.workflow.js` via the `Workflow` tool, passing the resolved dispatch set, N, mode, target URL, and `atCeiling`. The script fans the reviewers out in parallel and applies the Phase-4 consensus reducer (a mirror of `skills/stamina/consensus.mjs`, which carries the canonical reducer + its test).
+
+The Workflow **executes the rulebook below**; it is not a second dispatcher (review-senior Invariant 11 holds). The prose below is **authoritative** and is the required path for a stamina dispatched as a teammate (Mode B — teammates cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. The Workflow returns the consensus verdict only — it never merges, transitions a label, or chains to verify; any BLOCKED/ESCALATED ratchets upstream and NEEDS_CONTEXT parks. Classification (which N, which set) and the CI gate (Phase 0) stay in this prose.
+
 ### Phase 0 — CI status gate (PR mode only)
 
 > **CI must be green on the PR head before any aggregate APPROVE verdict.** Diff-static reviewers (`/safer:review-senior`, `/codex review`, `/simplify`) are blind to runtime regressions; CI is the runtime check. Real incident: a PR passed N=3 stamina with green diff-static review but had 5 red CI tests from a Stream/Fiber refactor.

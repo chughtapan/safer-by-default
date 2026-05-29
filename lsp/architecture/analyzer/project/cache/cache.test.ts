@@ -176,7 +176,7 @@ it("Property: schema rejects packageRuntime values outside the allowed enum", ()
     fc.property(
       fc
         .string({ minLength: 1, maxLength: 16 })
-        .filter((s) => !["browser", "node", "universal"].includes(s)),
+        .filter((s) => !["browser", "node", "universal", "bun"].includes(s)),
       (badRuntime) => {
         expect(() =>
           resolveArchitectureOptions({ packageRuntime: badRuntime }),

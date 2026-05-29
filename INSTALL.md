@@ -7,7 +7,7 @@ Install paths, dependency requirements, and troubleshooting for safer-by-default
 v0.2.0 is **TypeScript + vitest only** AND **dogfood-only**. Before running any install command below, confirm:
 
 - The adopter workspace is the maintainer's `chughtapan/safer-by-default` clone with the `vendor/safer-spec-development/` submodule populated (`git submodule update --init --recursive`).
-- `/safer:setup` will be invoked from `$SBD_ROOT/dogfood/` (the canonical dogfood path). Non-dogfood CWDs halt with a `NotDogfoodCwd` pointer.
+- `/safer:setup` will be invoked from `$SBD_ROOT/dogfood/` (the canonical dogfood path). This workspace is **not** committed to the repo — scaffold it first (a `package.json` plus `tsconfig.json` and `vitest.config.{ts,js,mts}`); from a fresh clone the directory is absent. Non-dogfood CWDs (and the missing directory) halt with a `NotDogfoodCwd` pointer.
 - The workspace carries `tsconfig.json` and `vitest.config.{ts,js,mts}`. Non-TS / non-vitest workspaces halt with a "use safer-by-default 0.1.x" pointer.
 - `pnpm` is installed. v0.2.0's dogfood install uses pnpm's `link:` protocol; npm and bun have different `link:` semantics and are not supported in v0.2.0.
 
@@ -81,7 +81,7 @@ After the plugin is installed:
 safer-setup-labels
 ```
 
-Creates the GitHub issue labels (`safer:parent`, `safer:contract`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`, …) the skills publish under. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
+Creates the labels the skills publish under: the parent-epic marker `safer:parent` plus the modality labels `safer:contract`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:research`, `safer:spike`, `safer:deferred`. Per-stage state labels (`planning`, `review`, `implementing`, `verifying`, `done`) are created on demand as `/safer:orchestrate` runs a pipeline. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
 
 ## Working from source (developers)
 
@@ -105,7 +105,15 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
 
 - `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator + the architecture LSP runtime).
 - [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
-- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path. `/safer:setup` Step 10c detects each one and prints the exact install command for any that are missing, then fetches `lsp-proxy.py` at a pinned upstream commit into `~/.cache/safer-by-default/lsp-proxy.py`. The fetch is fail-closed: a network failure halts setup with a retry instruction rather than leaving the LSP path half-installed.
+- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path, plus the upstream `lsp-proxy.py` in the cache. `/safer:setup` Step 10c provisions these: it installs `typescript-language-server` globally when missing (via `npm -g`, falling back to the detected package manager's global form), checks `python3` and `bun` (printing the install command for those — system-level, so you install them), and fetches `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) into `~/.cache/safer-by-default/`, fail-closed (a partial download never lands). If setup ran offline, fetch the proxy manually:
+
+  ```bash
+  mkdir -p ~/.cache/safer-by-default
+  curl -fsSL https://raw.githubusercontent.com/techee/lsp-proxy/9b5a2a5/lsp-proxy.py \
+    -o ~/.cache/safer-by-default/lsp-proxy.py
+  ```
+
+  `lsp-proxy.py` is GPL v2 and lives only in your local cache, never the plugin tree. If any binary or the proxy file is missing, `lsp/proxy/run.sh` exits with a pointer to `/safer:setup` and the rest of the plugin keeps working.
 - **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
 
 ## LSP behavior at install time
@@ -117,7 +125,7 @@ The plugin manifest declares one `lspServers` entry pointing at `lsp/proxy/run.s
 
 Why the proxy: Claude Code's LSP dispatcher returns opaque "internal error" on every operation when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while internally fanning notifications to both children and merging their `publishDiagnostics` upward.
 
-If `bun`, `typescript-language-server`, or `python3` is missing, `lsp/proxy/run.sh` exits non-zero with a pointer to `/safer:setup`. If `~/.cache/safer-by-default/lsp-proxy.py` is missing, the wrapper exits with the same pointer. Either way, the rest of the plugin (skills, bins) keeps working.
+If `~/.cache/safer-by-default/lsp-proxy.py` is missing, `lsp/proxy/run.sh` exits non-zero with a pointer to `/safer:setup` (Step 10c fetches it). If `bun`, `typescript-language-server`, or `python3` is missing, the proxy fails when it tries to spawn its children. Either way, the rest of the plugin (skills, bins) keeps working.
 
 ESLint syntax rules from `eslint-plugin-agent-code-guard` are NOT on the LSP path; they ship via the CLI surface that `/safer:setup` writes into each project's `eslint.config.js`, and `/safer:verify` runs `eslint` as a ring-1 gate when the project has an eslint config but no `lint` script.
 
@@ -140,8 +148,8 @@ Then reload plugins. Stale entries in `~/.claude/plugins/installed_plugins.json`
 **`./setup-codex` falls through to a network clone.**
 Set `$SAFER_SOURCE_DIR` to your working tree path, or install via the CC marketplace first so the script can reuse that cache. The XDG fallback only activates when neither override nor cache is available.
 
-**`safer-update-check` halts skills with `PRECONDITION_FAIL`.**
-This is the upgrade gate working as intended. Run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default`, then re-invoke the skill. To skip the gate inside an autonomous orchestration, ensure `SAFER_PARENT_ISSUE` is set — the gate suppresses itself for dispatched runs.
+**Skills halt with `PRECONDITION_FAIL` after `safer-update-check` reports `UPGRADE_AVAILABLE`.**
+This is the upgrade gate working as intended. (`safer-update-check` only reports the mismatch; the entry skills' preambles emit the `PRECONDITION_FAIL` halt.) Run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default`, then re-invoke the skill. To skip the gate inside an autonomous orchestration, ensure `SAFER_PARENT_ISSUE` is set — the gate suppresses itself for dispatched runs.
 
 **State directory.**
 Local state lives at `~/.safer/`:

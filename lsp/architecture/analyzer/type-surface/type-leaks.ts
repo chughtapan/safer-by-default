@@ -100,7 +100,8 @@ export function packageAllowedInPublicTypes(
 ): boolean {
   if (options.publicTypePackages.some((entry) => entry.package === packageName)) return true;
   if (packageName !== "node") return false;
-  return options.packageRuntime === "node";
+  // Bun implements the node: API surface, so node-builtin types are allowed there too.
+  return options.packageRuntime === "node" || options.packageRuntime === "bun";
 }
 
 function exportedSignatureDiagnostics(

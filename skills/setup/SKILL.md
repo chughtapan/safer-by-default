@@ -318,6 +318,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication
@@ -675,6 +681,7 @@ PM=""
 [ -f package-lock.json ] && PM="npm"
 [ -f yarn.lock ]         && PM="yarn"
 [ -f bun.lockb ]         && PM="bun"
+[ -f bun.lock ]          && PM="bun"   # bun 1.2+ default text lockfile (bun.lockb is legacy)
 [ -z "$PM" ] && PM="pnpm"  # default, announce to user below
 echo "PM: $PM"
 
@@ -718,7 +725,7 @@ Announce to the user what you found. If `PM` fell back to the default, say so: "
 - C) Update. Run `<pm> up eslint-plugin-agent-code-guard`; re-probe; re-baseline. No config changes.
 - D) Walk away. Stop here; report no changes.
 
-If A, skip to Step 8 (probe). If C, skip to Step 8 after the upgrade. If D, stop and emit the one-line summary.
+If A, skip to Step 9 (probe). If C, skip to Step 9 after the upgrade. If D, stop and emit the one-line summary.
 
 **If `LEGACY` is set and `FLAT_CONFIG` is empty:** stop. Tell the user:
 
@@ -1392,6 +1399,69 @@ The `awk` pattern matches the prefix `## Project structural choices (managed by 
 
 This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
 
+### Step 10c: Provision the LSP-side prerequisites (global)
+
+The architecture LSP and the TypeScript code-intelligence server run behind the upstream `lsp-proxy.py` (see `ARCHITECTURE.md` → LSP integration). This step provisions the global, not-project-local pieces: the three binaries the proxy execs, and the pinned proxy script itself. It is the last step before the receipt because it is independent of the project's lint/strict config.
+
+**Detect the three binaries.** `python3`, `typescript-language-server`, and `bun` must be on `PATH`. `typescript-language-server` is a node CLI — auto-install it globally when missing (a global tool, not a project dep, so it does not touch the repo lockfile). `python3` and `bun` are system-level and OS-specific, so for those print the exact install command and let the user run it.
+
+```bash
+LSP_MISSING=()
+command -v python3 >/dev/null 2>&1 || LSP_MISSING+=("python3 — system package (apt install python3 / brew install python3)")
+command -v bun >/dev/null 2>&1 || LSP_MISSING+=("bun — curl -fsSL https://bun.sh/install | bash")
+
+# typescript-language-server: auto-install globally when missing. Prefer npm -g (the universal
+# node global installer, present wherever node is); fall back to the detected PM's global form.
+if ! command -v typescript-language-server >/dev/null 2>&1; then
+  if   command -v npm >/dev/null 2>&1; then TLS_INSTALL="npm install -g typescript-language-server"
+  elif [ "${PM:-}" = "bun" ];          then TLS_INSTALL="bun add -g typescript-language-server"
+  elif [ "${PM:-}" = "pnpm" ];         then TLS_INSTALL="pnpm add -g typescript-language-server"
+  elif [ "${PM:-}" = "yarn" ];         then TLS_INSTALL="yarn global add typescript-language-server"
+  else                                      TLS_INSTALL=""
+  fi
+  if [ -n "$TLS_INSTALL" ]; then
+    echo "Installing typescript-language-server globally: $TLS_INSTALL"
+    if $TLS_INSTALL; then
+      echo "typescript-language-server: installed"
+    else
+      echo "WARN: '$TLS_INSTALL' failed — install typescript-language-server manually, then re-run /safer:setup"
+      LSP_MISSING+=("typescript-language-server — $TLS_INSTALL (auto-install failed)")
+    fi
+  else
+    LSP_MISSING+=("typescript-language-server — npm install -g typescript-language-server")
+  fi
+fi
+
+if [ ${#LSP_MISSING[@]} -gt 0 ]; then
+  echo "LSP binaries needing manual install — then re-run /safer:setup:"
+  printf '  - %s\n' "${LSP_MISSING[@]}"
+  LSP_BIN_STATUS="needs-manual: $(printf '%s; ' "${LSP_MISSING[@]%% —*}")"
+else
+  LSP_BIN_STATUS="ok"
+fi
+```
+
+**Fetch the pinned proxy.** `lsp-proxy.py` is the upstream [techee/lsp-proxy](https://github.com/techee/lsp-proxy) script pinned at `9b5a2a5`. It is GPL v2, so it lives only in the user's local cache, never the plugin tree (distribution stays MIT). The fetch is **fail-closed** (a partial download never lands — write to a temp file and `mv` only on success) and **idempotent** (re-running re-pins to the same commit):
+
+```bash
+LSP_PROXY="$HOME/.cache/safer-by-default/lsp-proxy.py"
+LSP_PROXY_URL="https://raw.githubusercontent.com/techee/lsp-proxy/9b5a2a5/lsp-proxy.py"
+mkdir -p "$(dirname "$LSP_PROXY")"
+if curl -fsSL "$LSP_PROXY_URL" -o "$LSP_PROXY.tmp"; then
+  mv "$LSP_PROXY.tmp" "$LSP_PROXY"
+  echo "lsp-proxy.py: fetched (techee/lsp-proxy@9b5a2a5) → $LSP_PROXY"
+  LSP_PROXY_STATUS="fetched (9b5a2a5)"
+else
+  rm -f "$LSP_PROXY.tmp"
+  echo "WARN: could not fetch lsp-proxy.py from $LSP_PROXY_URL"
+  echo "  The LSP path is not provisioned. Re-run /safer:setup once network is available."
+  echo "  (Setup's other outcomes stand; skills and bin/ helpers work without the LSP path.)"
+  LSP_PROXY_STATUS="fetch-failed (re-run setup)"
+fi
+```
+
+A fetch failure does not abort setup: the lint floor, strict flags, and managed `CLAUDE.md` from the prior steps are already in place, and `lsp/proxy/run.sh` degrades with a pointer when the proxy is absent. Record `LSP path: ${LSP_PROXY_STATUS}; binaries: ${LSP_BIN_STATUS}` for the Step 11 receipt; a fetch failure or missing binary is a `DONE_WITH_CONCERNS` for the LSP path only.
+
 ### Step 11: Print the completion summary
 
 End with a bordered block naming every decision and outcome. This is the user's receipt:
@@ -1417,6 +1487,7 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Baseline decision:      A | B | C | D  (per Step 10)
   Baseline file:          .safer-baseline.json | not written
   CLAUDE.md:              created | updated  (managed section written)
+  LSP path:               proxy <fetched (9b5a2a5) | fetch-failed>; binaries <ok | missing: ...>
   Schema library:         <SCHEMA_LIB>
   Database access:        <DB_TOOL>
   Env var access:         <ENV_VAR_ACCESS>

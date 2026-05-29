@@ -1,3 +1,36 @@
+## 0.3.0 — 2026-05-28
+
+v0.3.0 establishes how `safer:` skills compose with Claude Code's **Workflow tool**. The boundary is one line: a Workflow may own a skill's deterministic fan-out (dispatch N independent passes, barrier, pure reduce); it must never own a human gate (contract OK, ratchet-up-always-parks, round authorization, stop conditions). Four reference Workflow scripts encode the deterministic core of the four fan-out skills, each with the gate-preservation invariants written literally into the code — a Workflow executes the prose rulebook, it is not a second dispatcher (review-senior Invariant 11 holds). The prose rulebook in each `SKILL.md` stays authoritative and remains the required path for dispatched teammates (which cannot invoke Workflow), Codex, and non-opted-in sessions.
+
+This release also wires the LSP path through `/safer:setup` (Step 10c) and clears a batch of adversarially-found bugs across orchestrate, contract, diagnose, verify, and the analyzer.
+
+**v0.3.0 remains dogfood-only**, unchanged from v0.2.0: external adopters stay on 0.1.x until the publish follow-up lifts the maintainer-repo pre-flight halt.
+
+### Added
+
+- **Four reference Workflow scripts** for the fan-out skills, faithful and runnable, with gate-preservation encoded literally:
+  - `skills/orchestrate/dispatch-wave.workflow.js` (centerpiece) — runs ONE dispatch wave: computes the ready set, fans out ready modalities in parallel under `isolation:'worktree'`, returns structured receipts. Replaces the Step 5d `CronCreate` poll loop, swarm-socket discovery, dead-pane cleanup, per-tick cap math, and marker-parsing. Gates nothing; every receipt returns to the prose lifecycle.
+  - `skills/stamina/dispatch.workflow.js` — fans out N heterogeneous reviewers, reduces to the Phase-4 consensus. No auto-merge, no label transition; BLOCKED/ESCALATED ratchet upstream, NEEDS_CONTEXT parks; never reads the diff (Iron Rule).
+  - `skills/verify/phase35.workflow.js` — evaluates the Phase-3.5 triggers, dispatches only the fired gstack targets in report-only form (verify never self-edits), folds via the verdict-precedence table. Ring-1 and the final SHIP/HOLD stay in verify.
+  - `skills/docs-reader/personas.workflow.js` — 4 cold-start personas in parallel, deterministic severity-weighted aggregate. Exactly one round; round 2/3 stay human gates; CONTRADICTION escalates; emit-only.
+- **Two canonical pure-core modules with `--selftest`**: `skills/orchestrate/ready-set.mjs` (DAG ready-set resolver, 7 cases) and `skills/stamina/consensus.mjs` (Phase-4 consensus reducer, 11 cases), each mirrored inline in its Workflow script (scripts cannot import local files) and exercised by `tests/test-bin/`.
+- **`docs/workflow-composition.md`** — the 18-skill fit verdict table, the fan-out-vs-gate boundary, feasibility limits (teammate/opt-in/Codex/nested-one-level), the wave-vs-lifecycle split for orchestrate, the Invariant-11 reconciliation, and a "Passing inputs" section recording the dogfood-hardened `args` rules (arrives as a JSON string; keep it to identifiers + URLs; fail loud on malformed input) plus the read-only-dispatch finding (prefer `isolation:'worktree'` over `agentType:'Explore'`). Linked from README and ARCHITECTURE.
+- **Fenced `### Workflow path (Claude Code, opt-in)`** section in the four fan-out skills' `SKILL.tmpl` bodies, plus a PRINCIPLES.md Part 3 note reconciling the Workflow path with the Iron Rule and Invariant 11 (regenerates all 18 `SKILL.md`).
+- **`/safer:setup` Step 10c** provisions the LSP path: detects `python3` / `typescript-language-server` / `bun`, auto-installs `typescript-language-server` globally via npm when absent, and fetches `lsp-proxy.py` (pinned, fail-closed) into `~/.cache/safer-by-default/`.
+
+### Fixed
+
+- **Workflow `args` channel** (`e3c0553`, `6dca0b7`): the harness delivers `args` as a JSON string, not a parsed object — all four scripts now run a `parseArgs()` shim. Malformed `args` (which large/nested payloads produce in transit) now return an explicit `BLOCKED` with the parse error instead of a silent empty no-op; args are kept minimal (identifiers + URLs), with heavy content passed by reference for the dispatched agent to fetch.
+- **orchestrate** (`986b269`): the Phase-3 epic now actually applies the `safer:parent` label that the update-gate reads. Plus cron-scan and dead-pane guards (`36d2e06`, #317/#318).
+- **contract / diagnose** (`70469cb`): resolve the undefined `$ISSUE` in the planning→review transition.
+- **verify** (`36d2e06`, #249): run the build before the pre-test gate.
+- **analyzer** (`34d82c7`, #316): accept `"bun"` as a valid `packageRuntime`.
+- **7 ready bugs** from the adversarial bug-hunt (`4943bdb`), and the `/ship` adversarial (Codex) review findings (`63f3048`).
+
+### Changed
+
+- **Docs reconciled with reality** (`3dba5e8`): install instructions, LSP-setup claims, the label list, the removed `lib/`, and the dogfood path in README / INSTALL / ARCHITECTURE / CLAUDE.md now match what the code does.
+
 ## 0.2.0 — 2026-05-18
 
 v0.2.0 composes `@chughtapan/safer-spec-development` (the per-folder living-spec codemod) into `safer-by-default` as a required dependency for the maintainer's dogfood workspace. The skill formerly called `/safer:spec` is renamed `/safer:contract`; two new wrapper skills (`/safer:contract-init` and `/safer:contract-migrate`) expose the codemod's per-folder bootstrap and migration flows from inside the plugin. The codemod's typed exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the correct upstream modality, expressing Principle 8 (the ratchet) as integers a CI gate can read.
@@ -72,7 +105,7 @@ To pick up v0.2.0 in Claude Code:
 
 Reason: Claude Code's LSP dispatcher returns opaque "internal error" on every operation when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while doing the multiplexing internally. Empirically confirmed with three different manifest shapes during the spike (3 servers → error; 1 server → works; 1 server-via-proxy with 2 children → all queries and diagnostics flow).
 
-**User impact: re-run `/safer:setup` and `/reload-plugins` after upgrade.** Setup now installs LSP-side prerequisites (`typescript-language-server`, `python3`, `bun`) and fetches `lsp-proxy.py` at a pinned upstream commit (`9b5a2a5`) into `~/.cache/safer-by-default/lsp-proxy.py`. The fetch is idempotent and fail-closed: a network failure halts setup with a retry instruction rather than leaving the LSP path half-installed. Distribution stays MIT — the GPL v2 `lsp-proxy.py` lives in the user's local cache, never the plugin source tree.
+**User impact: re-run `/safer:setup` and `/reload-plugins` after upgrade** (the `lspServers` manifest changed from two entries to one). Setup's Step 10c fetches `lsp-proxy.py` at a pinned upstream commit (`9b5a2a5`) into `~/.cache/safer-by-default/lsp-proxy.py` (fail-closed, idempotent), installs `typescript-language-server` globally if missing, and checks `python3` and `bun` (printing install commands for those). Distribution stays MIT — the GPL v2 `lsp-proxy.py` lives in the user's local cache, never the plugin source tree.
 
 ### Removed: `lsp/syntax/` and `vscode-eslint-language-server` from the LSP path
 

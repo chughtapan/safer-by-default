@@ -312,6 +312,12 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 - *"Stamina finished; I'll add one more pass to be safe."* The ceiling is the ceiling. More is not better past 4.
 - *"One reviewer blocked on a nit; I'll downgrade their verdict."* Stamina does not grade reviewers. Any BLOCK ratchets upstream (Principle 8).
 
+## Execution: the fan-out may run as a Workflow, but the gates do not
+
+On Claude Code, the heterogeneous fan-out — stamina's N reviewers, and orchestrate's per-wave modality dispatch — MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule — a pure reducer cannot form a first-party opinion the way a model turn might.
+
+Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven — between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
+
 ---
 
 # Part 4 — Communication
@@ -774,10 +780,11 @@ echo "$URL"
 rm -f "$TMP"
 ```
 
-Transition the sub-issue (or the bug issue) from `planning` to `review`:
+Transition the work item from `planning` to `review`. Only a dispatched run has a `planning` sub-issue to advance (`$SAFER_SUBISSUE`); a standalone diagnose issue is created directly in `review` (see the publish step) and a `SAFER_BUG_ISSUE` run only comments, so neither transitions. `$ISSUE` (resolved below) is reused by the telemetry block.
 
 ```bash
-safer-transition-label --issue "$ISSUE" --from planning --to review 2>/dev/null || true
+ISSUE="${SAFER_SUBISSUE:-${TARGET_BUG:-$(printf '%s' "$URL" | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+$')}}"
+[ -n "${SAFER_SUBISSUE:-}" ] && safer-transition-label --issue "$SAFER_SUBISSUE" --from planning --to review 2>/dev/null || true
 ```
 
 Emit the end event:
