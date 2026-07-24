@@ -101,6 +101,21 @@ GHEOF
   echo "$dir"
 }
 
+# stage_zapbot_home
+# Exports HOME to a fresh temp dir holding the minimal ~/.zapbot/config.json
+# that _safer-zapbot-env.sh requires, so suites invoking helper-sourcing bins
+# (safer-escalate, safer-transition-label, safer-publish) run without the
+# developer's real zapbot config. Registers cleanup on EXIT; call once before
+# the run_test block.
+stage_zapbot_home() {
+  local dir
+  dir=$(mktemp -d)
+  mkdir -p "$dir/.zapbot"
+  printf '{"apiKey": "test-key"}' > "$dir/.zapbot/config.json"
+  export HOME="$dir"
+  trap "rm -rf '$dir'" EXIT
+}
+
 report() {
   echo ""
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

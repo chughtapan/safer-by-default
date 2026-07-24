@@ -10,6 +10,11 @@ source "$HERE/../test-helpers.sh"
 PLUGIN_DIR="$(cd "$HERE/../.." && pwd)"
 BIN="$PLUGIN_DIR/bin/safer-publish"
 
+# safer-publish sources _safer-zapbot-env.sh, which requires a staged
+# ~/.zapbot/config.json; isolate HOME so the negative arg-validation tests
+# exercise the parser rather than aborting in the env helper.
+stage_zapbot_home
+
 test_requires_kind() {
   local rc
   "$BIN" >/dev/null 2>&1; rc=$?
