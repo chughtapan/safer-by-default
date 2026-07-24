@@ -47,7 +47,7 @@ if [ -n "$PR" ]; then
   fi
   REPO_FLAG=()
   [ -n "$REPO" ] && REPO_FLAG=(--repo "$REPO")
-  gh pr diff "$PR" "${REPO_FLAG[@]}" > "$TMP" 2>/dev/null || {
+  gh pr diff "$PR" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} > "$TMP" 2>/dev/null || {
     echo '{"error":"gh pr diff failed"}' >&2; exit 1
   }
 elif [ -n "$DIFF_FILE" ]; then

@@ -21,7 +21,7 @@ run_cli() {
     shift 2
   done
   local rc=0
-  env -i HOME="$HOME" PATH="$PATH" "${env_args[@]}" "$CLI" "$@" >/dev/null 2>&1 <<< "test body" || rc=$?
+  env -i HOME="$HOME" PATH="$PATH" ${env_args[@]+"${env_args[@]}"} "$CLI" "$@" >/dev/null 2>&1 <<< "test body" || rc=$?
   echo "$rc"
 }
 

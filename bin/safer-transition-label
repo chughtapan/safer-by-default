@@ -37,13 +37,13 @@ fi
 REPO_FLAG=()
 [ -n "$REPO" ] && REPO_FLAG=(--repo "$REPO")
 
-if gh issue edit "$ISSUE" "${REPO_FLAG[@]}" --remove-label "$FROM" --add-label "$TO" >/dev/null 2>&1; then
+if gh issue edit "$ISSUE" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --remove-label "$FROM" --add-label "$TO" >/dev/null 2>&1; then
   echo "TRANSITIONED #$ISSUE: $FROM → $TO"
   exit 0
 fi
 
 # Retry path: maybe the FROM label wasn't set. Try add-only.
-if gh issue edit "$ISSUE" "${REPO_FLAG[@]}" --add-label "$TO" >/dev/null 2>&1; then
+if gh issue edit "$ISSUE" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --add-label "$TO" >/dev/null 2>&1; then
   echo "TRANSITIONED #$ISSUE: (no $FROM) → $TO"
   exit 0
 fi

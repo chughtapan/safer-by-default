@@ -8,6 +8,11 @@ source "$HERE/../test-helpers.sh"
 PLUGIN_DIR="$(cd "$HERE/../.." && pwd)"
 BIN="$PLUGIN_DIR/bin/safer-transition-label"
 
+# safer-transition-label sources _safer-zapbot-env.sh, which requires a
+# staged ~/.zapbot/config.json; isolate HOME so tests do not depend on the
+# developer's real zapbot config.
+stage_zapbot_home
+
 # mock_gh_dir_sequence <rc1> <rc2> — first gh call returns rc1, second returns rc2.
 mock_gh_dir_sequence() {
   local rc1="$1"

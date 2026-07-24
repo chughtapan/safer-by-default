@@ -7,6 +7,11 @@ source "$HERE/../test-helpers.sh"
 PLUGIN_DIR="$(cd "$HERE/../.." && pwd)"
 BIN="$PLUGIN_DIR/bin/safer-escalate"
 
+# safer-escalate sources _safer-zapbot-env.sh, which requires a staged
+# ~/.zapbot/config.json; isolate HOME so tests do not depend on the
+# developer's real zapbot config.
+stage_zapbot_home
+
 test_requires_args() {
   local rc
   "$BIN" >/dev/null 2>&1; rc=$?
