@@ -243,7 +243,7 @@ if [ "${SAFER_PUBLISH_SOURCE:-0}" = "1" ]; then
 fi
 
 handle_fallback_flags "$@" || exit $?
-set -- "${SAFER_RESIDUAL_ARGS[@]}"
+set -- ${SAFER_RESIDUAL_ARGS[@]+"${SAFER_RESIDUAL_ARGS[@]}"}
 
 # ── Existing arg parser (unchanged below) ───────────────────────────
 
@@ -391,17 +391,17 @@ RC=0
 case "$KIND" in
   epic|issue)
     [ -z "$TITLE" ] && { echo "ERROR: --title required for $KIND" >&2; exit 1; }
-    OUT=$(_run_gh issue create "${REPO_FLAG[@]}" --title "$TITLE" "${body_args[@]}" "${label_args[@]}" 2>&1)
+    OUT=$(_run_gh issue create ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --title "$TITLE" ${body_args[@]+"${body_args[@]}"} ${label_args[@]+"${label_args[@]}"} 2>&1)
     RC=$?
     ;;
   comment)
     [ -z "$ISSUE" ] && { echo "ERROR: --issue required for comment" >&2; exit 1; }
-    OUT=$(_run_gh issue comment "$ISSUE" "${REPO_FLAG[@]}" "${body_args[@]}" 2>&1)
+    OUT=$(_run_gh issue comment "$ISSUE" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} ${body_args[@]+"${body_args[@]}"} 2>&1)
     RC=$?
     ;;
   pr-comment)
     [ -z "$PR" ] && { echo "ERROR: --pr required for pr-comment" >&2; exit 1; }
-    OUT=$(_run_gh pr comment "$PR" "${REPO_FLAG[@]}" "${body_args[@]}" 2>&1)
+    OUT=$(_run_gh pr comment "$PR" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} ${body_args[@]+"${body_args[@]}"} 2>&1)
     RC=$?
     ;;
   *)
