@@ -23,7 +23,7 @@ fi
 
 Run every block below **only when `$SPEC_LAYER_SKIP_REASON` is empty**. Each block re-checks the flag so a mid-step failure (install or doctor) cleanly skips the rest without aborting setup.
 
-**Install the codemod from npm.** Pinned to the `~0.2.0` tilde range (Spec Invariant 3: codemod and plugin version-lock in pairs). Uses the package manager detected in Step 1; idempotent — skips when the dependency is already declared.
+**Install the codemod from npm.** Pinned to the `~0.3.0` tilde range (Spec Invariant 3: codemod and plugin version-lock in pairs). Uses the package manager detected in Step 1; idempotent — skips when the dependency is already declared.
 
 ```bash
 if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
@@ -34,7 +34,7 @@ if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
     process.stdout.write(dep ? "1" : "0");
   ' 2>/dev/null || echo "0")
   if [ "$HAS_CODEMOD" = "0" ]; then
-    $PM add -D @chughtapan/safer-spec-development@~0.2.0 || {
+    $PM add -D @chughtapan/safer-spec-development@~0.3.0 || {
       echo "WARN: living-spec install failed; skipping the rest of Step 4c (lint floor stands)." >&2
       SPEC_LAYER_SKIP_REASON="install failed"
       SPEC_LAYER_STATUS="skipped (install failed)"

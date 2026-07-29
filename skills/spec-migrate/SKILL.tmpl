@@ -2,17 +2,11 @@
 name: spec-migrate
 version: 0.1.0
 description: |
-  Wrapper that exposes the sister codemod's safer-spec-migrate skill inside
-  safer-by-default. The body of this skill is inlined at bin/safer-gen-skills
-  time from vendor/safer-spec-skills/safer-spec-migrate/SKILL.md.
-
-  Use when an adopter is migrating an existing module (with prior public
-  exports) onto the living-spec layer. Do NOT use to bootstrap a fresh
-  module; route to /safer:spec-init.
-
-  Do NOT edit the body block below. Refresh the snapshot at
-  vendor/safer-spec-skills/safer-spec-migrate/SKILL.md (see that dir's README for
-  source pin + steps) and re-run bin/safer-gen-skills.
+  Move an existing module onto the living-spec layer, or onto a new
+  SPEC_FORMAT_VERSION: retrofits MODULE.md and the .safer-spec/<slug>.json
+  sidecar over a folder that already has public exports. Use when the module
+  predates the layer. Do NOT use to bootstrap a fresh folder; route to
+  /safer:spec-init.
 triggers:
   - migrate module to living-spec
   - upgrade folder to MODULE.md
@@ -31,4 +25,41 @@ allowed-tools:
 
 # /safer:spec-migrate
 
-{{> vendor-skill:safer-spec-migrate}}
+## Doctrine
+
+{{> principles-core}}
+
+## How this modality projects from the doctrine
+
+- **Principle 8 (The Ratchet).** Migration surfaces gaps the folder already had. Each one routes upstream by exit code rather than being smoothed over in the sidecar.
+- **Part 4 (Durable records).** The retrofitted `MODULE.md` becomes the folder's contract for every agent that touches it next.
+
+## Role
+
+This skill runs the `safer-spec-migrate` flow from `@chughtapan/safer-spec-development`, the sister codemod that owns the living-spec layer. The codemod ships its own skill body; this wrapper exists so the flow is reachable as `/safer:spec-migrate` inside a safer-by-default session.
+
+The authoritative instructions are the codemod's, not this file's. Read `node_modules/@chughtapan/safer-spec-development/skills/safer-spec-migrate/SKILL.md` and follow it. That file ships with the package, so it is versioned with the `safer-spec` binary the project actually has installed and cannot drift from it.
+
+If that file is absent the living-spec layer is not installed: stop with `BLOCKED`, and name the fix (`/safer:setup`, or `<pm> add -D @chughtapan/safer-spec-development@~0.3.0`). Do not reconstruct the flow from memory and do not hand-write a `MODULE.md` or sidecar — the sidecar is the codemod's machine-readable record, and authoring it by hand is the paper-over anti-pattern Principle 7 rejects.
+
+## Scope
+
+**In scope:**
+- Running the codemod's `safer-spec-migrate` flow against one folder that already has public exports.
+- Reporting what changed, and which findings route to which modality.
+
+**Out of scope:**
+- Seeding a folder that has no living-spec layer yet. That is `/safer:spec-init`.
+- Editing a sidecar or an `@spec.*` directive by hand to clear a validate error. Route by exit code: `11` → `/safer:requirements`, `12` → `/safer:architect`, `13` → `/safer:implement-*`.
+- Changing the module's public surface to make migration easier. A surface change is `/safer:implement-staff` work against an approved plan.
+
+## Completion status
+
+- `DONE` — the codemod's flow completed; `MODULE.md` and the sidecar reflect the folder's current exports; `safer-spec validate` was run and its exit code reported.
+- `DONE_WITH_CONCERNS` — the flow completed but exports remain unspecified. Name each and its route.
+- `BLOCKED` — the codemod is not installed, or its flow exited non-zero for a reason outside this folder.
+- `NEEDS_CONTEXT` — the target folder or the intended `SPEC_FORMAT_VERSION` is ambiguous.
+
+## Voice (reminder)
+
+The next agent reads `MODULE.md` as the folder's contract. Report which folder migrated, which exports remain unspecified, and the `safer-spec validate` exit code with its routing.

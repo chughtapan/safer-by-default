@@ -1,3 +1,52 @@
+## 0.5.0 — 2026-07-29
+
+Two concepts shared the word "contract": the document authored by `/safer:contract`, and the user/orchestrator deal recorded on the parent epic. They are now `/safer:requirements` and the `## Autonomy contract` block. The doctrine that every skill inlined verbatim is replaced by a compressed core plus a reference read on demand, cutting what a skill loads per invocation roughly in half. The architecture LSP moves to its own repository.
+
+### Breaking
+
+- **`/safer:contract` is renamed `/safer:requirements`** (hard cut, no alias), and its GitHub label `safer:contract` becomes `safer:requirements`. `bin/safer-setup-labels` creates the new label going forward; existing repos migrate in one command that carries every tagged issue with it:
+
+  ```bash
+  gh label edit safer:contract --name safer:requirements
+  ```
+
+  The name was `/safer:spec` before 0.2.0, which renamed it to `/safer:contract` alongside composing `@chughtapan/safer-spec-development`. Reverting to `spec` would collide with that codemod's `safer-spec` CLI, `.safer-spec/` sidecar, and `@spec.*` directives, so the document takes a name owned by neither: it produces goals, non-goals, invariants, acceptance criteria, assumptions, and open questions.
+
+- **`/safer:contract-init` and `/safer:contract-migrate` are renamed `/safer:spec-init` and `/safer:spec-migrate`**, restoring the names upstream ships. They configure the per-folder living-spec layer, which is the codemod's territory, not either kind of contract.
+
+- **`vendor/` is removed and the `{{> vendor-skill:<slug>}}` directive with it.** The two wrapper skills used to inline a committed snapshot of the codemod's skill bodies at generation time. The codemod ships those bodies in its npm package, so the wrappers now read them from `node_modules/@chughtapan/safer-spec-development/skills/<slug>/SKILL.md` at runtime, where they are versioned with the `safer-spec` binary actually installed and cannot drift from it. When the package is absent the wrappers stop with `BLOCKED` and name the install command, rather than acting on a stale copy. This also retires the snapshot's supply-chain guards (symlink refusal, canonical-path escape checks), which existed only to make inlining someone else's tree safe.
+
+- **`bin/safer-gen-skills --release` and the `__SAFER_SPEC_VERSION__` sentinel are removed.** Both existed to guard the v0.2.0 vendored integration's install-command substitution; the sentinel appears nowhere in the tree since the 0.4.0 npm cutover. The generator drops from 289 lines to 144 and now has exactly one directive, `{{> principles-core}}`.
+
+- **The orchestrator's `## Contract` block is renamed `## Autonomy contract`** (also `## Contract (draft)` and `## Contract history`). It bounds what the orchestrator may do without asking; the requirements document bounds what gets built. The Step 5c.-1 budget reader accepts either heading, so parent epics written before this release keep resolving their contract; retitle them on the next amendment so a cold reader sees one vocabulary.
+
+- **The LSP layer is removed.** `lsp/` (the proxy wrapper and the architecture analyzer) is deleted, `.claude-plugin/plugin.json` no longer declares `lspServers`, and `/safer:setup` Step 10c is gone. Installing the plugin now starts no language server. The analyzer is maintained at [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp); install it from there for architecture diagnostics. The `eslint-plugin-agent-code-guard` lint floor is unaffected — it always shipped via the CLI surface `/safer:setup` writes, not via LSP.
+
+- **The `{{> principles}}` template directive is retired** in favor of `{{> principles-core}}`. A template still carrying the old directive is now a hard error naming the successor rather than a silent no-op.
+
+- **`setup-codex` retires four wrapper names** — `safer-spec`, `safer-contract`, `safer-contract-init`, `safer-contract-migrate` — removing them on the next run so Codex stops surfacing skills that no longer resolve. Unrelated `safer-*` wrappers are still left alone.
+
+### Changed
+
+- **Doctrine reaches a skill in two layers.** `PRINCIPLES.core.md` is the compressed craft floor, inlined into every skill body; `PRINCIPLES.md` stays the full doctrine, read by path at the plugin root when a call is close or the artifact is high-blast-radius. Previously the full doctrine was inlined into all 16 skills, 8,368 duplicated lines, while `/safer:orchestrate`'s dispatch prompts and the Codex wrappers *already* told agents to read `PRINCIPLES.md` — so a dispatched teammate loaded it twice. Changing a rule now means updating both files, then regenerating.
+
+- **Rare-branch material moves behind references the skill reads on demand.** New files under `skills/orchestrate/references/` (auto-monitor loop, dispatch templates, permission-request protocol, backtrack), `skills/setup/references/` (living-spec wiring, managed `CLAUDE.md` block), `skills/ux-audit/references/` (form and stakeholder heuristics), and `skills/_shared/peer-channel.md`. Each leaves a stub naming the section and its trigger condition. Skill bodies fell from 18,022 lines to 9,293, with 1,281 lines loaded only when their branch fires.
+
+- **`allowed-tools` now matches what each skill's body actually calls.** `/safer:orchestrate` declared none of `Agent`, `SendMessage`, `TeamCreate`, `CronCreate`, `CronDelete`, or `Workflow` despite being built on them; the three `implement-*` tiers had `Write` but not `Edit` while their own bodies regulated `Edit` calls; `/safer:diagnose` had neither despite writing a reproduction test. `/safer:verify` and `/safer:review-senior` keep their read-only surface deliberately — that is what makes "you hold; you do not fix" structural rather than a prose rule.
+
+- **The autonomy contract has five fields, consistently.** `PRINCIPLES.md` said four, `/safer:orchestrate` said five and then "four sections" two paragraphs later, and all four worked examples omitted `Mode` — which `PRINCIPLES.md` → Goal modes requires. Every worked example in `docs/contracts/` now carries its `Mode` line, and `/safer:orchestrate` Phase 1a points at them instead of describing the shape from scratch.
+
+- The living-spec version floor moves to `@chughtapan/safer-spec-development@~0.3.0` (from `~0.2.0`). The two wrapper-skill bodies are byte-identical between those releases, so nothing an adopter reads changes.
+
+- `CLAUDE.md` is trimmed to repository gotchas: generated `SKILL.md` files, the two doctrine layers, the `PRINCIPLES.md` headings that external lint-rule docs anchor to, and where rare-branch material lives.
+
+### Fixed
+
+- `tests/test-bin/test-safer-peer-message-skill-purity.sh` scans every markdown file under `skills/`, not only `SKILL.md`, so transport rules still cover material that moved into reference files.
+- `tests/test-bin/test-orchestrate-auto-dispatch.sh` pins its rules against the skill's whole context surface (spine plus references), so a rule moving between them stays covered.
+- `tests/test-bin/test-safer-gen-skills.sh` is rewritten around the one remaining directive, and gains the coverage the vendored suite never had: `--check` catching a hand-edited `SKILL.md`, render idempotence, and a missing `PRINCIPLES.core.md` failing loud.
+- `setup-codex` no longer runs `git submodule update` or clones with `--recurse-submodules`; the submodule it populated was removed in 0.4.1 and the snapshot that replaced it is now gone too.
+
 ## 0.4.1 — 2026-05-29
 
 A build-time-only change to how the living-spec wrapper-skill bodies are sourced, plus removal of docs and scenarios the 0.4.0 npm cutover superseded. No runtime behavior changes: the codemod still installs from npm, and `/safer:setup` / `/safer:verify` behave exactly as in 0.4.0.

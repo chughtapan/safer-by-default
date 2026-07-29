@@ -2,17 +2,10 @@
 name: spec-init
 version: 0.1.0
 description: |
-  Wrapper that exposes the sister codemod's safer-spec-init skill inside
-  safer-by-default. The body of this skill is inlined at bin/safer-gen-skills
-  time from vendor/safer-spec-skills/safer-spec-init/SKILL.md.
-
-  Use when an adopter wants to bootstrap the living-spec layer for a new
-  per-folder MODULE.md. Do NOT use to migrate an existing folder; route to
-  /safer:spec-migrate.
-
-  Do NOT edit the body block below. Refresh the snapshot at
-  vendor/safer-spec-skills/safer-spec-init/SKILL.md (see that dir's README for
-  source pin + steps) and re-run bin/safer-gen-skills.
+  Bootstrap the per-folder living-spec layer for a module: a MODULE.md plus its
+  .safer-spec/<slug>.json sidecar, authored by the safer-spec codemod. Use when
+  a folder has no living-spec layer yet. Do NOT use to move an existing folder
+  to a new SPEC_FORMAT_VERSION; route to /safer:spec-migrate.
 triggers:
   - bootstrap module spec
   - init the living-spec
@@ -31,4 +24,41 @@ allowed-tools:
 
 # /safer:spec-init
 
-{{> vendor-skill:safer-spec-init}}
+## Doctrine
+
+{{> principles-core}}
+
+## How this modality projects from the doctrine
+
+- **Principle 8 (The Ratchet).** The living-spec layer is the ratchet's machine-readable surface. `safer-spec validate`'s typed exit codes route HOLD verdicts to the modality that owns the gap, rather than letting the implement tier paper over it.
+- **Part 4 (Durable records).** `MODULE.md` and its sidecar are the durable per-folder record. They outlive the session that authored them.
+
+## Role
+
+This skill runs the `safer-spec-init` flow from `@chughtapan/safer-spec-development`, the sister codemod that owns the living-spec layer. The codemod ships its own skill body; this wrapper exists so the flow is reachable as `/safer:spec-init` inside a safer-by-default session.
+
+The authoritative instructions are the codemod's, not this file's. Read `node_modules/@chughtapan/safer-spec-development/skills/safer-spec-init/SKILL.md` and follow it. That file ships with the package, so it is versioned with the `safer-spec` binary the project actually has installed and cannot drift from it.
+
+If that file is absent the living-spec layer is not installed: stop with `BLOCKED`, and name the fix (`/safer:setup`, or `<pm> add -D @chughtapan/safer-spec-development@~0.3.0`). Do not reconstruct the flow from memory and do not hand-write a `MODULE.md` or sidecar — the sidecar is the codemod's machine-readable record, and authoring it by hand is the paper-over anti-pattern Principle 7 rejects.
+
+## Scope
+
+**In scope:**
+- Running the codemod's `safer-spec-init` flow against one folder.
+- Reporting what it wrote and what it left for a follow-up modality.
+
+**Out of scope:**
+- Migrating a folder that already has a living-spec layer. That is `/safer:spec-migrate`.
+- Editing a sidecar or an `@spec.*` directive by hand to clear a validate error. Route by exit code: `11` → `/safer:requirements`, `12` → `/safer:architect`, `13` → `/safer:implement-*`.
+- Authoring the requirements document the module implements. That is `/safer:requirements`.
+
+## Completion status
+
+- `DONE` — the codemod's flow completed; `MODULE.md` and the sidecar exist; `safer-spec validate` was run and its exit code reported.
+- `DONE_WITH_CONCERNS` — the flow completed but left gaps the codemod named. List each.
+- `BLOCKED` — the codemod is not installed, or its flow exited non-zero for a reason outside this folder.
+- `NEEDS_CONTEXT` — the target folder is ambiguous and the user must name it.
+
+## Voice (reminder)
+
+The next agent reads `MODULE.md` as the folder's contract. Report which folder was seeded, what the sidecar records, and the `safer-spec validate` exit code with its routing.
