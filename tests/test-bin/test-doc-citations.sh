@@ -31,20 +31,30 @@ ROOT="$(cd "$HERE/../.." && pwd)"
 # were out of scope, which is exactly the kind of unchecked claim this file
 # exists to catch.
 #
-# `CHANGELOG.md` is included. An earlier version excluded it on the theory
-# that a changelog legitimately names deleted files and renamed headings.
-# That theory is currently hypothetical: reimplementing both predicates
-# against the file finds zero broken links and exactly one unresolved
-# citation, and that one is a meta-example describing this checker rather
-# than a historical record. Excluding a whole file to dodge one sentence is
-# the wrong trade; the sentence is reworded instead. Revisit only when a real
-# historical entry fails.
+# `CHANGELOG.md` is in the link set but NOT the citation set, and the reason
+# is evidenced rather than theoretical.
+#
+# A changelog entry that documents a citation fix must quote the broken
+# citation to be intelligible: "cited PRINCIPLES.md -> Durability (the heading
+# is Durable records)". That sentence is indistinguishable, to any extractor,
+# from the defect it describes. It happened twice while writing this file, and
+# it will happen every time a citation fix is documented, so rewording is
+# whack-a-mole rather than a fix.
+#
+# The distinction is real, not convenient: the check exists to stop a doc from
+# sending a reader to a heading that does not exist. A changelog is not sending
+# the reader anywhere; it is recording that someone else once did. Links are
+# still checked, because a changelog link is a live link.
 doc_set() {
   find "$ROOT" -maxdepth 1 -name '*.md' -type f
   find "$ROOT/scenarios" "$ROOT/docs" -name '*.md' -type f 2>/dev/null
   find "$ROOT/skills" -name 'SKILL.tmpl' -type f 2>/dev/null
   find "$ROOT/skills" \( -path '*/references/*.md' -o -path '*/prompts/*.md' \) -type f 2>/dev/null
   find "$ROOT/skills/_shared" -name '*.md' -type f 2>/dev/null
+}
+
+citation_doc_set() {
+  doc_set | grep -v '/CHANGELOG\.md$'
 }
 
 principles_headings() {
@@ -101,7 +111,7 @@ test_quoted_citations_resolve() {
       printf '%s\n' "$headings" | grep -qxF "$cited" \
         || missing="$missing\n  $doc cites \"$cited\""
     done < <(cited_headings "$doc")
-  done < <(doc_set)
+  done < <(citation_doc_set)
 
   [ -z "$missing" ] || {
     printf 'citations to nonexistent PRINCIPLES.md headings:%b\n' "$missing" >&2
@@ -126,7 +136,7 @@ test_quoted_citations_resolve() {
 
 unquoted_cited() {
   prose_only "$1" 2>/dev/null \
-    | grep -oE 'PRINCIPLES\.md`?\)?[[:space:]]*(->|→)[[:space:]]*[^",.)]*' \
+    | grep -oE 'PRINCIPLES\.md`?\)?[[:space:]]*(->|→)[[:space:]]*[^",.)(]*' \
     | sed 's/.*\(->\|→\)[[:space:]]*//' \
     | sed 's/[[:space:]]*\(->\|→\)[[:space:]]*/\n/g' \
     | sed 's/`//g; s/[[:space:]]*$//' \
@@ -149,7 +159,7 @@ test_unquoted_citations_resolve() {
       done < <(printf '%s\n' "$headings")
       [ "$ok" = 1 ] || missing="$missing\n  $doc cites \"$cited\""
     done < <(unquoted_cited "$doc")
-  done < <(doc_set)
+  done < <(citation_doc_set)
 
   [ -z "$missing" ] || {
     printf 'unquoted citations naming no PRINCIPLES.md heading:%b\n' "$missing" >&2
