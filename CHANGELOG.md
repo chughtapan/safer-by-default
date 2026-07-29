@@ -1,3 +1,10 @@
+## Unreleased
+
+### Changed
+
+- **Principle 2's boundary list is qualified.** "From any other package" read as a universal: a decode owed at every seam a value crosses, including seams inside one program where nothing about the data changed. That mandates re-decoding data the program already decoded at its edge, which costs time to re-derive a fact already held and teaches callers that some layer downstream will catch what they skipped. A boundary is now defined as the point where the data's provenance changes, and the internal-chain case is stated outright: A calls B, B calls C, decoded at A's ingress, B and C do not re-decode. Disk, network, environment variables, user input, and dynamic imports are unchanged and unconditional. A package seam counts when provenance changes there, not because an import happened. `PRINCIPLES.core.md` item 2 carries the same qualification, so all 18 rendered skills inline it.
+- **`PRINCIPLES.md` → Voice gains one line on blank-line grouping.** A blank line in code is a grouping operator: a run of lines with no blank line between them reads as one thought, and a blank line where indentation already delineates the block is noise. Framed structurally rather than by how much fits on one screen, which is the rationale Google's C++ style guide deleted from its own vertical-whitespace section in `google/styleguide@c6f57a9` (31 Jul 2025).
+
 ## 0.5.0 — 2026-07-29
 
 Two concepts shared the word "contract": the document authored by `/safer:contract`, and the user/orchestrator deal recorded on the parent epic. They are now `/safer:requirements` and the `## Autonomy contract` block. The doctrine that every skill inlined verbatim is replaced by a compressed core plus a reference read on demand, cutting what a skill loads per invocation roughly in half. The architecture LSP moves to its own repository.

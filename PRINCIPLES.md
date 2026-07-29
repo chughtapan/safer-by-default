@@ -84,7 +84,9 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Why.** Static types are an assertion about shape. Runtime data is a fact. Assertions that contradict facts produce the worst class of bug: runtime behavior that disagrees with the type system. The only way to make types truths is to validate at the boundary. Once validated, the rest of the code path can trust the type. ETHOS §2 "Search Before Building" names this pattern at the knowledge layer: know what is actually coming in before deciding what to do with it; boundary validation is the runtime expression of the same discipline.
 
-**The boundaries.** Data from disk. From the network. From environment variables. From user input. From dynamic imports. From any other package. Every one of those is a boundary. Pick a schema library once, Effect Schema, Zod, Valibot, and use it at all of them.
+**The boundaries.** A boundary is where the data's provenance changes: the point where it enters your program, so the module receiving it is the first component that holds the knowledge needed to check its shape. Data from disk. From the network. From environment variables. From user input. From dynamic imports. Every one of those is a boundary, every time. A package seam is a boundary when provenance changes there: the data entered the system at that seam, or the package on the other side sits outside your build and ships facts rather than assertions your compiler checked. A package seam is not a boundary merely because an import happened. Pick a schema library once, Effect Schema, Zod, Valibot, and use it at every boundary you have.
+
+**One decode per provenance change, not one per layer crossed.** A calls B, B calls C, and the data was decoded at A's ingress. B and C do not decode it again. Inside that chain the value is already a truth, and a constraint both sides can see belongs in the type system (Principle 1), not in a second runtime decode. Re-decoding is not defense in depth: it re-derives a fact the program already holds, and it teaches callers that some layer downstream will catch what they failed to decode at the edge, which is how the one decode that matters starts to look optional. Repeat a decode only for a reason you can state, a measured performance win or a containment requirement the first decode does not serve. "It came from another module" is not one.
 
 **Anti-patterns.**
 - `(await r.json()) as Record<string, unknown>`. The cast is a lie; the shape is unknown until decoded.
@@ -496,6 +498,8 @@ End with what to do. Every output names its status marker and, where applicable,
 When the output is code, the type system is the voice. A signature that encodes the constraint speaks louder than a comment that describes it. Prefer the signature.
 
 A comment explains a hidden constraint or a workaround, never the shape the reader can already see. *"This branch handles the legacy V1 envelope that pre-2024 clients still send"* is worth writing. *"This function parses JSON"* is not.
+
+A blank line in code is a grouping operator: a run of lines with no blank line between them reads as one thought, so make that true, and drop the blank line where indentation already delineates, such as the start or end of a block.
 
 The next agent touching the code is a junior. The type system is the document that junior reads first. Make it say the right thing.
 

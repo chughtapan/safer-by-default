@@ -37,7 +37,7 @@ The cost of the same mistake compounds: roughly 1x this session, 10x next sprint
 ## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
-2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
+2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. A boundary is where provenance changes: disk, network, env vars, user input, dynamic imports, and a package seam when the data entered there or the other side is outside your build. One decode per provenance change, not one per layer crossed: A calls B calls C, decoded at A's ingress, B and C do not re-decode. A cast is not a decode.
 3. **Errors are typed, not thrown.** The set of errors a function can produce is part of its type. Tagged errors or discriminated result types encode that set; `throw` and silent `catch {}` erase it, and `Promise<T>` erases the error channel entirely.
 4. **Exhaustiveness over optionality.** Every switch over a union ends in a default that assigns to `never`. Every `match` handles both branches.
 
