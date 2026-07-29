@@ -10,7 +10,9 @@
 
 **Granted scope.** A single `/safer:architect` dispatch against an existing spec. The architect publishes its design doc + interface stubs. The chain stops there; orchestrator asks the user what to authorize for implementation.
 
-## Contract
+## Autonomy contract
+
+**Mode.** feature-ship — land the plan; implementation is not yet authorized
 
 **Goal.** Produce an architect design doc + interface stubs that satisfy the spec at <https://github.com/OWNER/REPO/issues/198#issuecomment-XXX>.
 

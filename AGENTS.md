@@ -6,15 +6,15 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 1. [`PRINCIPLES.md`](./PRINCIPLES.md) — four-part doctrine (craft, discipline, stamina, communication). Every skill projects from these principles.
 2. The skill you're about to invoke. Read its `SKILL.md` end-to-end before running its workflow.
-3. The parent epic's `## Contract` block (if dispatched by `/safer:orchestrate`). The contract bounds your autonomy — goal, acceptance criteria, autonomy budget, and always-park items.
+3. The parent epic's `## Autonomy contract` block (if dispatched by `/safer:orchestrate`). The contract bounds your autonomy — goal, acceptance criteria, autonomy budget, and always-park items.
 
 ## Skills by modality
 
 | Modality | Skill | When to invoke |
 |---|---|---|
-| **Design** | `/safer:contract` | Ambiguous intent → contract doc |
-| | `/safer:contract-init` | Bootstrap living-spec for a new module (`MODULE.md` + sidecar) |
-| | `/safer:contract-migrate` | Port a module to a new `SPEC_FORMAT_VERSION` |
+| **Design** | `/safer:requirements` | Ambiguous intent → contract doc |
+| | `/safer:spec-init` | Bootstrap living-spec for a new module (`MODULE.md` + sidecar) |
+| | `/safer:spec-migrate` | Port a module to a new `SPEC_FORMAT_VERSION` |
 | | `/safer:architect` | Approved contract → module layout + interface stubs |
 | | `/safer:diagnose` | Reproducible bug → smallest repro + codex verdict |
 | | `/safer:spike` | Feasibility question → throwaway code + verdict |
@@ -56,7 +56,7 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 ## The update gate
 
-User-initiated entry-point skills (`/safer:contract`, `/safer:contract-init`, `/safer:contract-migrate`, `/safer:architect`, `/safer:diagnose`, `/safer:spike`, `/safer:research`, `/safer:setup`, `/safer:ux-audit`) halt at the preamble when `safer-update-check` reports an upgrade and `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. The user is told to run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` before re-running.
+User-initiated entry-point skills (`/safer:requirements`, `/safer:spec-init`, `/safer:spec-migrate`, `/safer:architect`, `/safer:diagnose`, `/safer:spike`, `/safer:research`, `/safer:setup`, `/safer:ux-audit`) halt at the preamble when `safer-update-check` reports an upgrade and `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. The user is told to run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` before re-running.
 
 `/safer:orchestrate` gates only on fresh-pipeline starts (no open `safer:parent` epic exists yet). Autonomous re-entry — cron-loop ticks, parent-epic polling — skips the gate so in-flight pipelines drain.
 
@@ -76,7 +76,7 @@ User-prompting gstack skills run hold-scope autonomous when invoked from inside 
 - **Skip the artifact.** "I did the work, here's a summary." Publish the artifact via `safer-publish` before declaring DONE.
 - **Auto-amend the contract.** Contracts amend through explicit `AMEND CONTRACT:` comments authored by repo collaborators on the parent epic. Never inferred from a skill run.
 - **Bypass the gate with `--no-update-check`.** No such flag exists. The gate exists because a stale skill body and a fresh remote can disagree on doctrine. Upgrade first.
-- **Add a new modality on the fly.** New modalities ship through `/safer:contract` → `/safer:architect` → review, not as a one-line edit to `skills/`.
+- **Add a new modality on the fly.** New modalities ship through `/safer:requirements` → `/safer:architect` → review, not as a one-line edit to `skills/`.
 - **Fix tests by deleting them.** Tests fail because the code or the spec is wrong. Investigate.
 
 ## Adding a new skill

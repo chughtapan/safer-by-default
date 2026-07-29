@@ -345,9 +345,9 @@ done
 # v0.2.0 rename cleanup: remove ONLY the known retired wrapper from earlier
 # versions. Broad-scope cleanup ("every safer-* whose suffix isn't in the
 # current skills list") risks removing locally-installed unrelated wrappers;
-# the narrow form is sufficient for the spec→contract rename. Future renames
+# the narrow form is sufficient for the renames this list covers. Future renames
 # extend this explicit retired-name list.
-RETIRED_WRAPPERS=("safer-spec")
+RETIRED_WRAPPERS=("safer-spec" "safer-contract" "safer-contract-init" "safer-contract-migrate")
 for retired in "${RETIRED_WRAPPERS[@]}"; do
   retired_dir="$SKILLS_DIR/$retired"
   retired_file="$retired_dir/SKILL.md"

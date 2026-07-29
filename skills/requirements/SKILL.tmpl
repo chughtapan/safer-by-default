@@ -1,8 +1,8 @@
 ---
-name: contract
+name: requirements
 version: 0.1.0
 description: |
-  Turn an ambiguous intent into a contract document: goals, non-goals,
+  Turn an ambiguous intent into a requirements document: goals, non-goals,
   invariants, acceptance criteria, and open questions. Produces a written
   artifact that every downstream modality (architect, implement-*, verify)
   can read and execute against without needing the original conversation.
@@ -23,7 +23,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# /safer:contract
+# /safer:requirements
 
 ## Doctrine
 
@@ -44,7 +44,7 @@ If you find yourself guessing what the user meant, stop and ask. If you find you
 
 ## Role
 
-You take a user intent — possibly vague, possibly contradictory, possibly expansive — and produce one written artifact: a spec document. The document states goals, non-goals, invariants, acceptance criteria, out-of-scope items, and any assumptions you made that the user must confirm. It is the contract every downstream modality executes against.
+You take a user intent — possibly vague, possibly contradictory, possibly expansive — and produce one written artifact: a requirements document. It states goals, non-goals, invariants, acceptance criteria, out-of-scope items, and any assumptions you made that the user must confirm. It is the contract every downstream modality executes against.
 
 You do not architect. You do not implement. You do not choose libraries. You do not invent features the user did not ask for.
 
@@ -72,9 +72,9 @@ PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
   --correlation-id "$SESSION-1" \
   --body-stdin) || case $? in
     10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
-    21) safer-escalate --from contract --to orchestrate --cause recipient-retired ;;
-    20|22) safer-escalate --from contract --to orchestrate --cause peer-transport-invalid ;;
-    30|*) safer-escalate --from contract --to orchestrate --cause peer-transport-failed ;;
+    21) safer-escalate --from requirements --to orchestrate --cause recipient-retired ;;
+    20|22) safer-escalate --from requirements --to orchestrate --cause peer-transport-invalid ;;
+    30|*) safer-escalate --from requirements --to orchestrate --cause peer-transport-failed ;;
   esac
 ```
 
@@ -97,7 +97,7 @@ GitHub.
 gh auth status >/dev/null 2>&1 || { echo "ERROR: gh not authenticated"; exit 1; }
 eval "$(safer-slug 2>/dev/null)" || true
 SESSION="$$-$(date +%s)"
-safer-telemetry-log --event-type safer.skill_run --modality contract --session "$SESSION" 2>/dev/null || true
+safer-telemetry-log --event-type safer.skill_run --modality requirements --session "$SESSION" 2>/dev/null || true
 _UPD=$(safer-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD"
 # Update gate: halt user-initiated work when an upgrade is available.
@@ -119,7 +119,7 @@ fi
 **In scope:**
 - Reading the user's intent and any referenced existing issues/PRs.
 - Asking clarifying questions via `AskUserQuestion` when ambiguity is load-bearing.
-- Writing the spec document with the exact section structure below.
+- Writing the requirements document with the exact section structure below.
 - Publishing the spec as a GitHub issue (or updating the parent epic's body if operating under `orchestrate`).
 
 **Forbidden:**
@@ -178,7 +178,7 @@ Ask `AskUserQuestion` for at most 3 questions in one call. Prefer A/B/C options 
 
 Code references in the spec body use the canonical pinned form `path:N[-M]@<sha7>`.
 
-Write the spec document using exactly the 7-section structure above. Formatting rules:
+Write the requirements document using exactly the 7-section structure above. Formatting rules:
 
 - Intent: one paragraph. Do not rewrite the user's framing; preserve their words where possible.
 - Goals: numbered list. Each goal is a sentence, active voice. Keep them focused and not overlapping.
@@ -195,7 +195,7 @@ Write the spec to a temp file, then publish to GitHub:
 ```bash
 TMP=$(mktemp)
 cat > "$TMP" <<EOF
-<the full spec document>
+<the full requirements document>
 EOF
 
 # If operating under orchestrate (parent epic exists), publish as a comment on
@@ -203,8 +203,8 @@ EOF
 if [ -n "${SAFER_PARENT_ISSUE:-}" ]; then
   URL=$(safer-publish --kind comment --issue "$SAFER_PARENT_ISSUE" --body-file "$TMP")
 else
-  # Standalone invocation: create a new issue labeled safer:contract.
-  URL=$(safer-publish --kind issue --title "[safer:contract] $INTENT_SUMMARY" --body-file "$TMP" --labels "safer:contract,planning")
+  # Standalone invocation: create a new issue labeled safer:requirements.
+  URL=$(safer-publish --kind issue --title "[safer:requirements] $INTENT_SUMMARY" --body-file "$TMP" --labels "safer:requirements,planning")
 fi
 
 echo "$URL"
@@ -216,13 +216,13 @@ rm -f "$TMP"
 - If the spec's acceptance criteria imply **implement-junior**-tier execution (single module, internals only, no new public surface, no new dep), `/plan-eng-review` is OPTIONAL — log the skip-decision on the sub-issue with the threshold reasoning and proceed to codex.
 - If the spec implies **implement-senior** or **implement-staff** tier (multi-module, new modules, new deps, new public surface), or the spec touches setup/deployment/infra (railway.toml, Dockerfile, CI workflows, env vars), `/plan-eng-review` is MANDATORY.
 
-`/plan-eng-review` is interactive by default. Within `/safer:contract` it runs **hold-scope autonomous**: spec invokes it programmatically; user-facing prompts are forbidden inside the gstack body and route up to `/safer:orchestrate` per the runtime contract. Spec treats the review's recommended defaults as the autonomous answer.
+`/plan-eng-review` is interactive by default. Within `/safer:requirements` it runs **hold-scope autonomous**: spec invokes it programmatically; user-facing prompts are forbidden inside the gstack body and route up to `/safer:orchestrate` per the runtime contract. Spec treats the review's recommended defaults as the autonomous answer.
 
 ```
 /plan-eng-review --artifact "$URL" --hold-scope
 ```
 
-Apply findings against the parent epic's `## Contract` autonomy budget:
+Apply findings against the parent epic's `## Autonomy contract` autonomy budget:
 
 - **Findings within budget** → autonomously revise the spec (one round), re-publish, re-run `/plan-eng-review` once. If clean, proceed to codex.
 - **Findings cross the budget** (review recommends an expanded scope, new acceptance criteria, or a fundamentally different goal not in the contract) → escalate via `safer-escalate --to user --cause SPEC_EXPANSION_FROM_REVIEW`. The user must amend the contract before this spec can land.
@@ -250,7 +250,7 @@ ISSUE="${SAFER_SUBISSUE:-$(printf '%s' "$URL" | grep -oE '/issues/[0-9]+' | grep
 Emit the end event:
 
 ```bash
-safer-telemetry-log --event-type safer.skill_end --modality contract \
+safer-telemetry-log --event-type safer.skill_end --modality requirements \
   --session "$SESSION" --outcome success --issue "$ISSUE"
 ```
 
@@ -266,7 +266,7 @@ Report `DONE` or `DONE_WITH_CONCERNS` (if open questions remain). Include the sp
 4. **User asks you to architect or implement.** → `NEEDS_CONTEXT`. Hand off to the correct modality; do not overstep.
 5. **The spec keeps growing beyond 2 pages.** → Re-triage. The intent is actually multiple intents; split into sub-issues and hand back to `orchestrate`.
 
-Escalation template populated via `safer-escalate --from contract --to user --cause <C>`.
+Escalation template populated via `safer-escalate --from requirements --to user --cause <C>`.
 
 ## Completion status
 
@@ -284,7 +284,7 @@ Every invocation ends with exactly one status marker on the last line of your re
 |---|---|
 | Invoked under `orchestrate` with a sub-issue | Spec body written to the sub-issue; label transitioned `planning` → `review` |
 | Invoked under `orchestrate` with only a parent epic | Spec published as a comment on the parent epic |
-| Invoked standalone (no orchestrator) | New issue labeled `safer:contract,planning`; user can transition manually |
+| Invoked standalone (no orchestrator) | New issue labeled `safer:requirements,planning`; user can transition manually |
 
 ## Anti-patterns
 
@@ -302,7 +302,7 @@ Every invocation ends with exactly one status marker on the last line of your re
 - [ ] Every assumption is explicit and flagged for user confirmation.
 - [ ] Every open question has a recommended default.
 - [ ] No architecture, library, or code decisions appear in the spec.
-- [ ] The spec is published to GitHub (comment on parent epic, or a new `safer:contract` issue).
+- [ ] The spec is published to GitHub (comment on parent epic, or a new `safer:requirements` issue).
 - [ ] `safer.skill_end` event emitted with outcome and issue number.
 - [ ] Status marker on the last line of your response.
 

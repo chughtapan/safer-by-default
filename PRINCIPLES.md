@@ -200,7 +200,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:requirements`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
@@ -229,12 +229,12 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 
 ### Living-spec is the ratchet's machine-readable surface
 
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:spec-init` / `/safer:spec-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
 
 | Exit | Error | Mechanical route |
 |---|---|---|
 | `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:requirements` |
 | `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
 | `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
 
@@ -302,16 +302,18 @@ Communication has four rules: contracts (the deal between user and orchestrator)
 
 Default state for the orchestrator and every dispatching skill is NOT autonomous. The user's instruction defines what may execute without further confirmation. Skills stay inside the granted scope; crossing the boundary requires explicit re-authorization.
 
-Every orchestration is governed by a **contract** recorded on the parent epic body — the deal between user and orchestrator, with four parts: Goal, Acceptance, Autonomy budget, Always-park. The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
+Every orchestration is governed by an **autonomy contract** recorded on the parent epic body under an `## Autonomy contract` heading — the deal between user and orchestrator, with five fields: Mode, Goal, Acceptance, Autonomy budget, Always-park (Mode is specified under Goal modes below). The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
 
-Two rules apply to every contract regardless of content:
+This is a different artifact from the requirements document `/safer:requirements` authors. The autonomy contract bounds *what the orchestrator may do without asking*; the requirements document bounds *what gets built*. Worked examples of the former live in `docs/contracts/`.
+
+Two rules apply to every autonomy contract regardless of content:
 
 1. **Ratchet-up always parks.** When a downstream modality must escalate to a higher modality (Principle 8 Ratchet), the original autonomy scope no longer applies. The escalation parks for re-authorization, even if the higher modality is technically inside the granted budget.
 2. **Stop-the-line conditions fire regardless of contract.** Three-strikes mis-scoping, confusion protocol, peer-review disagreement, stamina BLOCK, LOW-confidence on non-junior recommendations — each parks even within budget.
 
 ### Goal modes
 
-Every contract declares one **goal mode**. The orchestrator's defaults differ in each. Mode is a single line in the `## Contract` block of the parent epic, named back to the user during Phase 1a draft:
+Every contract declares one **goal mode**. The orchestrator's defaults differ in each. Mode is a single line in the `## Autonomy contract` block of the parent epic, named back to the user during Phase 1a draft:
 
 ```
 Mode: feature-ship | refactor | burndown
@@ -337,7 +339,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Requirements doc | GitHub issue, `safer:requirements` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -361,7 +363,7 @@ When an artifact's content changes, edit the original. Do not append `## Amendme
 
 Why: a record that accumulates amendments is no longer a record of *what is*; it is a record of *what was at each point in time*. The cold-start reader asks "what is the current shape," and amendment chains force them to reconcile multiple versions to find out. The forge already keeps history; the artifact's job is to be the current snapshot.
 
-**Exception.** Contract amendments. The contract framework explicitly tracks `## Contract history` as an append-only log of amendments — this is the one place where amendment-style accumulation is doctrine, because the contract IS the historical record of the deal. Everywhere else, edit in place.
+**Exception.** Contract amendments. The contract framework explicitly tracks `## Autonomy contract history` as an append-only log of amendments — this is the one place where amendment-style accumulation is doctrine, because the contract IS the historical record of the deal. Everywhere else, edit in place.
 
 ### Doctrine is SHA-stamped
 

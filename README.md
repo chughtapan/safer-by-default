@@ -19,7 +19,7 @@ It is not. This plugin recalibrates.
 
 > **`/safer:setup` works on any TypeScript + vitest repository.** As of v0.4.0 the living-spec codemod (`@chughtapan/safer-spec-development`) is published to npm, so setup installs it from the registry — the earlier dogfood-only halt is gone. On other projects, setup still runs the lint floor and LSP path and skips only the living-spec layer. See [Prerequisites](#prerequisites).
 
-Skills load as `safer:<name>` (`/safer:contract`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
+Skills load as `safer:<name>` (`/safer:requirements`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
 **Codex**:
 
@@ -80,7 +80,7 @@ The doctrine factors into four orthogonal axes. The first two govern *what code 
 
 **Part 4 — Communication.** How work hands off across sessions, agents, and time.
 
-- **Contracts.** Autonomy is granted, not assumed. Every orchestration runs against a `## Contract` block (goal, acceptance, autonomy budget, always-park items) authored on the parent epic. Out-of-budget next steps park; ratchet-up always parks.
+- **Contracts.** Autonomy is granted, not assumed. Every orchestration runs against a `## Autonomy contract` block (goal, acceptance, autonomy budget, always-park items) authored on the parent epic. Out-of-budget next steps park; ratchet-up always parks.
 - **Durable records.** The forge (GitHub) is the record. Edit in place; never amend. Every artifact is doctrine-SHA-stamped at OK time so the reviewer knows which doctrine the work was approved against. Code references pinned by file:line, never "the function we discussed."
 - **Output receipts.** Every artifact declares four numbers: status (DONE / DONE_PARKED / REVISE), confidence, effort, and process issues. Four lines, every time. The next reader knows what the producer believed without reading the body.
 - **Cold-start writing.** The next agent has none of your context. Present-tense, portable references, no "earlier in this session." If a fact is load-bearing, it lives in the artifact body, not in the chat.
@@ -97,15 +97,15 @@ The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from 
 
 Eighteen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
 
-Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:contract` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
+Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:requirements` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
 
 ### Design / exploration
 
 | Skill | When to invoke | Output |
 |---|---|---|
-| `/safer:contract` | ambiguous intent; no acceptance criteria | contract doc → GitHub issue |
-| `/safer:contract-init` | bootstrap living-spec for a new module (per-folder `MODULE.md` + sidecar) | new `MODULE.md` + `.safer-spec/<slug>.json` + property-test stub |
-| `/safer:contract-migrate` | port a module to a new `SPEC_FORMAT_VERSION` | per-file dry-run diff + per-file rewrite |
+| `/safer:requirements` | ambiguous intent; no acceptance criteria | contract doc → GitHub issue |
+| `/safer:spec-init` | bootstrap living-spec for a new module (per-folder `MODULE.md` + sidecar) | new `MODULE.md` + `.safer-spec/<slug>.json` + property-test stub |
+| `/safer:spec-migrate` | port a module to a new `SPEC_FORMAT_VERSION` | per-file dry-run diff + per-file rewrite |
 | `/safer:architect` | need module/interface/data-flow structure | design doc + interface stubs + every artifact that defines the system (docs, configs, scripts, CI, deploy files) |
 | `/safer:diagnose` | reproducible bug | smallest repro + codex verdict |
 | `/safer:spike` | "is X feasible?" | throwaway code + go/no-go |
@@ -145,7 +145,7 @@ user intent
     ▼
 /safer:orchestrate       ─── creates parent epic + sub-issues on GitHub
     │
-    ├── /safer:contract         → contract published to sub-issue
+    ├── /safer:requirements         → contract published to sub-issue
     ├── /safer:architect    → design doc + interfaces published
     ├── /safer:implement-*  → draft PR opened
     ├── /safer:review-senior → native PR review

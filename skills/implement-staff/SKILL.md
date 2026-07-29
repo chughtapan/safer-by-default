@@ -233,7 +233,7 @@ Stop rules are not advisory. They are binary. Fired means stopped. This is the g
 - "I'll leave a comment in the code and keep going." *(A code comment is not an escalation artifact. Stop.)*
 - "The test is almost passing; one more attempt." *(The stop rule fires before the one-more-attempt.)*
 - "I caught myself about to write `any`/`as T`/`catch {}`/`throw new Error()`, so I'll annotate it as `DONE_WITH_CONCERNS` and let review-senior catch it." *(A Principle 1-4 violation the agent caught itself about to write IS a stop rule firing. The route is `safer-escalate`, not annotate-and-ship. See "Stop rules vs `DONE_WITH_CONCERNS`" below.)*
-- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:contract`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
+- "I'll edit the sidecar JSON or the `@spec.kind` directive to clear the validate error and ship." *(The sidecar is the codemod's machine-readable record of what the contract says about each export; editing it to make the error go away sidesteps Invariant 2 — the route is the exit-code modality, not the JSON edit. Exit `11` → `/safer:requirements`. Exit `12` → `/safer:architect`. Exit `13` → `/safer:implement-*`.)*
 
 ### Stop rules vs `DONE_WITH_CONCERNS`
 
@@ -262,12 +262,12 @@ Up is legal. Forward is legal (when the upstream artifact is ready). Sideways is
 
 ### Living-spec is the ratchet's machine-readable surface
 
-The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:contract-init` / `/safer:contract-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
+The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sidecar, authored via `/safer:spec-init` / `/safer:spec-migrate`, validated by `safer-spec validate`) gives the ratchet a typed escalation channel. Exit codes 10/11/12/13 from `safer-spec validate` route HOLD verdicts mechanically through `/safer:verify` to the right upstream modality — they are the Ratchet expressed as integers a CI gate can read:
 
 | Exit | Error | Mechanical route |
 |---|---|---|
 | `10` | `VersionSkewError` (installed sister ≠ pinned floor) | `BLOCKED`; show `safer-spec doctor` output verbatim |
-| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:contract` |
+| `11` | `MissingSpecPropertyError` (public export without `@spec.kind`) | → `/safer:requirements` |
 | `12` | `MissingStubError` (sidecar references a stub the module didn't materialize) | → `/safer:architect` (or `/safer:implement-staff` per `--json recommended_route`) |
 | `13` | `MissingImplError` (stub exists but body is missing) | → `/safer:implement-{junior,senior,staff}` per `--json recommended_route` |
 
@@ -335,16 +335,18 @@ Communication has four rules: contracts (the deal between user and orchestrator)
 
 Default state for the orchestrator and every dispatching skill is NOT autonomous. The user's instruction defines what may execute without further confirmation. Skills stay inside the granted scope; crossing the boundary requires explicit re-authorization.
 
-Every orchestration is governed by a **contract** recorded on the parent epic body — the deal between user and orchestrator, with four parts: Goal, Acceptance, Autonomy budget, Always-park. The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
+Every orchestration is governed by an **autonomy contract** recorded on the parent epic body under an `## Autonomy contract` heading — the deal between user and orchestrator, with five fields: Mode, Goal, Acceptance, Autonomy budget, Always-park (Mode is specified under Goal modes below). The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
 
-Two rules apply to every contract regardless of content:
+This is a different artifact from the requirements document `/safer:requirements` authors. The autonomy contract bounds *what the orchestrator may do without asking*; the requirements document bounds *what gets built*. Worked examples of the former live in `docs/contracts/`.
+
+Two rules apply to every autonomy contract regardless of content:
 
 1. **Ratchet-up always parks.** When a downstream modality must escalate to a higher modality (Principle 8 Ratchet), the original autonomy scope no longer applies. The escalation parks for re-authorization, even if the higher modality is technically inside the granted budget.
 2. **Stop-the-line conditions fire regardless of contract.** Three-strikes mis-scoping, confusion protocol, peer-review disagreement, stamina BLOCK, LOW-confidence on non-junior recommendations — each parks even within budget.
 
 ### Goal modes
 
-Every contract declares one **goal mode**. The orchestrator's defaults differ in each. Mode is a single line in the `## Contract` block of the parent epic, named back to the user during Phase 1a draft:
+Every contract declares one **goal mode**. The orchestrator's defaults differ in each. Mode is a single line in the `## Autonomy contract` block of the parent epic, named back to the user during Phase 1a draft:
 
 ```
 Mode: feature-ship | refactor | burndown
@@ -370,7 +372,7 @@ The forge is the canonical transport because this plugin targets GitHub by defau
 
 | Artifact | Published as |
 |---|---|
-| Spec doc | GitHub issue, `safer:contract` label |
+| Requirements doc | GitHub issue, `safer:requirements` label |
 | Architecture doc | Comment on parent epic, or sub-issue labeled `safer:architect` |
 | Root cause writeup | Comment on the bug issue |
 | Spike go/no-go + writeup | Issue labeled `safer:spike`; code branch unmerged |
@@ -394,7 +396,7 @@ When an artifact's content changes, edit the original. Do not append `## Amendme
 
 Why: a record that accumulates amendments is no longer a record of *what is*; it is a record of *what was at each point in time*. The cold-start reader asks "what is the current shape," and amendment chains force them to reconcile multiple versions to find out. The forge already keeps history; the artifact's job is to be the current snapshot.
 
-**Exception.** Contract amendments. The contract framework explicitly tracks `## Contract history` as an append-only log of amendments — this is the one place where amendment-style accumulation is doctrine, because the contract IS the historical record of the deal. Everywhere else, edit in place.
+**Exception.** Contract amendments. The contract framework explicitly tracks `## Autonomy contract history` as an append-only log of amendments — this is the one place where amendment-style accumulation is doctrine, because the contract IS the historical record of the deal. Everywhere else, edit in place.
 
 ### Doctrine is SHA-stamped
 
@@ -644,7 +646,7 @@ GitHub.
 
 ## Inputs required
 
-- A spec in state `plan-approved`, published on GitHub (issue labeled `safer:contract`, or an architect plan that references and aligns with a published spec).
+- A spec in state `plan-approved`, published on GitHub (issue labeled `safer:requirements`, or an architect plan that references and aligns with a published spec).
 - A sub-issue labeled `safer:implement-staff`.
 - `gh` authenticated.
 - Local repo on a clean working tree.
@@ -683,7 +685,7 @@ If the spec URL was not passed with the invocation, stop and ask. No spec, no st
 - Transitioning the sub-issue label `planning` → `implementing` → `review`.
 
 **Forbidden:**
-- Revising the spec. If the spec is wrong or incomplete, escalate to `/safer:contract`.
+- Revising the spec. If the spec is wrong or incomplete, escalate to `/safer:requirements`.
 - Introducing a new module the spec did not authorize, even if "it would make the new module cleaner."
 - Adding a public surface not in the spec or plan ("might be useful later" is the debt pattern).
 - Adding a dep that the plan did not authorize.
@@ -706,7 +708,7 @@ Hard rules:
 3. Every new dep in `package.json` maps to a spec constraint. The mapping goes in the PR body and the Dependencies table.
 4. Every file is reachable from a named module.
 5. No "while I'm here" edits to pre-existing modules, except barrel `export` updates that the plan authorized.
-6. **Module-count cap (inherited from architect).** Staff implements at most 5 new modules per orchestration. Architect's hard cap at the design stage carries forward to staff at the implementation stage; both modalities operate against the same authorized scope. Designs that legitimately need more than 5 new modules decompose upstream — spec authors a multi-orchestration sequence (e.g., "module batch 1 of N"), each batch ≤5 modules. Bigger work that arrives at staff under one orchestration is not authorized; escalate to spec via `safer-escalate --from implement-staff --to contract --cause module-cap-exceeded`.
+6. **Module-count cap (inherited from architect).** Staff implements at most 5 new modules per orchestration. Architect's hard cap at the design stage carries forward to staff at the implementation stage; both modalities operate against the same authorized scope. Designs that legitimately need more than 5 new modules decompose upstream — spec authors a multi-orchestration sequence (e.g., "module batch 1 of N"), each batch ≤5 modules. Bigger work that arrives at staff under one orchestration is not authorized; escalate to spec via `safer-escalate --from implement-staff --to requirements --cause module-cap-exceeded`.
 
 Soft guides:
 
@@ -770,7 +772,7 @@ For each new module in the traceability table:
 
 This sequence produces a module whose shape is visible before any behavior is written. The shape is what the downstream caller compiles against; get it right first.
 
-**`@spec.*` JSDoc on new public exports (v0.2.0 dogfood).** Every new public export in a `MODULE.md`-bearing area carries `@spec.kind`, `@spec.property`, and (where applicable) `@spec.threshold` JSDoc directives that match the architect plan's Property-test gates table. The codemod reads these directives at validate time and writes the per-folder `.safer-spec/<slug>.json` sidecar accordingly. An export without `@spec.kind` is a Phase 8 validate failure (exit code 11 → routes back to `/safer:contract` per Principle 8); the route is to author the directive in the contract step, not to clear the error by hand-editing the sidecar (stop rule 4 below).
+**`@spec.*` JSDoc on new public exports (v0.2.0 dogfood).** Every new public export in a `MODULE.md`-bearing area carries `@spec.kind`, `@spec.property`, and (where applicable) `@spec.threshold` JSDoc directives that match the architect plan's Property-test gates table. The codemod reads these directives at validate time and writes the per-folder `.safer-spec/<slug>.json` sidecar accordingly. An export without `@spec.kind` is a Phase 8 validate failure (exit code 11 → routes back to `/safer:requirements` per Principle 8); the route is to author the directive in the contract step, not to clear the error by hand-editing the sidecar (stop rule 4 below).
 
 ### Phase 5 — Install deps
 
@@ -843,7 +845,7 @@ Expected: `tier: staff`. Other classifications are signals:
 pnpm exec safer-spec validate --implemented
 ```
 
-Apply the routing per `/safer:verify`'s Phase 5 table: exit `11` → escalate to `/safer:contract` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`; exit `12` → escalate to `/safer:architect` (or self-route if the stub is in scope per the architect plan); exit `13` → finish the implementation (the staff PR cannot ship with `MissingImplError` rows). Editing the sidecar JSON or `@spec.*` directives by hand to clear the validate error is the Principle 7 anti-pattern (stop rule 4 below).
+Apply the routing per `/safer:verify`'s Phase 5 table: exit `11` → escalate to `/safer:requirements` via `safer-escalate --from implement-staff --to requirements --cause MISSING_SPEC_PROPERTY`; exit `12` → escalate to `/safer:architect` (or self-route if the stub is in scope per the architect plan); exit `13` → finish the implementation (the staff PR cannot ship with `MissingImplError` rows). Editing the sidecar JSON or `@spec.*` directives by hand to clear the validate error is the Principle 7 anti-pattern (stop rule 4 below).
 
 ### Phase 8a — Pre-PR simplify pass (mandatory, stricter than senior)
 
@@ -952,10 +954,10 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults or left
 
 ## Stop rules
 
-1. **Spec revision needed.** An acceptance criterion is wrong, missing, or contradictory as the implementation surfaces it. → `ESCALATED` to `/safer:contract` via `safer-escalate --from implement-staff --to contract --cause SPEC_REVISION`.
+1. **Spec revision needed.** An acceptance criterion is wrong, missing, or contradictory as the implementation surfaces it. → `ESCALATED` to `/safer:requirements` via `safer-escalate --from implement-staff --to requirements --cause SPEC_REVISION`.
 2. **Unresolvable ambiguity in the plan.** The plan leaves a load-bearing question open. → `ESCALATED` to architect.
 3. **Scope drift: a new artifact has no anchor.** → Stop. Delete the artifact or escalate. The traceability table is the rule.
-4. **New public export without `@spec.*` JSDoc** (v0.2.0 dogfood; folder carries `MODULE.md`). The directive is the contract surface the codemod reads; missing it is upstream work, not an implement-staff fix. Editing the sidecar JSON or `@spec.kind` directive by hand to clear the validate error is the Principle 7 anti-pattern (paper-over). → `ESCALATED` to `/safer:contract` via `safer-escalate --from implement-staff --to contract --cause MISSING_SPEC_PROPERTY`.
+4. **New public export without `@spec.*` JSDoc** (v0.2.0 dogfood; folder carries `MODULE.md`). The directive is the contract surface the codemod reads; missing it is upstream work, not an implement-staff fix. Editing the sidecar JSON or `@spec.kind` directive by hand to clear the validate error is the Principle 7 anti-pattern (paper-over). → `ESCALATED` to `/safer:requirements` via `safer-escalate --from implement-staff --to requirements --cause MISSING_SPEC_PROPERTY`.
 5. **Dep license or maintenance status unclear.** → `NEEDS_CONTEXT` to user. Do not "probably MIT" a dep choice.
 6. **`safer-diff-scope` errors out or returns an unexpected value.** → `NEEDS_CONTEXT`. Capture the output, do not push.
 7. **Pre-existing module needs a public-surface change that the spec did not authorize.** → `ESCALATED` to architect and spec.
@@ -974,7 +976,7 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults or left
 
 ```bash
 safer-escalate --from implement-staff \
-  --to <contract|architect> \
+  --to <requirements|architect> \
   --cause <SPEC_REVISION|PLAN_GAP|UNANCHORED_SCOPE|LICENSE_UNCLEAR|SURFACE_CHANGE_EXISTING|SCHEMA_MISMATCH|DIFF_SCOPE_ERROR>
 ```
 

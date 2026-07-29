@@ -17,7 +17,7 @@ Inside a Claude Code session:
 /plugin install safer@safer-by-default
 ```
 
-Skills register under the `safer:<name>` namespace (`/safer:contract`, `/safer:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
+Skills register under the `safer:<name>` namespace (`/safer:requirements`, `/safer:architect`, …). The plugin's `bin/` directory is auto-prepended to `PATH`, so `safer-publish`, `safer-vp`, `safer-update-check`, etc. are available immediately. No `./setup` step required.
 
 **Verify**:
 
@@ -64,7 +64,7 @@ It then symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex skill wrapp
 | `SAFER_REPO_URL` | Git remote for the XDG fallback clone | `https://github.com/chughtapan/safer-by-default.git` |
 | `CODEX_HOME` | Codex config root | `~/.codex` |
 
-**Verify**: Codex should now respond to `safer:contract`, `safer:architect`, etc. The wrapper SKILL.md files at `~/.codex/skills/safer-<name>/` carry a marker comment (`<!-- safer-by-default codex wrapper -->`) so re-runs replace generated wrappers but leave hand-written ones at the same path untouched.
+**Verify**: Codex should now respond to `safer:requirements`, `safer:architect`, etc. The wrapper SKILL.md files at `~/.codex/skills/safer-<name>/` carry a marker comment (`<!-- safer-by-default codex wrapper -->`) so re-runs replace generated wrappers but leave hand-written ones at the same path untouched.
 
 **Upgrade**: re-run `./setup-codex`. The XDG clone refreshes; the wrappers regenerate. If you're using the CC plugin cache as the source, run `/plugin marketplace update safer-by-default` first to refresh that cache, then `./setup-codex`.
 
@@ -76,7 +76,7 @@ After the plugin is installed:
 safer-setup-labels
 ```
 
-Creates the labels the skills publish under: the parent-epic marker `safer:parent` plus the modality labels `safer:contract`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:research`, `safer:spike`, `safer:deferred`. Per-stage state labels (`planning`, `review`, `implementing`, `verifying`, `done`) are created on demand as `/safer:orchestrate` runs a pipeline. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
+Creates the labels the skills publish under: the parent-epic marker `safer:parent` plus the modality labels `safer:requirements`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:research`, `safer:spike`, `safer:deferred`. Per-stage state labels (`planning`, `review`, `implementing`, `verifying`, `done`) are created on demand as `/safer:orchestrate` runs a pipeline. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
 
 ## Working from source (developers)
 

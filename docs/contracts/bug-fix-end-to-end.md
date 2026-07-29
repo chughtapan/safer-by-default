@@ -10,7 +10,9 @@
 
 **Granted scope.** Diagnose → implement-junior → review-senior → verify → merge. The chain runs autonomously; the orchestrator pings only on `Always-park` hits or ratchet-up.
 
-## Contract
+## Autonomy contract
+
+**Mode.** feature-ship — ship the fix; adjacent findings defer to follow-up issues
 
 **Goal.** Fix the day_vote phase regression so DAY_VOTE exits on quorum reached, in the running game and in tests.
 

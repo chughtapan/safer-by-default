@@ -208,7 +208,7 @@ if [ "$SPEC_LAYER_PRESENT" = "1" ]; then
 fi
 ```
 
-Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec layer); `10` (version skew) → `BLOCKED` with the validate output verbatim; `11` (`MissingSpecPropertyError`) → `HOLD` route `/safer:contract` (override if `--json` carries `recommended_route`); `12` (`MissingStubError`) → `HOLD` route `/safer:architect` (or `/safer:implement-staff` if `--json` names the stub); `13` (`MissingImplError`) → `HOLD` route `/safer:implement-{junior,senior,staff}` per `--json recommended_route`; fallback to `bin/safer-diff-scope` whole-PR with a verdict-body note that routing is PR-level imprecise; `124` (timeout) → `BLOCKED` with stderr surfaced. Phase 5's verdict table carries the same rows.
+Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec layer); `10` (version skew) → `BLOCKED` with the validate output verbatim; `11` (`MissingSpecPropertyError`) → `HOLD` route `/safer:requirements` (override if `--json` carries `recommended_route`); `12` (`MissingStubError`) → `HOLD` route `/safer:architect` (or `/safer:implement-staff` if `--json` names the stub); `13` (`MissingImplError`) → `HOLD` route `/safer:implement-{junior,senior,staff}` per `--json recommended_route`; fallback to `bin/safer-diff-scope` whole-PR with a verdict-body note that routing is PR-level imprecise; `124` (timeout) → `BLOCKED` with stderr surfaced. Phase 5's verdict table carries the same rows.
 
 ### Phase 3.5 — Compose gstack testing layer (rings 2 + 3)
 
@@ -282,11 +282,11 @@ A folder without `MODULE.md` skips this checklist. A folder with `MODULE.md` whe
 | All composed targets pass | no change to ring-1 verdict |
 | `safer-spec validate --implemented` exit `0` | no change to ring-1 verdict |
 | Exit `10` (version skew) | `BLOCKED`; surface validate output verbatim |
-| Exit `11` (`MissingSpecPropertyError`) | `HOLD` → `/safer:contract` (override per `--json recommended_route`) |
+| Exit `11` (`MissingSpecPropertyError`) | `HOLD` → `/safer:requirements` (override per `--json recommended_route`) |
 | Exit `12` (`MissingStubError`) | `HOLD` → `/safer:architect` (or `/safer:implement-staff` per `--json`) |
 | Exit `13` (`MissingImplError`) | `HOLD` → `/safer:implement-{junior,senior,staff}` per `--json`; fallback `bin/safer-diff-scope` whole-PR |
 | Exit `124` (validate timeout) | `BLOCKED`; surface stderr verbatim |
-| Stop rule 7 (stale sidecar) | `HOLD` → `/safer:contract` |
+| Stop rule 7 (stale sidecar) | `HOLD` → `/safer:requirements` |
 
 The verdict is mechanical. No judgment call beyond flakiness detection. If the mechanics say HOLD, the verdict is HOLD regardless of how close the diff is to green.
 
@@ -378,11 +378,11 @@ Each stop rule fires on a specific condition. When fired, produce an escalation 
 
 1. **You fixed a test.** Iron rule violation. Discard the edit (revert the file via `git checkout -- <file>`). Redo the run cleanly. The verdict cannot ship with verify-authored code in the diff.
 2. **Acceptance criteria unverifiable without more context.** Multiple criteria need external evidence verify cannot collect. Status: `BLOCKED`. Name each unverifiable criterion and what would verify it.
-3. **The tests themselves are broken.** The test file has a syntax error, or the test harness does not start, or a test is asserting against stale fixtures that were never updated with the diff. Status: `ESCALATED` to `contract` or `architect` (the contract the tests encode is wrong). Do not patch the tests.
+3. **The tests themselves are broken.** The test file has a syntax error, or the test harness does not start, or a test is asserting against stale fixtures that were never updated with the diff. Status: `ESCALATED` to `requirements` or `architect` (the contract the tests encode is wrong). Do not patch the tests.
 4. **Missing test infrastructure.** The repo has no runnable test command and no lint command. Status: `BLOCKED` to user; the repo is not verify-ready.
 5. **Persistent flakiness.** A test passes on retry but fails again on a third run. Status: `HOLD` with "flaky test is a regression" as the finding; route to `diagnose`. Do not `SHIP_WITH_CONCERNS` for a test that is unstable at this level.
 6. **Scope mismatch mid-run.** The diff grew between review-senior's review and your checkout (the author pushed more commits). Status: `BLOCKED`; ask review-senior to re-review the new head. Do not verify a diff that has not been reviewed at the current SHA.
-7. **Stale sidecar (living-spec).** `safer-spec validate` reports a sidecar `.safer-spec/<slug>.json` whose declared exports no longer match the folder's `index.ts` public surface (an export was renamed, removed, or its `@spec.kind` directive deleted in the diff). Status: `HOLD` → `/safer:contract` via `safer-escalate --from verify --to contract --cause STALE_SIDECAR`. The fix is upstream: the contract step authors the directive on the new export shape; verify does not edit sidecar JSON or `@spec.*` directives directly (Invariant 2 violation — editing the sidecar to clear the validate error is the Principle 7 anti-pattern "paper-over").
+7. **Stale sidecar (living-spec).** `safer-spec validate` reports a sidecar `.safer-spec/<slug>.json` whose declared exports no longer match the folder's `index.ts` public surface (an export was renamed, removed, or its `@spec.kind` directive deleted in the diff). Status: `HOLD` → `/safer:requirements` via `safer-escalate --from verify --to requirements --cause STALE_SIDECAR`. The fix is upstream: the contract step authors the directive on the new export shape; verify does not edit sidecar JSON or `@spec.*` directives directly (Invariant 2 violation — editing the sidecar to clear the validate error is the Principle 7 anti-pattern "paper-over").
 
 ## Completion status
 
@@ -418,7 +418,7 @@ A `HOLD` verdict is a valid terminal output for this modality: verify's job is t
 <each failing command or criterion, with file:line or test name>
 
 ## Recommended route
-<implement-junior | implement-senior | diagnose | architect | contract>
+<implement-junior | implement-senior | diagnose | architect | requirements>
 
 ## Confidence
 <LOW|MED|HIGH> <evidence>

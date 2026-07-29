@@ -150,8 +150,8 @@ Dispatched skills (with `SAFER_PARENT_ISSUE` set) skip the gate. The user upgrad
 - `last-update-check` — 1h cache for the version poll.
 
 **Pipeline** (GitHub):
-- Parent epic — labeled `safer:parent`. Body carries `## Contract`, `## Status`, `## Contract history`.
-- Sub-issues — one per modality. Labeled with the modality state (`safer:contract`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`).
+- Parent epic — labeled `safer:parent`. Body carries `## Autonomy contract`, `## Status`, `## Autonomy contract history`.
+- Sub-issues — one per modality. Labeled with the modality state (`safer:requirements`, `safer:planning`, `safer:implementing`, `safer:reviewing`, `safer:verifying`, `safer:done`, `safer:deferred`).
 - Comments — every published artifact (spec doc, design doc, persona feedback, audit findings, escalation notices, wake-up digests).
 
 The orchestrator reads pipeline state from GitHub on every tick; nothing pipeline-relevant lives in local files.
@@ -174,7 +174,7 @@ Some artifacts have a high blast-radius — public-surface PRs, doctrine changes
 
 ## Contracts
 
-Every orchestration runs against a `## Contract` block on the parent epic body — goal, acceptance, autonomy budget, always-park items. The orchestrator drafts the contract in Phase 1a, names it back to the user, and waits for `OK` before any decomposition. Out-of-budget next dispatches park the sub-issue with `## Awaiting amendment`. Ratchet-up to a higher modality always parks regardless of budget.
+Every orchestration runs against a `## Autonomy contract` block on the parent epic body — goal, acceptance, autonomy budget, always-park items. The orchestrator drafts the contract in Phase 1a, names it back to the user, and waits for `OK` before any decomposition. Out-of-budget next dispatches park the sub-issue with `## Awaiting amendment`. Ratchet-up to a higher modality always parks regardless of budget.
 
 Worked examples in `docs/contracts/`:
 - `invitation.md` — initial intent → orchestrator contract.

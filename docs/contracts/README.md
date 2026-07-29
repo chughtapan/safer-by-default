@@ -1,8 +1,8 @@
 # Contract examples
 
-Worked contract templates for common dispatch shapes. Each example is a real `## Contract` section as it would appear on a parent epic body — copy, adapt, post.
+Worked contract templates for common dispatch shapes. Each example is a real `## Autonomy contract` section as it would appear on a parent epic body — copy, adapt, post.
 
-The four-section format is doctrine (`PRINCIPLES.md → Contracts`). These examples show what the sections look like in practice for the dispatch patterns that come up most.
+The five-field format is doctrine (`PRINCIPLES.md` → Contracts). `Mode` is one of `feature-ship`, `refactor`, or `burndown`; it bounds the orchestrator's defaults, so it is named explicitly rather than inferred. These examples show what the sections look like in practice for the dispatch patterns that come up most.
 
 | File | Shape | When to use |
 |---|---|---|

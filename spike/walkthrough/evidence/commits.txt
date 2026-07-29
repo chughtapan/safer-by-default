@@ -1,0 +1,180 @@
+111c38bd0d1ff279cf5707bb90472d0fd609d3ff
+spike(walkthrough): VERDICT v3 — visual polish validated
+V3 ships per-scene segmentation, slide-style gum scenes, line highlights
+on code, crossfade transitions, persistent footer, and the
+Even-a-Geek-Can-Speak narration framework.
+
+New findings:
+- gum slides need pre-rendering (writes to .txt at planner time, tape
+  cats it) so viewer doesn't see the full gum invocation typed live
+- ffmpeg xfade needs constant frame rate; two-pass composite is the
+  reliable path
+- vhs render-vs-wallclock is worse at 1920x1080 (~50%) than 1280x720
+  (~80%). Per-scene padding absorbs but body scenes hold last frame
+  for ~10s. Next fix: 1280x720 or per-scene timescale probe.
+
+Verdict stays GO. Graduation modality remains /safer:contract.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+6afe6cca06f1f6cdd27fa174b2dea7a3dc7d88de
+spike(walkthrough): v3 planner prompt — Even a Geek Can Speak framework + 120-180s budget
+Adds the Hook -> Thesis -> Evidence -> Call-to-action framework as the
+required structure, expands per-scene word budgets (Evidence 50-80 words
+each instead of ~30), and bumps total length to 120-180s. Adds explicit
+anti-patterns (Evidence without a trade-off, generic CTAs, etc).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+65dc1186f525749aeb5585391d29e5022a8e8b67
+spike(walkthrough): v3 — first end-to-end run with per-scene segments
+- scene_planner.ts: pre-renders gum-styled slide files at planner time
+  so the tape just `cat`s a short filename instead of typing the full
+  gum invocation (cleaner visuals for title/pr-card/outro scenes)
+- composite.ts: switched from single-pass tpad+xfade complex filter
+  to two-pass (per-scene pad with constant 30fps, then xfade chain).
+  Fixes 'inputs needs constant frame rate' error from xfade on tpad
+  output.
+- narrative_plan.md (v3): 7 scenes following Hook -> Thesis -> 4
+  Evidence -> CTA framework. Hook leads with reviewer pain (1000 line
+  PR), Thesis names the capability (narrated walkthrough), Evidence
+  ties each architectural choice to viewer-felt output quality, CTA
+  names a specific next step.
+
+vhs's render-vs-wallclock at 1920x1080 is much worse than at 1280x720
+(scenes 2-6 came in at ~50% of audio length). composite.ts pads
+each segment with clone-last-frame to match audio. Audio plays fully
+across the held final frame of each scene.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+3abdc58019ab55d98da56d307939f707553c6de4
+spike(walkthrough): v3 scaffold — per-scene segmentation with scene types
+Splits the monolithic vhs recording into per-scene MP4 segments that
+get crossfaded together. Each scene picks a Type from {title, pr-card,
+log, code, diff, outro} and renders with the right tool:
+
+- title/outro: gum style centered box (double border, accent color)
+- pr-card: gh pr view formatted and piped through gum bordered box
+- log: git log --graph
+- code: bat with --highlight-line so narrated lines visibly pop
+- diff: git diff piped through delta
+
+v3 chrome: WindowBar Colorful, BorderRadius 12, Margin 40, MarginFill
+slate, CursorBlink off, FontSize 22, 1920x1080.
+
+New files: scene_planner.ts emits per-scene tapes; render_scenes.ts
+invokes vhs per tape; composite.ts builds the ffmpeg xfade chain +
+persistent drawtext footer (PR # / branch / spike name).
+
+Planner prompt now requires a Type field per scene, and Highlight on
+code scenes. README runbook reflects the new PLAN -> NARRATE ->
+RENDER -> COMPOSITE -> PUBLISH order.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+0b8e8456854846419197aca695a86e3e6a894ca2
+spike(walkthrough): VERDICT v2 — GO, audio-first validated
+V2 ran clean: per-scene Sleeps sized from measured Cartesia output,
+no atempo, no SSML. The atempo crunch on v1's scene 2 is gone.
+
+New finding documented: vhs's render-vs-wallclock timescale varies
+between runs (1.21x on v1, 1.28x on v2). Current pipeline absorbs
+the gap with ffmpeg tpad clone + -shortest so audio plays out over
+a held final frame. The real fix for /safer:walkthrough is per-scene
+MP4 segmentation + ffmpeg concat — three-line change.
+
+Verdict reupgraded from GO WITH REDESIGN (v1) to GO (v2). Graduation
+modality remains /safer:contract. Per autonomy-scope memory, this
+stops here — do not auto-invoke contract.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+802a83f400b57c1dc582e60717813b2b57a8a422
+spike(walkthrough): v2 narrative_plan (no durations, plain prose)
+Six scenes for the v2 audio-first dogfood. Lead with the flip; show
+the verdict's headline finding; show the tts.ts measure loop and the
+scene_planner Sleep sizing; close on a v1-vs-v2 compare CTA.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+91dee66e26b0656ff4e1e133755979f92317930b
+spike(walkthrough): v2 — audio-first per-scene timing, no SSML
+Reshape the pipeline so the scene is the alignment unit. Cartesia
+synthesizes each scene's plain-prose narration; tts.ts measures the
+WAV; scene_planner sizes each vhs Sleep to match. Video lands on
+audio boundaries per scene, no atempo, no padding negotiation.
+
+Changes:
+- prompts/planner.md: drop (Ns) durations, drop word-budget math,
+  forbid all markup inside Narration (no SSML, no backticks, no asterisks)
+- prompts/narrator.md: deleted (planner writes the final prose directly)
+- tts.ts: input is narrative_plan.md now (not transcript.ssml). Output
+  is per-scene WAV + manifest.json with MEASURED durations. Adds 0.8s
+  tail silence per scene so the viewer has a beat to register state.
+- scene_planner.ts: takes plan + manifest, sizes Sleeps from measured
+  audio (corrected for vhs's ~17% timescale underrun + Type render overhead)
+- README runbook: PLAN → NARRATE → RECORD → MERGE → PUBLISH ordering
+
+This is the redesign called out in v1's VERDICT. Next run validates whether
+it actually eliminates the alignment problems we saw in scene 2.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+4e477919d136f16dcc9882a09eb9f6a0bd6c0206
+spike(walkthrough): VERDICT — GO WITH REDESIGN
+Pipeline shipped end-to-end and asset is live, but the time-budget
+architecture is inverted: planner allocates seconds, recorder and
+narrator both fight to match, merge stage reconciles via atempo
+(1.6x on scene 2 this run).
+
+Right shape per user feedback: narrate first, measure per-scene WAV,
+size vhs Sleeps to match. Drift goes to zero, atempo goes away.
+
+Graduation: /safer:contract for a real /safer:walkthrough skill.
+Per autonomy-scope memory: this verdict stops here. No auto-ratchet.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+933eaf17466866166b1f021102ee9f38bd4186e4
+spike(walkthrough): first end-to-end run with atempo fitting
+- scene_planner emits BAT_PAGER/PAGER env so bat doesn't pager-lock
+  the recording mid-scene
+- tts.ts absolutizes concat paths (relative paths from /tmp concat list
+  resolved wrong)
+- tts.ts applies ffmpeg atempo when Cartesia output overruns scene budget
+  (scene 2 hit 1.6x due to SSML emphasis overhead)
+- narrative_plan committed as the first run's planning artifact
+
+Caveat for the next run: the time-budget-first architecture is inverted.
+Narrator should run BEFORE the recorder, and vhs Sleeps should size from
+measured per-scene WAV durations rather than the other way around. That
+fix belongs in the real /safer:walkthrough skill.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---
+25ad65b5f6dded9ec2d45e51eb9627896ea3ccb0
+spike(walkthrough): scaffold narrated PR walkthrough pipeline
+Throwaway prototype answering: can we produce a watchable narrated
+walkthrough MP4 (vhs + Cartesia + ffmpeg + gh release) end-to-end in
+<=2h? Pipeline split into PLAN -> RECORD -> NARRATE -> MERGE -> PUBLISH
+stages with reviewable artifacts between each.
+
+Scaffold only; no narrative_plan or recording yet. Smoke tests passed:
+scene_planner emits valid vhs tape + manifest; tts.ts hit Cartesia API
+and produced a 2.84s WAV with the default voice.
+
+Plan file: ~/.claude/plans/i-want-to-spike-steady-puffin.md
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---

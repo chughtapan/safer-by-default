@@ -95,12 +95,12 @@ worktree, while `model` and the schema and the whole-document read are preserved
 | `review-senior` | **moderate** | Dispatch-then-aggregate is scriptable, but Invariant 11 names the routing table as *the* dispatcher; a code dispatcher here is a SPEC-revision trigger. Composed targets are gstack `/`-skills, not `agent()` subagents. |
 | `ux-audit` | **moderate** | Seven inspection protocols are a parallelizable sweep, but the goal/persona front gate is an `AskUserQuestion`, and most value is model judgment (goal-link, severity). |
 | `research` | **moderate** | The round loop is scriptable (loop-until-confidence), but it is sequential (round N+1 depends on round N), and the codex supervisor must stay a genuinely separate cross-model call. |
-| `contract-migrate` | **moderate** | A genuine loop-over-a-set (per-tracked-MODULE.md regenerate-and-diff), parallelizable, but the dry-run confirmation and the "diff = bug vs. drift?" call are human gates. |
+| `spec-migrate` | **moderate** | A genuine loop-over-a-set (per-tracked-MODULE.md regenerate-and-diff), parallelizable, but the dry-run confirmation and the "diff = bug vs. drift?" call are human gates. |
 | `diagnose` | **moderate** | Its only fan-out (N-direction forks) is delegated *up* to orchestrate and is a ratchet-up that always parks; the codex verdict must stay a separate cross-model opinion. |
 | `dogfood` | none | N=1 by charter (one cold-start subagent). A primitive a workflow *calls*, not a workflow host. |
 | `spike` | none | One question, one branch, one verdict. No fan-out. |
 | `contract` | none | Single-author spec authoring behind the human contract gate; `AskUserQuestion` ambiguity resolution is irreducible. |
-| `contract-init` | none | Single-folder export-graph read; deliberately de-CLI'd because the judgment can't be mechanized. |
+| `spec-init` | none | Single-folder export-graph read; deliberately de-CLI'd because the judgment can't be mechanized. |
 | `architect` | none | Single-author design; the Iron Rule (ship everything but the bodies) is a model brake. |
 | `implement-junior` / `-senior` / `-staff` | none | Single-author, single-PR. The scope brakes (Budget Gate, Ratchet, stop rules) are model-driven. |
 | `setup` | none | Already a deterministic bash spine, gated by many `AskUserQuestion` prompts; no agents to orchestrate. |
