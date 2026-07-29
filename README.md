@@ -4,7 +4,7 @@ A Claude skill plugin that recalibrates your coding agent for type-safe, scope-d
 
 ## The Problem
 
-Your coding agent is miscalibrated. It was trained on human-written code. Decades of it ,  written under one constraint that does not apply to it: typing was expensive for humans. That is why its training corpus is saturated with `throw new Error("bad")`, `as Record<string, unknown>`, `try { ... } catch {}`, `Promise<T>` return types, `if`-else without a `never` default, and untyped `process.env.FOO!` reads. Those were the compromises humans made when keyboard time was scarce. For an agent, keyboard time is not scarce. The agent can produce code that *eliminates classes of error by construction*. The way a compiler eliminates register-allocation bugs ,  if it is calibrated to do so.
+Your coding agent is miscalibrated. It was trained on human-written code. Decades of it, written under one constraint that does not apply to it: typing was expensive for humans. That is why its training corpus is saturated with `throw new Error("bad")`, `as Record<string, unknown>`, `try { ... } catch {}`, `Promise<T>` return types, `if`-else without a `never` default, and untyped `process.env.FOO!` reads. Those were the compromises humans made when keyboard time was scarce. For an agent, keyboard time is not scarce. The agent can produce code that *eliminates classes of error by construction*. The way a compiler eliminates register-allocation bugs, if it is calibrated to do so.
 
 It is not. This plugin recalibrates.
 
@@ -162,6 +162,8 @@ Every skill publishes its artifact to GitHub before considering itself done. Sta
 safer is the SDS modality spine. [gstack](https://github.com/garrytan/gstack) is a parallel toolbox of interactive workflow skills (`/codex`, `/qa`, `/ship`, `/plan-*`, `/health`, etc.). gstack is a hard dependency: every safer skill assumes the gstack tools it names are present. Install gstack alongside this plugin.
 
 Individual skills name their own gstack tool usage inline in the workflow prose where the tool is called. There is no central routing table; the skill body is the dispatcher.
+
+How the two doctrines compose (safer wins on scope, gstack ETHOS wins on quality-within-scope) is stated in [`PRINCIPLES.md`](./PRINCIPLES.md) → "Composing with gstack".
 
 **Ship hop.** safer's `verify` modality emits SHIP/HOLD; the post-verify hop routes through gstack `/ship` (VERSION + CHANGELOG + PR). `/safer:orchestrate` handles that routing.
 

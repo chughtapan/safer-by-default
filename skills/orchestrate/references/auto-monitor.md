@@ -154,7 +154,7 @@ For each comment body, scan in priority order:
 
    The auto-gate never skips verify on implement-\* sub-issues. A sub-issue at `plan-approved` whose PR is merged and has no verify verdict on the merge commit is a candidate for auto-dispatch to verify on every tick until the verdict lands.
 
-5a. **Surface process issues from teammate SendMessages (mandatory).** Per PRINCIPLES.md → Process issues are first-class artifacts, every teammate's closing SendMessage carries a `Process issues:` field. The orchestrator scans the SendMessage stream each tick and:
+5a. **Surface process issues from teammate SendMessages (mandatory).** Per PRINCIPLES.md → "Every output carries receipts", every teammate's closing SendMessage carries a `Process issues:` field. The orchestrator scans the SendMessage stream each tick and:
 
    - Aggregates non-empty `Process issues` entries from this tick's teammates.
    - Surfaces them to the user as a one-line summary in the next status update. NOT buried in a verdict body, NOT silently dropped because the substantive verdict was APPROVE.

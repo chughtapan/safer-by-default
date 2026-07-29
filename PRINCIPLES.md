@@ -244,6 +244,18 @@ The per-folder living-spec layer (`MODULE.md` + `.safer-spec/<slug>.json` sideca
 
 The implement tier does not edit the sidecar JSON or `@spec.*` directives to clear the error. That is Principle 7's paper-over anti-pattern. The route is the modality the exit code names; the work happens upstream, then ratchets forward.
 
+## Composing with gstack
+
+safer-by-default treats [`gstack`](https://github.com/garrytan/gstack) as a hard dependency. Skills call gstack tools inline at dispatch boundaries: `/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/qa`, and others. There is deliberately no complete list here. Each skill body names the calls it makes, at the point it makes them, so an agent invoking skill X reads only X. A central roster would be a second place to keep current, and it would rot the first time a skill added a call.
+
+**Precedence: safer wins on scope; gstack ETHOS wins on quality-within-scope.**
+
+The two doctrines answer different questions and the split is clean. safer decides *whether this change is yours to make* and *how large it is allowed to be*. That is Part 2, and it is not negotiable by a composed skill. gstack decides *how good the change is* once the scope question is already settled. When a gstack skill recommends work outside the budget, the budget wins and the recommendation becomes an escalation, not a task. When it recommends a better way to do work already in budget, take it.
+
+This belongs in Discipline rather than in the architecture notes because it is a scope rule wearing a composition costume. An agent that lets a composed reviewer widen its scope has violated Principle 6 no matter how good the review was.
+
+**User-prompting gstack skills run hold-scope autonomous inside a safer skill body.** `/plan-eng-review`, `/qa`, and their siblings are interactive when a human invokes them directly. Invoked from inside a modality they are not, because there is no human in that loop to answer. They run with their recommended defaults as the autonomous answer, and anything that genuinely needs a person routes up to `/safer:orchestrate` rather than stalling mid-body.
+
 ---
 
 # Part 3 — Stamina
@@ -286,7 +298,7 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 
 ## Execution: the fan-out may run as a Workflow, but the gates do not
 
-On Claude Code, the heterogeneous fan-out. Stamina's N reviewers, and orchestrate's per-wave modality dispatch ,  MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule ,  a pure reducer cannot form a first-party opinion the way a model turn might.
+On Claude Code, the heterogeneous fan-out. Stamina's N reviewers, and orchestrate's per-wave modality dispatch, MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule: a pure reducer cannot form a first-party opinion the way a model turn might.
 
 Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven. Between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
 
