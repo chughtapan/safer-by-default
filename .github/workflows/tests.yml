@@ -1,0 +1,24 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rendered skills match their templates
+        # skills/<name>/SKILL.md is generated from SKILL.tmpl + PRINCIPLES.core.md
+        # and both files are committed. A hand-edited SKILL.md, or a .tmpl edit
+        # that was never re-rendered, ships doctrine that disagrees with itself.
+        # --check compares byte-exactly and names every stale file.
+        run: bin/safer-gen-skills --check
+
+      - name: Helper unit tests
+        # Integration tests are opt-in (they need gh auth and a live repo);
+        # run-tests.sh skips them unless --integration is passed.
+        run: bash tests/run-tests.sh

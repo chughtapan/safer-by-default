@@ -64,11 +64,7 @@ Dispatched skills (when running under `SAFER_PARENT_ISSUE`) skip the gate entire
 
 ## Composition with gstack
 
-safer-by-default treats [`gstack`](https://github.com/garrytan/gstack) as a hard dependency. Every safer skill that needs broad-toolbox capability (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/plan-devex-review`, `/security-review`, `/ship`) calls into gstack inline. `/safer:setup` fails fast if gstack is absent.
-
-Doctrine precedence: safer wins on scope; gstack ETHOS wins on quality-within-scope. See `PRINCIPLES.md` → "Composing with gstack" for the precedence rule.
-
-User-prompting gstack skills run hold-scope autonomous when invoked from inside a safer skill body. User-facing prompts route up to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`. No skill body initiates a user prompt directly.
+gstack is a hard dependency; both `./setup` and `/safer:setup` fail fast without it. The precedence rule (safer wins on scope, gstack ETHOS wins on quality-within-scope) and the hold-scope rule for user-prompting gstack skills are doctrine: see [`PRINCIPLES.md`](./PRINCIPLES.md) → "Composing with gstack".
 
 ## Anti-patterns (do not do these)
 

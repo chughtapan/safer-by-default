@@ -2,7 +2,7 @@
 
 cc-judge scenarios that exercise `PRINCIPLES.md` against agent behavior. Each scenario is an agent prompt, a fixture workspace, a judge rubric, and a verdict. The suite is the test suite for the doctrine.
 
-Spec: [`docs/specs/evals-suite-v1.md`](../docs/specs/evals-suite-v1.md). Routing and v1 scope live there.
+The doctrine under test is [`PRINCIPLES.md`](../PRINCIPLES.md); the layout, axis vocabulary, and authoring rules live in this file.
 
 ## Layout
 

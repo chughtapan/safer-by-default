@@ -240,7 +240,7 @@ Decomposition implication: every sub-task you skip ("we'll figure it out later,"
               (VP / scrum master)
                        │
                        ▼
-                   contract
+                 requirements
                        │
                        ▼
                    architect
@@ -303,7 +303,7 @@ Classification table:
 | "Can we do X?" / "Is X feasible?" | `/safer:spike` directly |
 | "How do X systems work?" / open question | `/safer:research` directly |
 | "Fix this bug and ship the fix" | Orchestrate: diagnose → implement-* → verify |
-| "Build feature X" | Orchestrate: contract → architect → implement-* → verify |
+| "Build feature X" | Orchestrate: requirements → architect → implement-* → verify |
 | "Investigate and fix if tractable" | Orchestrate: diagnose → (decide) → implement-* → verify |
 | Clearly one modality, clearly done when that finishes | Decline; route directly |
 

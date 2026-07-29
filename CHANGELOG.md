@@ -1,3 +1,25 @@
+## Unreleased
+
+The docs claimed things about this repo that were not true, and nothing checked. These entries make the claims match the tree and add the CI that would have caught them.
+
+### Added
+
+- **Test CI.** `.github/workflows/tests.yml` runs `bin/safer-gen-skills --check` and `tests/run-tests.sh` on every push and pull request. `AGENTS.md` has asserted since 0.1.0 that CI fails on a stale `SKILL.md`; until now no workflow ran either command, so a hand-edited `SKILL.md` or an un-rendered `.tmpl` edit could ship doctrine that disagreed with itself.
+- **`PRINCIPLES.md` → "Composing with gstack"**, in Part 2 (Discipline). Carries the precedence rule (safer wins on scope, gstack ETHOS wins on quality-within-scope) and the hold-scope rule for user-prompting gstack skills. `AGENTS.md` has cited this heading by name since 0.1.0 and it did not exist. It belongs in Discipline because it is a scope rule: an agent that lets a composed reviewer widen its budget has violated Principle 6 regardless of how good the review was.
+- **`./setup` now checks gstack**, the one hard dependency it never verified. Accepts either install shape (`~/.claude/skills/gstack/`, or an enabled `gstack@*` plugin in `settings.json`) and fails the run when absent, matching what `/safer:setup` already did.
+
+### Fixed
+
+- **`./setup` looked for a plugin ID that no longer exists.** It grepped `settings.json` for `safer-by-default@safer-by-default`; the slug became `safer@safer-by-default` in 0.4.x. Every current install therefore reported "plugin not enabled" and printed a `/plugin install` line that reinstalls the retired ID. The check now matches the current slug, and recognizes the retired one separately to print rename instructions instead of a false negative. It also stated skills load as `safer-by-default:<name>`; the namespace is `safer:<name>`.
+- **`SKILL.md.tmpl` mandated a `## Composition with gstack` section that 0 of 18 skills carry**, and `ARCHITECTURE.md` asserted the section existed in each of them with `### Invokes` / `### Invoked by` subsections. `README.md` said the opposite, correctly: there is no central routing table, the skill body is the dispatcher. Section dropped from the template, claim removed from `ARCHITECTURE.md`.
+- **`ARCHITECTURE.md` update-gate list named three skills wrongly.** It listed `contract`, `contract-init`, `contract-migrate`; the gate lives on `requirements`, `architect`, `diagnose`, `spike`, `research`, `setup`, `ux-audit`, and `orchestrate`. `spec-init` and `spec-migrate` never carried it, so the doc claimed a gate on two skills that never had one.
+- **`ARCHITECTURE.md` skill anatomy was stale in both directions.** It listed a `## Read first` H2 that no skill has, and omitted `## Doctrine` and `## How this modality projects from the doctrine`, which is where `{{> principles-core}}` actually lands. Replaced with the real 15-item structure, plus a note that a rendered skill carries additional H2s because `PRINCIPLES.core.md` brings its own.
+- **`ARCHITECTURE.md` repo layout** listed the pre-0.5.0 `contract*` skill names, omitted `spec-init`, `spec-migrate`, and `_shared/`, and claimed a `docs/design/` directory that does not exist.
+- **`ARCHITECTURE.md` documented neither `references/` nor `_shared/`**, though both are load-bearing and `CLAUDE.md` describes them. Added, with the stub convention and the two-layer doctrine render.
+- **`skills/orchestrate/SKILL.tmpl` still routed to `contract`** in the ladder diagram and the triage table, a leftover from the 0.5.0 rename.
+- **`scenarios/README.md` linked `docs/specs/evals-suite-v1.md`**, which does not exist.
+- **`tests/run-tests.sh` globbed `test-linear-v2/`**, a directory that does not exist. Harmless under `nullglob`, removed.
+
 ## 0.5.0 — 2026-07-29
 
 Two concepts shared the word "contract": the document authored by `/safer:contract`, and the user/orchestrator deal recorded on the parent epic. They are now `/safer:requirements` and the `## Autonomy contract` block. The doctrine that every skill inlined verbatim is replaced by a compressed core plus a reference read on demand, cutting what a skill loads per invocation roughly in half. The architecture LSP moves to its own repository.

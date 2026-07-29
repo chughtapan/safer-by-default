@@ -163,6 +163,8 @@ safer is the SDS modality spine. [gstack](https://github.com/garrytan/gstack) is
 
 Individual skills name their own gstack tool usage inline in the workflow prose where the tool is called. There is no central routing table; the skill body is the dispatcher.
 
+How the two doctrines compose (safer wins on scope, gstack ETHOS wins on quality-within-scope) is stated in [`PRINCIPLES.md`](./PRINCIPLES.md) → "Composing with gstack".
+
 **Ship hop.** safer's `verify` modality emits SHIP/HOLD; the post-verify hop routes through gstack `/ship` (VERSION + CHANGELOG + PR). `/safer:orchestrate` handles that routing.
 
 ## Composing with Claude Code workflows

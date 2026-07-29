@@ -25,10 +25,9 @@ safer-by-default/
 │   ├── marketplace.json       ← Claude Code marketplace registration
 │   └── plugin.json            ← plugin metadata
 ├── skills/                    ← 18 modality skills, one folder each
+│   ├── _shared/               ← cross-skill reference material, read on demand
 │   ├── orchestrate/
-│   ├── contract/
-│   ├── contract-init/
-│   ├── contract-migrate/
+│   ├── requirements/
 │   ├── architect/
 │   ├── implement-{junior,senior,staff}/
 │   ├── diagnose/
@@ -40,9 +39,11 @@ safer-by-default/
 │   ├── dogfood/
 │   ├── docs-reader/
 │   ├── ux-audit/
-│   └── setup/
+│   ├── setup/
+│   ├── spec-init/
+│   └── spec-migrate/
 ├── bin/                       ← 14 CLI helpers (+ _safer-zapbot-env.sh, sourced shared module); auto-PATH at session start (see "CLI helpers" below)
-├── docs/                      ← contracts/ (templates) + design/ (living-spec) + workflow-composition.md
+├── docs/                      ← contracts/ (templates) + workflow-composition.md
 ├── scenarios/                 ← cc-judge calibration suite
 ├── tests/                     ← test-bin/, test-integration/
 ├── setup                      ← dev-mode sanity check + legacy cleanup
@@ -55,18 +56,33 @@ Each `skills/<name>/SKILL.md` follows a fixed structure (codified in [`SKILL.md.
 
 1. **YAML frontmatter.** `name`, `version`, `description`, optional `triggers`, `allowed-tools`.
 2. **`# /safer:NAME`.** H1 heading, matches the YAML name.
-3. **`## Read first`.** What to read before any work.
-4. **`## Iron rule`.** The single non-negotiable invariant for this modality.
-5. **`## Role`.** What the skill is and what it isn't.
-6. **`## Inputs required`.** What must be present before invocation; preamble bash; update gate.
-7. **`## Scope`.** In-scope and out-of-scope work.
-8. **`## Workflow`.** Phased steps.
-9. **`## Stop rules`.** When to halt and escalate.
-10. **`## Publication map`.** What artifact gets published where.
-11. **`## Anti-patterns`.** Common drift to avoid.
-12. **`## Checklist before declaring DONE`.** Verifiable preconditions.
+3. **`## Doctrine`.** Where `{{> principles-core}}` lands. See "Doctrine rendering" below.
+4. **`## How this modality projects from the doctrine`.** Which Parts and principles this modality leans on.
+5. **`## Iron rule`.** The single non-negotiable invariant for this modality.
+6. **`## Role`.** What the skill is and what it isn't.
+7. **`## Inputs required`.** What must be present before invocation; preamble bash; update gate.
+8. **`## Scope`.** In-scope and out-of-scope work.
+9. **`## Scope budget`.** The shape of change in and out of scope.
+10. **`## Workflow`.** Phased steps.
+11. **`## Stop rules`.** When to halt and escalate.
+12. **`## Publication map`.** What artifact gets published where.
+13. **`## Anti-patterns`.** Common drift to avoid.
+14. **`## Checklist before declaring DONE`.** Verifiable preconditions.
+15. **`## Communication discipline`.** Status marker, receipts, voice.
 
-Skills read `PRINCIPLES.md` in their preamble and project the relevant principles onto their modality. They publish artifacts via `safer-publish` to GitHub.
+A rendered `SKILL.md` carries more H2s than this list, because `PRINCIPLES.core.md` brings its own `## Part 1..4` headings in with it at step 3.
+
+Skills publish their artifacts to GitHub via `safer-publish`.
+
+### On-demand reference material
+
+Rare-branch material does not live in the skill body. It lives in `skills/<name>/references/<topic>.md` (one skill) or `skills/_shared/<topic>.md` (several), and the body leaves a stub shaped **imperative + trigger condition + path**, so the model reads it when the branch applies and skips it otherwise. A stub written as a bare noun phrase reads as a citation and gets treated as optional. `SKILL.md.tmpl` carries the full convention.
+
+### Doctrine rendering
+
+`bin/safer-gen-skills` renders each `skills/<name>/SKILL.tmpl` to a sibling `SKILL.md`, inserting an auto-generated marker after the frontmatter and expanding the single directive `{{> principles-core}}` into the contents of `PRINCIPLES.core.md`. Both files are committed. `bin/safer-gen-skills --check` compares byte-exactly and exits 1 on any stale render; CI runs it.
+
+Doctrine is two layers. `PRINCIPLES.core.md` is the compressed craft floor, inlined into every skill, so a line added there costs its length times the skill count. The full `PRINCIPLES.md` is read by path when a call is close or the artifact is high-blast-radius. Changing a rule means updating both.
 
 ## CLI helpers (`bin/safer-*`)
 
@@ -121,7 +137,7 @@ It then symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex skill wrapp
 
 `bin/safer-update-check` polls `https://raw.githubusercontent.com/chughtapan/safer-by-default/main/VERSION` once per hour, cache at `~/.safer/last-update-check`. On mismatch, prints `UPGRADE_AVAILABLE <local> <remote>` to stdout. Silent on network failure or when up to date.
 
-**Update gate**: user-facing entry skills (contract, contract-init, contract-migrate, architect, diagnose, spike, research, setup, ux-audit) halt at the preamble if `_UPD` is non-empty AND `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. Output: `PRECONDITION_FAIL` block telling the user to run the marketplace install commands. The model relays the message and waits for confirmation before doing any work.
+**Update gate**: user-facing entry skills (requirements, architect, diagnose, spike, research, setup, ux-audit, orchestrate) halt at the preamble if `_UPD` is non-empty AND `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. `spec-init` and `spec-migrate` do not carry the gate. Output: `PRECONDITION_FAIL` block telling the user to run the marketplace install commands. The model relays the message and waits for confirmation before doing any work.
 
 `/safer:orchestrate` uses a refined gate: halts only on fresh-pipeline starts (no open `safer:parent` epic exists). Autonomous re-entry, cron ticks, parent-epic polling, skips the gate so in-flight pipelines drain to completion.
 
@@ -142,13 +158,11 @@ The orchestrator reads pipeline state from GitHub on every tick; nothing pipelin
 
 ## Composition with gstack
 
-safer-by-default treats [`gstack`](https://github.com/garrytan/gstack) as a hard dependency. Skills call gstack tools inline at modality dispatch boundaries. `/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/plan-devex-review`, `/security-review`, `/ship`. `/safer:setup` fails fast if gstack is absent at `~/.claude/skills/gstack/`.
+safer-by-default treats [`gstack`](https://github.com/garrytan/gstack) as a hard dependency. Skills call gstack tools inline at modality dispatch boundaries. `/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/plan-devex-review`, `/security-review`, `/ship`. Both `./setup` and `/safer:setup` fail fast if gstack is absent.
 
-Doctrine precedence: **safer wins on scope; gstack ETHOS wins on quality-within-scope.**
+The precedence rule and the hold-scope rule are doctrine, not architecture. They live in [`PRINCIPLES.md`](./PRINCIPLES.md) → "Composing with gstack".
 
-Each skill's `## Composition with gstack` section names that skill's specific gstack invocations under `### Invokes` (what this skill calls) and `### Invoked by` (which gstack skills delegate into this one). Per-skill locality means an agent invoking skill X reads only X's body.
-
-User-prompting gstack skills (e.g. `/plan-eng-review`, `/qa`) run hold-scope autonomous when invoked from inside a safer skill body. User-facing prompts route up to `/safer:orchestrate`, which surfaces them via `AskUserQuestion`.
+There is no central routing table. Each skill body names the gstack calls it makes, where it makes them, so an agent invoking skill X reads only X.
 
 ## Stamina
 

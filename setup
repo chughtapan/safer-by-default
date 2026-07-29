@@ -66,6 +66,28 @@ if command -v gh >/dev/null 2>&1; then
   fi
 fi
 
+# gstack is the one hard dependency this script never checked. safer skills
+# call gstack tools (/simplify, /review, /codex, /plan-eng-review,
+# /plan-devex-review, /security-review, /ship, /land-and-deploy) inline, and
+# those calls have no fallback. Two install shapes count: the standalone
+# skill directory, and a marketplace plugin enabled in settings.json.
+gstack_present() {
+  [ -d "$HOME/.claude/skills/gstack" ] && return 0
+  for s in "$HOME/.claude/settings.json" \
+           "$HOME/.claude/settings.local.json"; do
+    [ -f "$s" ] && grep -q '"gstack@[^"]*"[[:space:]]*:[[:space:]]*true' "$s" && return 0
+  done
+  return 1
+}
+if gstack_present; then
+  log "  ✓ gstack present"
+else
+  err "gstack is required but not found."
+  err "  Looked for: ~/.claude/skills/gstack/ and an enabled gstack plugin in settings.json"
+  err "  Install inside Claude Code, then re-run: /gstack-upgrade"
+  FAIL=1
+fi
+
 # Optional composition partner. Look in both the legacy standalone-skill
 # path and the marketplace cache (since the marketplace install is now the
 # canonical Claude Code path for zapbot).
@@ -131,20 +153,28 @@ fi
 # --- Verify Claude Code plugin install + clean up legacy symlinks ---
 # The canonical Claude Code install path is the plugin marketplace:
 #   /plugin marketplace add chughtapan/safer-by-default
-#   /plugin install safer-by-default@safer-by-default
-# It auto-registers skills under the safer-by-default:<name> namespace and
-# auto-prepends bin/ to PATH. This script does not install anything for
-# Claude Code — it only checks the install and removes symlinks left by
-# older versions of setup that registered skills as ~/.claude/skills/safer-*.
+#   /plugin install safer@safer-by-default
+# The plugin slug is `safer`; the marketplace is `safer-by-default`. Skills
+# register under the safer:<name> namespace and bin/ is auto-prepended to
+# PATH. This script installs nothing for Claude Code. It checks the install
+# and removes symlinks left by older setup versions that registered skills
+# as ~/.claude/skills/safer-*.
 log "Checking Claude Code plugin install..."
 CC_SKILLS="$HOME/.claude/skills"
 SETTINGS="$HOME/.claude/settings.json"
-if [ -f "$SETTINGS" ] && grep -q '"safer-by-default@safer-by-default"[[:space:]]*:[[:space:]]*true' "$SETTINGS"; then
-  log "  ✓ plugin enabled in $SETTINGS — skills load as safer-by-default:<name>"
+if [ -f "$SETTINGS" ] && grep -q '"safer@safer-by-default"[[:space:]]*:[[:space:]]*true' "$SETTINGS"; then
+  log "  ✓ plugin enabled in $SETTINGS. Skills load as safer:<name>"
+elif [ -f "$SETTINGS" ] && grep -q '"safer-by-default@safer-by-default"[[:space:]]*:[[:space:]]*true' "$SETTINGS"; then
+  # The slug was renamed. An install under the old ID still resolves skills,
+  # so this is a rename prompt rather than a failure.
+  log "  ○ plugin enabled under the retired ID safer-by-default@safer-by-default."
+  log "    Inside Claude Code, switch to the current slug:"
+  log "      /plugin uninstall safer-by-default@safer-by-default"
+  log "      /plugin install safer@safer-by-default"
 else
   log "  ○ plugin not enabled. Inside Claude Code, run:"
   log "      /plugin marketplace add chughtapan/safer-by-default"
-  log "      /plugin install safer-by-default@safer-by-default"
+  log "      /plugin install safer@safer-by-default"
 fi
 
 log "Cleaning up legacy standalone skill symlinks..."

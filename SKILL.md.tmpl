@@ -173,18 +173,6 @@ Each rule names the trigger and the response. On fire: tear down any in-flight t
 | Out-of-budget | Workflow needs work outside `## Scope budget` | `safer-escalate --to <higher>`; park sub-issue |
 | Contract violation | A required input is missing or the contract's autonomy budget bars this work | Park; post `## Awaiting amendment` block; return `DONE_PARKED` |
 
-## Composition with gstack
-
-### Invokes
-
-- `/{{gstack-skill}}`. {{when and why this skill calls into gstack}}.
-
-### Invoked by
-
-- `/safer:{{upstream-modality}}`. {{when this skill is dispatched as a sub-task of another modality}}.
-
-User-prompting gstack skills run hold-scope autonomous from inside this skill body. Surface user-facing prompts via `AskUserQuestion` only when this skill is invoked at the top level (no `SAFER_PARENT_ISSUE`); under orchestrate, route prompts up via the parent epic.
-
 ## Publication map
 
 | Artifact | Destination | When |
