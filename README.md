@@ -149,7 +149,7 @@ user intent
 
 ### Workspace monorepos
 
-`/safer:setup` Step 4c installs the codemod **once** at the workspace root (`<pm> add -D @chughtapan/safer-spec-development@~0.2.0`), populating `node_modules/.bin`. If the layout has `vitest.workspace.ts` or per-package `vitest.config.{ts,js,mts}` files, setup repeats the **wire+seed** step (reporter patch + `safer-spec.config.json` seed) per workspace package, but the codemod install runs only at the workspace root.
+`/safer:setup` Step 4c installs the codemod **once** at the workspace root (`<pm> add -D @chughtapan/safer-spec-development@~0.3.0`), populating `node_modules/.bin`. If the layout has `vitest.workspace.ts` or per-package `vitest.config.{ts,js,mts}` files, setup repeats the **wire+seed** step (reporter patch + `safer-spec.config.json` seed) per workspace package, but the codemod install runs only at the workspace root.
 
 **Parent epic + sub-issues:** The orchestrate skill breaks one user intent into a GitHub issue (parent epic) and creates child sub-issues for each work unit (contract, architecture, implementation, review). Each sub-issue tracks one modality of work.
 
