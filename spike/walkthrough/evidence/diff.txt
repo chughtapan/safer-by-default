@@ -1,0 +1,1400 @@
+diff --git a/spike/walkthrough/.gitignore b/spike/walkthrough/.gitignore
+new file mode 100644
+index 0000000..fcdcf52
+--- /dev/null
++++ b/spike/walkthrough/.gitignore
+@@ -0,0 +1,14 @@
++node_modules/
++bun.lockb
++bun.lock
++audio/
++evidence/diff.txt
++evidence/diff-stat.txt
++evidence/commits.txt
++evidence/reviews.json
++walkthrough.tape
++walkthrough.mp4
++narration.wav
++final.mp4
++manifest.json
++transcript.ssml
+diff --git a/spike/walkthrough/README.md b/spike/walkthrough/README.md
+new file mode 100644
+index 0000000..d9c2bc4
+--- /dev/null
++++ b/spike/walkthrough/README.md
+@@ -0,0 +1,137 @@
++# spike/walkthrough — narrated PR walkthrough pipeline
++
++Throwaway prototype answering one question:
++
++> Can we produce a watchable narrated walkthrough MP4 for a PR — terminal-recorded diff + Cartesia voice-over + ffmpeg merge + GH release upload + link pasted in PR body — end-to-end in ≤2h, with output quality you'd actually use for review?
++
++Scope, GO criteria, graduation modality: see `VERDICT.md` (written at the end of the run).
++
++## Prerequisites
++
++- `CARTESIA_API_KEY` exported (default: from `~/.bashrc`)
++- `gh` CLI authed against this repo
++- `bun` ≥ 1.3
++- `vhs` (Charm), `ffmpeg`, `bat`, `ttyd`, `gum`, `delta` on `PATH`
++
++Verify in one line:
++
++```bash
++for b in bun vhs ffmpeg bat ttyd gum delta gh; do command -v "$b" >/dev/null || echo "MISSING: $b"; done
++test -n "$CARTESIA_API_KEY" || echo "MISSING: CARTESIA_API_KEY"
++```
++
++## Runbook (the agent follows these steps in order)
++
++The orchestrator is the agent running the spike, not a shell script. Each stage emits a reviewable artifact on disk.
++
++**Audio-first + per-scene segmentation**: NARRATE runs first. Each scene becomes its own vhs render based on its `Type` (title, pr-card, log, code, diff, outro). `composite.ts` stitches the per-scene MP4s with crossfade transitions and overlays a persistent footer.
++
++### Stage 1 — PLAN (gather evidence + dispatch planning subagent)
++
++```bash
++cd spike/walkthrough
++mkdir -p evidence audio
++git log main..HEAD --format='%H%n%s%n%b%n---' > evidence/commits.txt
++git diff main...HEAD --stat                    > evidence/diff-stat.txt
++git diff main...HEAD                           > evidence/diff.txt
++PR_NUM=$(gh pr view --json number -q .number 2>/dev/null || echo "")
++[ -n "$PR_NUM" ] && gh pr view "$PR_NUM" --json reviews,comments > evidence/reviews.json || echo "[]" > evidence/reviews.json
++```
++
++Then call the planning subagent (Agent tool, `subagent_type=general-purpose`) with `prompts/planner.md` as the system prompt and the evidence files as input. Save the returned markdown to `narrative_plan.md`. The plan has scenes with `Show:` and `Narration:` fields — **no durations** (those come from TTS).
++
++**Human checkpoint**: show `narrative_plan.md` to the user via AskUserQuestion. Options: ship as-is / let me edit it / abort and re-prompt. Default flow pauses here.
++
++### Stage 2 — NARRATE (plan → per-scene wav + manifest)
++
++Voice: defaults to Cartesia's "Barbershop Man" (`a0e99841-438c-4a64-b679-ae501e7d6091`). Override by exporting `CARTESIA_VOICE_ID` from any voice on https://play.cartesia.ai/voices.
++
++```bash
++eval "$(grep '^export CARTESIA_API_KEY=' ~/.bashrc)"
++bun run tts.ts narrative_plan.md
++# writes audio/scene_N.wav per scene + narration.wav (concatenated) + manifest.json (measured durations)
++```
++
++Each scene's narration is sent to Cartesia as plain prose (no SSML, no markup). A 0.8s tail of silence is appended to each scene so the viewer has a beat to register the on-screen state before the next scene cuts in.
++
++Smoke test:
++
++```bash
++bun run tts.ts --text "hello from the spike" --out /tmp/hi.wav
++```
++
++### Stage 3 — RENDER (plan + manifest → per-scene .tape + .mp4)
++
++```bash
++bun run scene_planner.ts narrative_plan.md manifest.json   # writes segments/scene_N.tape per scene (one per Type)
++bun run render_scenes.ts manifest.json                     # invokes vhs per scene → segments/scene_N.mp4
++```
++
++Each scene type renders differently:
++- `title`, `outro` — `gum style --align center --border double` (slide-style card)
++- `pr-card` — `gh pr view` formatted output piped through `gum style --border rounded`
++- `log` — `git log --graph --oneline --decorate -C2 main..HEAD`
++- `code` — `bat --highlight-line A:B --line-range C:D path` (highlight emphasizes the narrated lines)
++- `diff` — `git diff main...HEAD -- path | delta --paging=never`
++
++`render_scenes.ts` invokes vhs from the repo root with an `env -i` subshell. Each per-scene tape carries the v3 chrome (WindowBar Colorful, BorderRadius 12, Margin 40, MarginFill #1d1f2a, CursorBlink off, FontSize 22, 1920×1080).
++
++Smoke test before the real run:
++
++```bash
++bun run scene_planner.ts --dry-run narrative_plan.md manifest.json   # prints all tapes, no file writes
++```
++
++### Stage 4 — COMPOSITE (segments → final.mp4 with crossfades + footer)
++
++```bash
++PR_NUMBER=$(gh pr view --json number -q .number 2>/dev/null) bun run composite.ts manifest.json narration.wav final.mp4
++```
++
++ffmpeg's `xfade` filter crossfades each adjacent pair of segments (0.4s); the audio is the pre-concatenated `narration.wav` from Stage 2 (per-scene 0.8s tail silence already provides the audio transition window). A persistent `drawtext` footer shows `PR #N · branch · spike/walkthrough` across the entire video.
++
++### Stage 5 — PUBLISH (gh release + PR body)
++
++```bash
++SHA7=$(git rev-parse --short HEAD)
++TAG=spike-walkthrough-${SHA7}
++gh release create "$TAG" --draft --notes "Auto-uploaded by spike/walkthrough on $(git branch --show-current)" final.mp4 || gh release upload "$TAG" --clobber final.mp4
++ASSET_URL=$(gh release view "$TAG" --json assets -q '.assets[0].url')
++
++PR_NUM=$(gh pr view --json number -q .number 2>/dev/null || gh pr create --draft --fill --json number -q .number)
++BODY=$(gh pr view "$PR_NUM" --json body -q .body)
++case "$BODY" in
++  *"## Walkthrough"*) echo "PR body already has walkthrough section";;
++  *) gh pr edit "$PR_NUM" --body "$(printf '%s\n\n## Walkthrough\n%s\n\n<details><summary>Narrative plan</summary>\n\n%s\n</details>\n' "$BODY" "$ASSET_URL" "$(cat narrative_plan.md)")";;
++esac
++
++echo "WATCH: $ASSET_URL"
++```
++
++### Stage 6 — VERDICT + dogfood
++
++Write `VERDICT.md` scoring each GO criterion. Print the asset URL in chat with a one-line invitation. Stop. Do not invoke `/safer:contract` without re-auth (per autonomy-scope memory).
++
++## Files
++
++| File | Stage | Purpose |
++|---|---|---|
++| `prompts/planner.md` | 1 | Planning subagent system prompt |
++| `evidence/` | 1 | Diff, commits, reviews captured for the planner |
++| `narrative_plan.md` | 1 → 2,3 | Structured story (no durations); planner subagent output |
++| `tts.ts` | 2 | Reads plan, hits Cartesia per scene, measures WAVs, writes manifest |
++| `audio/scene_N.wav` | 2 | Per-scene narration (raw Cartesia output, plus 0.8s tail silence) |
++| `narration.wav` | 2 → 4 | Concatenated narration |
++| `manifest.json` | 2 → 3,4 | Per-scene **measured** durations (source of truth for Sleeps + xfade math) |
++| `scene_planner.ts` | 3 | Plan + manifest → one `.tape` per scene under `segments/` |
++| `segments/scene_N.tape` | 3 → vhs | Per-scene vhs script |
++| `render_scenes.ts` | 3 | Iterates manifest, invokes vhs per tape, produces `segments/scene_N.mp4` |
++| `segments/scene_N.mp4` | 3 → 4 | Per-scene silent video |
++| `segments/pr-card.txt` | 3 | Pre-rendered PR card body (when a `pr-card` scene exists) |
++| `composite.ts` | 4 | ffmpeg `xfade` chain + persistent `drawtext` footer + audio mux → `final.mp4` |
++| `final.mp4` | 4 → 5 | Composited video with crossfade transitions and footer |
++| `VERDICT.md` | 6 | GO/MIXED/NO-GO with evidence |
++
++## Re-running
++
++`evidence/` and `narrative_plan.md` are cheap to keep. `audio/`, `*.wav`, `*.mp4`, `*.tape` are regenerated and gitignored. Same-sha re-runs reuse the existing GH release via `--clobber`.
+diff --git a/spike/walkthrough/VERDICT.md b/spike/walkthrough/VERDICT.md
+new file mode 100644
+index 0000000..fc70844
+--- /dev/null
++++ b/spike/walkthrough/VERDICT.md
+@@ -0,0 +1,108 @@
++# Spike verdict: narrated PR walkthrough pipeline
++
++**Verdict**: **GO** — v3 visual-polish redesign shipped. Pipeline mixes slide-style (gum) and terminal-style (bat + delta) scenes with crossfade transitions, line highlighting on code excerpts, and a persistent footer. Narration structure follows the Even-a-Geek-Can-Speak framework (Hook → Thesis → Evidence → Call to action).
++
++**Wall-clock**: ~135 minutes total across v1, v2, v3.
++
++**Assets**:
++- **v3** (visual polish, current): https://github.com/chughtapan/safer-by-default/releases/download/untagged-d1f8aadce2f7e28c941c/final.mp4
++- v2 (audio-first): https://github.com/chughtapan/safer-by-default/releases/download/untagged-303de75c9b1a2f846dd7/final.mp4
++- v1 (duration-first): https://github.com/chughtapan/safer-by-default/releases/download/untagged-597640ef0b7282bf4809/final.mp4
++
++**PR**: https://github.com/chughtapan/safer-by-default/pull/314
++**Branch**: spike/walkthrough-narration
++
++## v1 vs v2 vs v3
++
++| Aspect | v1 (duration-first) | v2 (audio-first) | v3 (per-scene segments) |
++|---|---|---|---|
++| Source of truth for per-scene duration | Planner guess in `(Ns)` | Measured WAV from Cartesia | Measured WAV from Cartesia |
++| Narration markup | SSML with `<emphasis>` and `<break>` | Plain prose only | Plain prose only |
++| Subagent stages | planner + narrator | planner only | planner only |
++| Narration framework | none | none | Even-a-Geek-Can-Speak (Hook→Thesis→Evidence→CTA) |
++| Total narration length | ~72s | ~80s | ~120s (more depth per scene) |
++| Recording shape | one monolithic vhs run | one monolithic vhs run | per-scene vhs runs (one per scene type) |
++| Scene types | only code+log+figlet | only code+log+figlet | title (gum slide), pr-card (gh+gum), log, code (highlighted), diff (delta), outro (gum slide) |
++| Line highlighting on code scenes | no | no | yes (`bat --highlight-line`) |
++| Title cards | figlet ASCII | figlet ASCII | gum styled centered box (double border, accent color) |
++| Transitions between scenes | hard cuts | hard cuts | 0.4s crossfade (`ffmpeg xfade`) |
++| Persistent footer | no | no | yes (PR # / branch / spike name via `drawtext`) |
++| Window chrome | basic | basic | macOS-style WindowBar Colorful, BorderRadius 12, MarginFill slate |
++| Canvas size | 1280×720 | 1280×720 | 1920×1080 |
++| Scene 2 outcome | atempo'd 1.6x (audibly fast) | natural read | natural read |
++| Tail handling | `-shortest` truncated narration | `tpad` clones last frame so audio finishes | per-scene `tpad` per segment, audio plays fully |
++
++## GO criteria — scoreboard (v2)
++
++| Criterion | Result | Evidence |
++|---|---|---|
++| `narrative_plan.md` reads like a story, not a commit log; load-bearing first; ≤7 scenes | ✅ | 6 scenes, leads with the v2 flip, ends with v1-vs-v2 CTA |
++| Final MP4 plays, audio aligns to on-screen diff, no dead air >5s | ✅ | Audio plays naturally; per-scene Sleeps sized from measured audio; tpad covers the ~7s tail |
++| Cartesia TTS sounds natural enough to watch | ✅ | Plain prose reads cleanly across all scenes; no SSML artifacts |
++| GH release asset returns a working public URL; pasted into PR body | ✅ | v1 and v2 draft releases both linked in PR #314 body |
++| ASCII title cards render legibly | ✅ | figlet -f slant for intro/outro renders cleanly in 1280×720 |
++| Total wall-clock <2h | ✅ | ~75min combined for both runs |
++
++## Headline finding (v1) — time-budget architecture was inverted [SHIPPED in v2]
++
++V1 asked the planner to allocate per-scene seconds, then made both the recorder and the narrator fight to match that guess. The merge stage reconciled with atempo (1.6x on scene 2, audibly fast).
++
++V2 flipped it: narrator runs first, measures actual per-scene WAV durations, recorder sizes vhs Sleeps to match. Drift per scene goes from ±20% to ±0% (in the audio dimension). Atempo deleted. The narrator subagent was deleted entirely — the planner writes the final prose directly because there's no SSML to expand.
++
++## New finding from v2 — vhs render timescale isn't constant [PARTIALLY SHIPPED in v3]
++
++V1 took 88s of Sleep and produced 72.6s of video (1.21x). V2 took 95.8s of Sleep and produced 74.6s (1.28x). Same machine, same vhs version, same theme/font/typing-speed.
++
++V3 ships the per-scene segmentation fix called out above (`render_scenes.ts`). Each scene is its own vhs invocation, ffprobed independently, padded to its audio length in `composite.ts`. Drift across scenes is impossible.
++
++**New caveat at v3**: per-scene render at 1920×1080 lands at roughly *50%* of the requested Sleep duration — significantly worse than the 80% v1/v2 saw at 1280×720. The composite stage absorbs this by padding each segment with clone-last-frame to match audio. Body scenes therefore show ~10s of held frame while the narrator finishes talking about the code. Functional, but not invisible.
++
++**The next fix** for the real `/safer:walkthrough`: either drop back to 1280×720 (the v1/v2 size where the timescale was closer to 1.0x) or run a per-scene timescale probe before recording (record a 5s test scene, measure actual duration, adapt). Both options are in scope for the contract.
++
++## New findings from v3 — visual polish trade-offs
++
++1. **gum slides need pre-rendering**, not in-band typing. First attempt typed the full `gum style ...` command in the tape — viewer saw the 200-character invocation as the slide loaded. Fix: scene_planner.ts runs gum at planner time, writes the styled output to `segments/scene_N_slide.txt`, and the tape just `cat`s it. Visible command shrinks from "gum style --align center --border double ..." to "cat spike/walkthrough/segments/scene_N_slide.txt". Lesson for the real skill: anything visual that doesn't need to *demonstrate the command* should be pre-rendered, not typed live.
++
++2. **ffmpeg xfade needs constant frame rate** — tpad inside the complex filter graph produces variable-rate output that xfade rejects with "current rate of 1/0 is invalid". Single-pass `[i:v]tpad,fps=30,setpts=PTS-STARTPTS` didn't fix it. Working solution: two-pass composite — first ffmpeg call per-segment to pad + force `-r 30 -fps_mode cfr`, second call to chain `xfade` across the now-CFR padded segments. Slower (~2x per render) but reliable.
++
++3. **bat `--highlight-line A:B` is the right primitive** for "look here" emphasis. It dims surrounding lines and brightens the target range. No additional ffmpeg overlay needed — the bat output already encodes the visual emphasis.
++
++4. **Persistent footer via `drawtext`** works but is purely additive: `drawtext=text='PR #N · branch · spike':fontsize=20:fontcolor=white@0.8:y=h-36:box=1:boxcolor=black@0.6`. The boxborderw padding matters — without it the text crowds the background box.
++
++5. **Narration framework changed outputs materially**. v2 had 80s of summary narration; v3 has 120s of structured narration following Hook → Thesis → Evidence → CTA. The Evidence scenes (50-80 words each) actually *explain trade-offs* instead of just describing code surfaces. Worth keeping as a default in the real skill.
++
++## Other findings to fold into /safer:walkthrough
++
++1. **vhs needs `--no-sandbox`** on standard Linux distros without unprivileged user namespaces. Setup script must wrap the rod-downloaded chromium with a `--no-sandbox --disable-gpu --disable-dev-shm-usage` flag wrapper. Otherwise the recording crashes at Chromium zygote init with no useful error.
++2. **bat must run with `BAT_PAGER=""` and `PAGER=cat`** inside the vhs shell. Without it, bat enters less and subsequent Type commands go INTO the pager, silently breaking all later scenes (we lost scenes 3-6 on the first take this way).
++3. **Cartesia SSML `<emphasis>` materially extends read time** (~50% on scene 2). Either budget more time for emphasized words, drop emphasis, or accept atempo as the fallback.
++4. **vhs Sleep ≠ wall-clock**: rendered MP4 came in at 72.6s for 88s of planned Sleep, a consistent 17.5% underrun. Worth investigating whether vhs's FPS encoding compresses or whether Sleep is interpreted differently in the renderer.
++5. **figlet `-f slant` titles** with ≤10 chars render cleanly at FontSize 18 × Width 1280; longer cards (>14 chars) wrap or clip.
++6. **Concat-list paths must be absolute** when the list file lives in `/tmp` but the audio sits in cwd. ffmpeg resolves relative paths against the list file's directory.
++
++## Graduation modality
++
++**`/safer:contract`** — scope a real `/safer:walkthrough` skill with the audio-first architecture above, and codify the runtime requirements (Chromium wrapper, bat pager env, SSML→duration policy) as part of `/safer:setup`'s install-time work.
++
++The contract should also decide:
++- Pluggable storage backend (GH release default; Supabase / S3 as options)
++- Whether to support multi-voice (reviewer + author dialog) — out of scope here but interesting
++- Whether the human checkpoint after PLAN is opt-in or default-on
++- Whether the skill auto-runs on PR open (CI integration) or stays human-triggered
++
++Per the spike doctrine and the user's autonomy-scope memory: this verdict **stops here**. Do NOT auto-invoke `/safer:contract`. Re-authorization is required.
++
++## Re-runnability (v2)
++
++```bash
++cd spike/walkthrough
++eval "$(grep '^export CARTESIA_API_KEY=' ~/.bashrc)"
++bun run tts.ts narrative_plan.md             # writes audio/scene_N.wav + manifest.json (~30s, ~$0.01)
++bun run scene_planner.ts narrative_plan.md manifest.json   # writes walkthrough.tape sized to measured audio
++cd ../.. && env -i PATH="$PATH" HOME="$HOME" TERM=xterm-256color vhs spike/walkthrough/walkthrough.tape
++mv walkthrough.mp4 spike/walkthrough/walkthrough.mp4
++cd spike/walkthrough
++ffmpeg -y -i walkthrough.mp4 -i narration.wav -filter_complex "[0:v]tpad=stop_mode=clone:stop_duration=15s[v]" -map "[v]" -map 1:a -c:v libx264 -c:a aac -shortest final.mp4
++```
++
++Total cost per re-run: ~3 min compute + one Cartesia call (~$0.01 at current pricing).
+diff --git a/spike/walkthrough/composite.ts b/spike/walkthrough/composite.ts
+new file mode 100644
+index 0000000..399adfc
+--- /dev/null
++++ b/spike/walkthrough/composite.ts
+@@ -0,0 +1,177 @@
++#!/usr/bin/env bun
++import { existsSync, readFileSync } from "node:fs";
++import { spawnSync } from "node:child_process";
++import { resolve } from "node:path";
++
++interface Manifest {
++  title: string;
++  totalDurationSec: number;
++  scenes: { id: number; title: string; durationSec: number }[];
++}
++
++const XFADE_DURATION = 0.4;
++const FOOTER_HEIGHT_PX = 36;
++const PR_NUMBER = process.env.PR_NUMBER ?? "?";
++const BRANCH =
++  process.env.BRANCH ??
++  (() => {
++    const r = spawnSync("git", ["branch", "--show-current"], {
++      encoding: "utf8",
++    });
++    return r.stdout.trim() || "?";
++  })();
++
++const args = process.argv.slice(2);
++const manifestPath = args[0] ?? "manifest.json";
++const audioPath = args[1] ?? "narration.wav";
++const outputPath = args[2] ?? "final.mp4";
++
++const manifest: Manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++
++function videoDuration(path: string): number {
++  const r = spawnSync(
++    "ffprobe",
++    [
++      "-v",
++      "error",
++      "-show_entries",
++      "format=duration",
++      "-of",
++      "default=noprint_wrappers=1:nokey=1",
++      path,
++    ],
++    { encoding: "utf8" },
++  );
++  return parseFloat(r.stdout.trim());
++}
++
++function run(cmd: string[], label: string): void {
++  const r = spawnSync(cmd[0], cmd.slice(1), {
++    stdio: ["ignore", "pipe", "pipe"],
++  });
++  if (r.status !== 0) {
++    const err = r.stderr ? new TextDecoder().decode(r.stderr).split("\n").slice(-15).join("\n") : "";
++    throw new Error(`${label} failed:\n${err}`);
++  }
++}
++
++// Pass 1: pad each segment to (max(video, audio) + xfade_window) at constant 30fps.
++// Doing this as a per-segment ffmpeg run sidesteps the variable-frame-rate
++// errors that tpad inside a complex xfade graph triggers.
++console.log("Pass 1: per-scene pad to audio length + xfade window");
++const paddedSegments: { id: number; path: string; lengthSec: number }[] = [];
++for (let i = 0; i < manifest.scenes.length; i++) {
++  const s = manifest.scenes[i];
++  const segPath = resolve(`segments/scene_${s.id}.mp4`);
++  if (!existsSync(segPath)) {
++    throw new Error(`Missing segment ${segPath}`);
++  }
++  const videoSec = videoDuration(segPath);
++  const isLast = i === manifest.scenes.length - 1;
++  const target = Math.max(videoSec, s.durationSec) + (isLast ? 0 : XFADE_DURATION);
++  const padDur = target - videoSec;
++  const paddedPath = resolve(`segments/scene_${s.id}_padded.mp4`);
++
++  console.log(
++    `  scene ${s.id}: video=${videoSec.toFixed(2)}s audio=${s.durationSec.toFixed(2)}s → pad +${padDur.toFixed(2)}s → target ${target.toFixed(2)}s`,
++  );
++
++  run(
++    [
++      "ffmpeg",
++      "-y",
++      "-i",
++      segPath,
++      "-vf",
++      `tpad=stop_mode=clone:stop_duration=${padDur.toFixed(3)},fps=30,setpts=PTS-STARTPTS`,
++      "-an",
++      "-c:v",
++      "libx264",
++      "-preset",
++      "fast",
++      "-pix_fmt",
++      "yuv420p",
++      "-r",
++      "30",
++      "-fps_mode",
++      "cfr",
++      paddedPath,
++    ],
++    `pad scene ${s.id}`,
++  );
++  paddedSegments.push({ id: s.id, path: paddedPath, lengthSec: target });
++}
++
++// Pass 2: xfade chain across padded segments
++console.log("\nPass 2: xfade chain + drawtext footer + audio mux");
++
++const inputs: string[] = [];
++for (const s of paddedSegments) inputs.push("-i", s.path);
++inputs.push("-i", audioPath);
++
++const filters: string[] = [];
++let prevLabel = "0:v";
++let cumulativeOffset = 0;
++
++for (let i = 1; i < paddedSegments.length; i++) {
++  cumulativeOffset += paddedSegments[i - 1].lengthSec - XFADE_DURATION;
++  const outLabel = i === paddedSegments.length - 1 ? "vstitched" : `vx${i}`;
++  filters.push(
++    `[${prevLabel}][${i}:v]xfade=transition=fade:duration=${XFADE_DURATION}:offset=${cumulativeOffset.toFixed(3)}[${outLabel}]`,
++  );
++  prevLabel = outLabel;
++}
++
++if (paddedSegments.length === 1) {
++  filters.push(`[0:v]copy[vstitched]`);
++}
++
++// Footer overlay
++const footerText = `PR #${PR_NUMBER}  •  ${BRANCH}  •  spike/walkthrough`;
++const footerEscaped = footerText
++  .replace(/\\/g, "\\\\")
++  .replace(/:/g, "\\:")
++  .replace(/'/g, "\\'");
++filters.push(
++  `[vstitched]drawtext=text='${footerEscaped}':fontsize=20:fontcolor=white@0.8:x=(w-text_w)/2:y=h-${FOOTER_HEIGHT_PX}:box=1:boxcolor=black@0.6:boxborderw=10[vout]`,
++);
++
++const audioInputIndex = paddedSegments.length;
++const cmd = [
++  "ffmpeg",
++  "-y",
++  ...inputs,
++  "-filter_complex",
++  filters.join(";"),
++  "-map",
++  "[vout]",
++  "-map",
++  `${audioInputIndex}:a`,
++  "-c:v",
++  "libx264",
++  "-preset",
++  "fast",
++  "-pix_fmt",
++  "yuv420p",
++  "-c:a",
++  "aac",
++  "-b:a",
++  "128k",
++  "-shortest",
++  outputPath,
++];
++
++console.log("\nfilter graph:");
++console.log(filters.join(";\n"));
++console.log("");
++
++const r = spawnSync(cmd[0], cmd.slice(1), {
++  stdio: ["ignore", "pipe", "inherit"],
++});
++if (r.status !== 0) {
++  console.error("\nfinal composite failed");
++  process.exit(1);
++}
++
++const finalDur = videoDuration(outputPath);
++console.log(`\nWrote ${outputPath} (${finalDur.toFixed(2)}s)`);
+diff --git a/spike/walkthrough/narrative_plan.md b/spike/walkthrough/narrative_plan.md
+new file mode 100644
+index 0000000..d9d5719
+--- /dev/null
++++ b/spike/walkthrough/narrative_plan.md
+@@ -0,0 +1,47 @@
++# Walkthrough: Narrated PR walkthrough pipeline
++
++**Target**: spike/walkthrough-narration @ 3abdc58 · **Scenes**: 7
++
++## Scene 1 — The reviewer's problem
++- Type: title
++- Title card: "1000 LINES"
++- Subtitle: "and one approving thumb"
++- Narration: You open a thousand line pull request. You skim every file because there is no time. You approve it. A week later something breaks in production, and you find the line you skipped. This is the review you do every day.
++
++## Scene 2 — What you actually wanted
++- Type: pr-card
++- Narration: What you wanted was a peer to walk you through it. Show you the load bearing change, tell you why it matters, point at the line you would have missed. This pull request is that peer. It generates a narrated video walkthrough straight from the diff and the commit history, and ships the link in the description. You watch it once, and you actually understand the change.
++
++## Scene 3 — Render each scene on its own
++- Type: code
++- Files: spike/walkthrough/render_scenes.ts
++- Show: `bat --line-range 22:47 spike/walkthrough/render_scenes.ts`
++- Highlight: 32-47
++- Narration: One vhs recording per scene, not one for the whole video. This matters because terminal recordings drift. A monolithic recording is two minutes of accumulated timing error, and the narrator and the diff stop matching halfway through. Per scene isolation means scene seven aligns as tightly as scene one. The reviewer never catches the audio talking about code that already scrolled away.
++
++## Scene 4 — Audio drives the clock
++- Type: code
++- Files: spike/walkthrough/tts.ts
++- Show: `bat --line-range 200:225 spike/walkthrough/tts.ts`
++- Highlight: 217-224
++- Narration: The narrator records first, then ffprobe measures the wav, and the renderer sizes each segment to that measurement. The eight hundred millisecond tail silence is deliberate. Without it the cut lands the instant the last word ends and the viewer never registers what they just heard. With it, every scene gives you a beat to absorb the line on screen.
++
++## Scene 5 — Hold the frame, never speed the voice
++- Type: code
++- Files: spike/walkthrough/composite.ts
++- Show: `bat --line-range 84:110 spike/walkthrough/composite.ts`
++- Highlight: 86-109
++- Narration: When the video segment is shorter than the audio, we clone the last frame to cover the gap. We do not speed up the narrator. Audible speed ups are the first thing reviewers notice, and the second thing they bounce off. Holding the frame is invisible. The audio finishes naturally, the xfade lands on a clean boundary, and the viewer hears a peer talking, not a chipmunk reading a commit log.
++
++## Scene 6 — The line the narrator is pointing at
++- Type: code
++- Files: spike/walkthrough/scene_planner.ts
++- Show: `bat --line-range 119:147 spike/walkthrough/scene_planner.ts`
++- Highlight: 120-135
++- Narration: Each scene picks a renderer. Code scenes pipe through bat with highlight line set to the exact range the narrator is talking about, so the lines you are hearing about are also visibly lit on screen. The reviewer's eyes and ears land on the same five lines at the same second. That is the difference between watching a slideshow and following an argument.
++
++## Scene 7 — Try it on your next big PR
++- Type: outro
++- Title card: "YOUR PR NEXT"
++- Subtitle: "ship the link in the description"
++- Narration: Next time you open a pull request over five hundred lines, run safer walkthrough on it and paste the video link into the description. Your reviewers will watch it once, understand the change, and leave you a better review.
+diff --git a/spike/walkthrough/package.json b/spike/walkthrough/package.json
+new file mode 100644
+index 0000000..7792883
+--- /dev/null
++++ b/spike/walkthrough/package.json
+@@ -0,0 +1,14 @@
++{
++  "name": "@safer-by-default/spike-walkthrough",
++  "version": "0.0.0",
++  "private": true,
++  "type": "module",
++  "description": "Throwaway spike: narrated PR walkthrough video pipeline. See README.md for the runbook.",
++  "scripts": {
++    "scene-planner": "bun run scene_planner.ts",
++    "tts": "bun run tts.ts"
++  },
++  "devDependencies": {
++    "@types/bun": "^1.3.0"
++  }
++}
+diff --git a/spike/walkthrough/prompts/planner.md b/spike/walkthrough/prompts/planner.md
+new file mode 100644
+index 0000000..61672e8
+--- /dev/null
++++ b/spike/walkthrough/prompts/planner.md
+@@ -0,0 +1,136 @@
++# Planning subagent — narrative_plan.md producer
++
++You are a principal engineer giving a short technical talk: a **120-180 second narrated walkthrough** of a PR. You will read the diff, the commit history, and any review comments, then output a structured narrative plan: per-scene type, action (what's on screen), and narration (what's said aloud).
++
++The **scene** is the alignment unit. Cartesia synthesizes each scene's narration as a single audio chunk, then the recorder produces a matching video segment timed to that audio. You don't set durations — the TTS does.
++
++You ARE writing the narration prose here. Make it sound like a human peer talking, not like prose with markup. There is no SSML, no emphasis tags, no breaks. Cartesia reads each scene's text top-to-bottom in one go.
++
++The pipeline (v3) mixes **slide-style scenes** (centered, framed, presentation-feel) with **terminal-style scenes** (code, diffs, git log). You pick the right type per scene.
++
++## Story framework — "Even a Geek Can Speak"
++
++A code walkthrough is a short technical talk. Use this exact structure — every scene maps to a framework slot:
++
++| Framework slot | Scene count | Word budget per scene | Purpose |
++|---|---|---|---|
++| **Hook** | 1 (the opener) | 30-50 | A vivid opening that names what's *interesting* about this PR. Not "this PR adds X" — try "we used to do X. now we do Y. here's why we flipped it." Hook the viewer in the first 8 seconds. |
++| **Thesis** | 1 (right after Hook) | 40-60 | The single sentence the viewer should be able to repeat in their own words after watching. What did this PR actually accomplish? Why does it matter to a peer engineer? Lead with the *why*, then the *what*. |
++| **Evidence** | 3-5 (the body) | 50-80 each | Each shows ONE load-bearing change with concrete code/diff and explains *why* it was made — not just *what* it does. Each evidence scene should answer "would a smart reviewer want to read this line?". Order them by impact (most surprising first), not chronology. |
++| **Call to action** | 1 (the closer) | 20-40 | What should the viewer do next? Try the feature, watch a sibling video, check a specific file, leave a review comment. Be concrete — vague closers waste the runway. |
++
++Total: 6-8 scenes, 120-180 seconds of narration (≈330-500 words). Cartesia reads at ~165 wpm in practice.
++
++The Hook and Call to action are short and punchy. The Thesis is the most carefully written sentence in the whole video. Evidence scenes carry the weight — go deep, show specifics, name the trade-off you chose and the one you rejected.
++
++## Inputs
++
++You will be given:
++
++- `evidence/diff.txt` — full git diff (main..HEAD)
++- `evidence/diff-stat.txt` — `--stat` summary
++- `evidence/commits.txt` — `git log` with subjects + bodies, separated by `---`
++- `evidence/reviews.json` — PR review comments if a PR exists (may be `[]`)
++
++Optional inputs depending on the PR:
++- `README.md`, `ARCHITECTURE.md`, `CLAUDE.md` from the repo root — read these only if a scene needs project-level context
++
++## Scene types (required `Type:` field per scene)
++
++| Type | When to use | Renderer | Required fields | Best framework slot |
++|---|---|---|---|---|
++| `title` | Hook / section breaks within a long walkthrough | Centered gum-styled box | `Title card`, optional `Subtitle` | Hook |
++| `pr-card` | One scene showing PR meta (good for Thesis) | gh pr view → gum bordered box | none extra | Thesis |
++| `log` | Commit timeline (good for Thesis or first Evidence) | `git log --graph --oneline --decorate -C2 main..HEAD` | none extra | Thesis or Evidence |
++| `code` | Code excerpt with the narrated lines emphasized | `bat --highlight-line A:B --line-range C:D path` | `Files`, `Show`, `Highlight` | Evidence |
++| `diff` | What *changed* in one file (vs current code) | `git diff main...HEAD -- path \| delta --paging=never` | `Files`, `Show` | Evidence |
++| `outro` | Closing call-to-action with the asset URL | Centered gum-styled box | `Title card`, optional `Subtitle` | Call to action |
++
++Typical 7-scene shape following the framework:
++`title (Hook) → pr-card OR log (Thesis) → code (Evidence) → code (Evidence) → diff (Evidence) → code (Evidence) → outro (Call to action)`
++
++## Output contract
++
++Write `narrative_plan.md` to stdout in **exactly** this format:
++
++```markdown
++# Walkthrough: <one-line PR title>
++
++**Target**: <branch> @ <sha7> · **Scenes**: <count>
++
++## Scene 1 — <Scene name>
++- Type: title
++- Title card: "V3 VISUAL POLISH"
++- Subtitle: "narrated PR walkthrough, take three"
++- Narration: <plain prose, 1-3 sentences>
++
++## Scene 2 — <name>
++- Type: log
++- Show: `git log --graph --oneline --decorate -C2 main..HEAD`
++- Narration: <plain prose>
++
++## Scene 3 — <name>
++- Type: code
++- Files: spike/walkthrough/tts.ts
++- Show: `bat --line-range 195:225 spike/walkthrough/tts.ts`
++- Highlight: 201-220
++- Narration: <plain prose>
++
++## Scene 4 — <name>
++- Type: diff
++- Files: spike/walkthrough/scene_planner.ts
++- Show: `git diff main...HEAD -- spike/walkthrough/scene_planner.ts | delta --paging=never`
++- Narration: <plain prose>
++
++## Scene N — Outro & verify
++- Type: outro
++- Title card: "WATCH ME"
++- Subtitle: "compare v1, v2, v3 in the PR body"
++- Narration: <closing sentence>
++```
++
++No `(<duration>s)` in scene headers. No timing math. Cartesia's per-scene TTS output IS the duration; the recorder sizes each video segment to match.
++
++## Constraints
++
++1. **6–8 scenes total**, following the framework: Hook → Thesis → 3-5 Evidence → Call to action. Total narration 120-180s (~330-500 words at Cartesia's ~165 wpm).
++2. **Lead with the most load-bearing change**, not the chronologically first commit. Evidence scenes are ordered by impact — most surprising/important first.
++3. **Each `Show:` command must be runnable** in a vanilla shell, ≤25 lines of output, no pager. Renderer-specific guidance:
++   - `code` scenes: `bat --line-range C:D path` where the visible range is ≤25 lines. The `Highlight: A-B` field must be a *subset* of C:D.
++   - `diff` scenes: `git diff main...HEAD -- path | delta --paging=never` — keep to ONE file per scene. If the diff is huge, use a `code` scene with a narrow `bat --line-range` instead.
++   - `log` scenes: `git log --graph --oneline --decorate -C2 main..HEAD` is the canonical form. Don't customize.
++   - `title`, `pr-card`, `outro` scenes: no `Show:` needed — the renderer composes its own visual.
++4. **One file per scene** (two max).
++5. **Narration is what a human says.** Mix sentence lengths — short punchy sentences for emphasis, longer ones for the *why*. Each Evidence scene should explain a trade-off, not just describe a function. Read your narration aloud in your head; if it sounds like a code comment, rewrite it as how you'd describe it at a whiteboard.
++6. **End with an `outro` scene.** The Call to action should name something specific the viewer can do (open a file, watch v2, leave a comment).
++7. **No commit-by-commit slog.** Frame Evidence by *theme* (the architectural choice, the API redesign, the test coverage), not by commit boundary.
++8. **No backticks, no asterisks, no SSML, no markdown formatting inside the Narration field.** Cartesia reads literally.
++9. **Title cards ≤14 chars** (gum's centered box wraps gracefully but short is striking).
++10. **`Highlight:` on `code` scenes is required** — it's the whole reason `code` exists. If you don't have specific lines to call out, use a `diff` scene instead.
++
++## What "load-bearing" means
++
++The change that, if reverted, would undo the PR's purpose. Not "the first file alphabetically." Not "the file with the most lines changed." The change that materially shifts behavior, contract, or architecture.
++
++If you can't tell what's load-bearing from the diff alone, read the most recent commit messages — the author usually signals it.
++
++## Anti-patterns
++
++- ❌ One scene per commit
++- ❌ `code` scene without a `Highlight` field
++- ❌ `diff` scene that pipes >50 lines (split into code scenes with narrow ranges)
++- ❌ Title cards longer than 14 characters
++- ❌ Narration that's just the commit message read aloud
++- ❌ Narration that describes *what* without explaining *why* (Evidence scenes especially)
++- ❌ Narration shorter than 25 words on an Evidence scene (you have ~25s — use it for depth, not brevity)
++- ❌ Scenes that show whole files when 20 lines would do
++- ❌ Including imports, license headers, or boilerplate in `Show:` commands
++- ❌ More than 8 scenes or fewer than 6
++- ❌ Hook scene that just says "here's a walkthrough of this PR" — boring, doesn't hook anyone
++- ❌ Call-to-action that's just "the end" or "thanks for watching" — name something specific
++- ❌ Any markup inside Narration: backticks, asterisks, SSML, parentheticals
++- ❌ Using `figlet` anywhere — gum-styled boxes replace figlet for title cards
++
++## Tone
++
++Direct. The viewer is a peer engineer who reads code. Don't explain what `import` does. Do explain *why* a refactor was chosen if it's non-obvious.
+diff --git a/spike/walkthrough/render_scenes.ts b/spike/walkthrough/render_scenes.ts
+new file mode 100644
+index 0000000..1319bb4
+--- /dev/null
++++ b/spike/walkthrough/render_scenes.ts
+@@ -0,0 +1,76 @@
++#!/usr/bin/env bun
++import { existsSync, readFileSync } from "node:fs";
++import { spawnSync } from "node:child_process";
++import { resolve } from "node:path";
++
++interface Manifest {
++  title: string;
++  totalDurationSec: number;
++  scenes: { id: number; title: string; durationSec: number }[];
++}
++
++const args = process.argv.slice(2);
++const manifestPath = args[0] ?? "manifest.json";
++const manifest: Manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++
++// vhs must run from the repo root so paths like `bat ... spike/walkthrough/...`
++// inside the tapes resolve correctly. We capture cwd here, then resolve scene
++// tape and output paths against the repo root.
++const here = process.cwd(); // expected to be spike/walkthrough/
++const repoRoot = resolve(here, "..", "..");
++
++for (const scene of manifest.scenes) {
++  const tapeAbs = resolve(here, `segments/scene_${scene.id}.tape`);
++  const outputAbs = resolve(here, `segments/scene_${scene.id}.mp4`);
++
++  if (!existsSync(tapeAbs)) {
++    throw new Error(`Missing tape for scene ${scene.id}: ${tapeAbs}`);
++  }
++
++  console.log(`Scene ${scene.id} (${scene.title}): rendering...`);
++  const tStart = Date.now();
++  const r = spawnSync(
++    "env",
++    [
++      "-i",
++      `PATH=${process.env.PATH ?? ""}`,
++      `HOME=${process.env.HOME ?? ""}`,
++      "TERM=xterm-256color",
++      "vhs",
++      tapeAbs,
++    ],
++    { cwd: repoRoot, stdio: ["ignore", "ignore", "pipe"] },
++  );
++  if (r.status !== 0) {
++    const err = r.stderr ? new TextDecoder().decode(r.stderr) : "";
++    throw new Error(`vhs failed for scene ${scene.id}:\n${err}`);
++  }
++
++  if (!existsSync(outputAbs)) {
++    throw new Error(
++      `vhs reported success but ${outputAbs} not found (check tape Output directive)`,
++    );
++  }
++
++  // Probe actual rendered duration
++  const probe = spawnSync(
++    "ffprobe",
++    [
++      "-v",
++      "error",
++      "-show_entries",
++      "format=duration",
++      "-of",
++      "default=noprint_wrappers=1:nokey=1",
++      outputAbs,
++    ],
++    { encoding: "utf8" },
++  );
++  const actualSec = parseFloat(probe.stdout.trim());
++  const elapsedSec = (Date.now() - tStart) / 1000;
++  console.log(
++    `  → segments/scene_${scene.id}.mp4 = ${actualSec.toFixed(2)}s (audio target ${scene.durationSec}s) [${elapsedSec.toFixed(1)}s wall]`,
++  );
++}
++
++console.log(`Rendered ${manifest.scenes.length} segments.`);
+diff --git a/spike/walkthrough/scene_planner.ts b/spike/walkthrough/scene_planner.ts
+new file mode 100644
+index 0000000..366db64
+--- /dev/null
++++ b/spike/walkthrough/scene_planner.ts
+@@ -0,0 +1,357 @@
++#!/usr/bin/env bun
++import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
++
++type SceneType = "title" | "pr-card" | "log" | "code" | "diff" | "outro";
++
++interface Scene {
++  id: number;
++  title: string;
++  type: SceneType;
++  titleCard?: string;
++  subtitle?: string;
++  files: string[];
++  show?: string;
++  highlight?: string; // "47-52" or "47"
++  narration?: string;
++}
++
++interface Plan {
++  title: string;
++  scenes: Scene[];
++}
++
++interface Manifest {
++  title: string;
++  totalDurationSec: number;
++  scenes: { id: number; title: string; durationSec: number }[];
++}
++
++const VALID_TYPES: SceneType[] = [
++  "title",
++  "pr-card",
++  "log",
++  "code",
++  "diff",
++  "outro",
++];
++
++function parsePlan(md: string): Plan {
++  const titleMatch = md.match(/^# Walkthrough:\s*(.+)$/m);
++  const title = titleMatch?.[1]?.trim() ?? "Walkthrough";
++
++  const headerRe = /^## Scene (\d+)\s*[—-]\s*(.+?)(?:\s*\([^)]*\))?\s*$/gm;
++  const headers = [...md.matchAll(headerRe)];
++  const scenes: Scene[] = [];
++
++  for (let i = 0; i < headers.length; i++) {
++    const h = headers[i];
++    const start = h.index! + h[0].length;
++    const end = i + 1 < headers.length ? headers[i + 1].index! : md.length;
++    const body = md.slice(start, end);
++
++    const field = (name: string): string | undefined => {
++      const re = new RegExp(`^\\s*[-*]\\s*${name}:\\s*(.+)$`, "m");
++      const m = body.match(re);
++      if (!m) return undefined;
++      let v = m[1].trim();
++      if (v.startsWith("`") && v.endsWith("`")) v = v.slice(1, -1);
++      if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
++      return v;
++    };
++
++    const filesRaw = field("Files") ?? "";
++    const files =
++      filesRaw === "" || filesRaw.toLowerCase() === "none"
++        ? []
++        : filesRaw.split(",").map((s) => s.trim()).filter(Boolean);
++
++    const typeRaw = (field("Type") ?? "code").toLowerCase();
++    if (!VALID_TYPES.includes(typeRaw as SceneType)) {
++      throw new Error(
++        `Scene ${h[1]}: invalid Type "${typeRaw}". Must be one of ${VALID_TYPES.join("|")}.`,
++      );
++    }
++
++    scenes.push({
++      id: parseInt(h[1], 10),
++      title: h[2].trim(),
++      type: typeRaw as SceneType,
++      titleCard: field("Title card"),
++      subtitle: field("Subtitle"),
++      files,
++      show: field("Show"),
++      highlight: field("Highlight"),
++      narration: field("Narration"),
++    });
++  }
++
++  return { title, scenes };
++}
++
++function tapeHeader(outputPath: string): string[] {
++  return [
++    `Output ${outputPath}`,
++    `Set Shell bash`,
++    `Set FontSize 22`,
++    `Set Width 1920`,
++    `Set Height 1080`,
++    `Set Theme "Catppuccin Mocha"`,
++    `Set TypingSpeed 15ms`,
++    `Set Padding 30`,
++    `Set WindowBar Colorful`,
++    `Set BorderRadius 12`,
++    `Set Margin 40`,
++    `Set MarginFill "#1d1f2a"`,
++    `Set CursorBlink false`,
++    `Env BAT_PAGER ""`,
++    `Env BAT_STYLE "numbers,grid"`,
++    `Env PAGER cat`,
++    `Env DELTA_PAGER cat`,
++  ];
++}
++
++function shellEscapeSingle(s: string): string {
++  // For wrapping a string in '...'  bash single quotes
++  return s.replace(/'/g, "'\\''");
++}
++
++function prerenderSlide(scene: Scene): string {
++  // Title / outro / pr-card scenes get their styled output pre-rendered by
++  // gum at planner-time into a file, so the tape can just `cat` it. This
++  // avoids exposing the long `gum style ...` invocation in the recording.
++  const outFile = `segments/scene_${scene.id}_slide.txt`;
++
++  let cmd: string[];
++  if (scene.type === "title" || scene.type === "outro") {
++    const tc = scene.titleCard ?? scene.title;
++    const sub = scene.subtitle ?? "";
++    const accent = scene.type === "outro" ? "#a6e3a1" : "#cba6f7";
++    const args = [
++      "style",
++      "--align", "center",
++      "--border", "double",
++      "--border-foreground", accent,
++      "--foreground", "#cdd6f4",
++      "--padding", "3 6",
++      "--margin", "4 0",
++      "--width", "70",
++      "--bold",
++    ];
++    if (sub) {
++      args.push(tc, "", sub);
++    } else {
++      args.push(tc);
++    }
++    cmd = ["gum", ...args];
++  } else if (scene.type === "pr-card") {
++    // Pipe pr-card.txt through gum style; we do the pipe in Bun.
++    const prCardPath = "segments/pr-card.txt";
++    const body = readFileSync(prCardPath, "utf8");
++    const gumProc = Bun.spawnSync({
++      cmd: [
++        "gum",
++        "style",
++        "--border", "rounded",
++        "--border-foreground", "#89b4fa",
++        "--padding", "2 4",
++        "--width", "110",
++      ],
++      stdin: new TextEncoder().encode(body),
++      stdout: "pipe",
++      stderr: "pipe",
++    });
++    if (gumProc.exitCode !== 0) {
++      throw new Error(
++        `gum style failed for pr-card: ${new TextDecoder().decode(gumProc.stderr)}`,
++      );
++    }
++    writeFileSync(outFile, new TextDecoder().decode(gumProc.stdout));
++    return outFile;
++  } else {
++    throw new Error(`prerenderSlide called on non-slide type ${scene.type}`);
++  }
++
++  const proc = Bun.spawnSync({
++    cmd,
++    stdout: "pipe",
++    stderr: "pipe",
++  });
++  if (proc.exitCode !== 0) {
++    throw new Error(
++      `gum failed for scene ${scene.id}: ${new TextDecoder().decode(proc.stderr)}`,
++    );
++  }
++  writeFileSync(outFile, new TextDecoder().decode(proc.stdout));
++  return outFile;
++}
++
++function buildShowCommand(scene: Scene, prerenderedPath?: string): string {
++  switch (scene.type) {
++    case "title":
++    case "outro":
++    case "pr-card": {
++      // Tape just cats the pre-rendered slide file (short command, minimal
++      // visual noise above the styled output).
++      const path = prerenderedPath ?? `segments/scene_${scene.id}_slide.txt`;
++      return `cat spike/walkthrough/${path}`;
++    }
++    case "log": {
++      return scene.show ?? `git log --graph --oneline --decorate -C2 main..HEAD`;
++    }
++    case "code": {
++      if (!scene.show) {
++        throw new Error(`Scene ${scene.id} (code): missing Show field`);
++      }
++      if (!scene.highlight) {
++        throw new Error(
++          `Scene ${scene.id} (code): missing Highlight field (use a diff scene if you don't want line emphasis)`,
++        );
++      }
++      const range = scene.highlight.replace(/-/g, ":");
++      return scene.show.replace(/\bbat\b/, `bat --highlight-line ${range}`);
++    }
++    case "diff": {
++      if (!scene.show) {
++        throw new Error(`Scene ${scene.id} (diff): missing Show field`);
++      }
++      return scene.show;
++    }
++  }
++}
++
++function emitSceneTape(
++  scene: Scene,
++  sleepSec: number,
++  outputPath: string,
++): string {
++  const lines: string[] = [];
++  lines.push(
++    `# Scene ${scene.id} (${scene.type}): ${scene.title} — sleep ${sleepSec.toFixed(2)}s`,
++  );
++  lines.push(``);
++  for (const h of tapeHeader(outputPath)) lines.push(h);
++  lines.push(``);
++
++  const cmd = buildShowCommand(scene).replace(/"/g, '\\"');
++
++  lines.push(`Hide`);
++  lines.push(`Type "clear"`);
++  lines.push(`Enter`);
++  lines.push(`Sleep 200ms`);
++  lines.push(`Show`);
++  lines.push(`Type "${cmd}"`);
++  lines.push(`Enter`);
++  lines.push(`Sleep ${sleepSec.toFixed(2)}s`);
++
++  return lines.join("\n") + "\n";
++}
++
++async function prerenderPrCard(): Promise<void> {
++  // For pr-card scenes, shell out to gh to fetch and format the PR data.
++  // Write to spike/walkthrough/segments/pr-card.txt so the tape just cats it.
++  const proc = Bun.spawnSync({
++    cmd: [
++      "gh",
++      "pr",
++      "view",
++      "--json",
++      "number,title,headRefName,author,additions,deletions,files,body",
++      "--template",
++      `PR #{{.number}}: {{.title}}
++
++branch: {{.headRefName}}    by: {{.author.login}}
++diff:   +{{.additions}} / -{{.deletions}} across {{len .files}} files
++
++{{.body}}`,
++    ],
++    stdout: "pipe",
++    stderr: "pipe",
++  });
++  if (proc.exitCode !== 0) {
++    throw new Error(
++      `gh pr view failed for pr-card scene: ${new TextDecoder().decode(proc.stderr)}`,
++    );
++  }
++  let body = new TextDecoder().decode(proc.stdout);
++  // Truncate body to ~12 lines so the card fits the canvas at FontSize 22
++  const allLines = body.split("\n");
++  if (allLines.length > 18) {
++    body = allLines.slice(0, 18).join("\n") + "\n...";
++  }
++  writeFileSync("segments/pr-card.txt", body);
++  console.log(`  pre-rendered segments/pr-card.txt (${body.length} bytes)`);
++}
++
++// vhs's render-vs-wallclock varies. Per-scene short renders see less drift than
++// monolithic recordings. 1.15 is the starting heuristic for v3.
++const VHS_TIMESCALE = 1.15;
++const TYPE_RENDER_OVERHEAD_SEC = 0.3;
++
++const args = process.argv.slice(2);
++const dryRun = args.includes("--dry-run");
++const positional = args.filter((a) => !a.startsWith("--"));
++const planPath = positional[0] ?? "narrative_plan.md";
++const manifestPath = positional[1] ?? "manifest.json";
++
++const md = readFileSync(planPath, "utf8");
++const plan = parsePlan(md);
++
++if (plan.scenes.length === 0) {
++  console.error(`No scenes found in ${planPath}`);
++  process.exit(1);
++}
++
++let manifest: Manifest;
++try {
++  manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
++} catch {
++  console.error(
++    `Could not read manifest at ${manifestPath}. Run tts.ts first.`,
++  );
++  process.exit(1);
++}
++
++const durationById = new Map(
++  manifest.scenes.map((s) => [s.id, s.durationSec]),
++);
++
++if (!existsSync("segments")) mkdirSync("segments", { recursive: true });
++
++// Pre-render any pr-card scenes (needed before prerenderSlide can read pr-card.txt)
++if (plan.scenes.some((s) => s.type === "pr-card")) {
++  await prerenderPrCard();
++}
++
++// Pre-render styled slide files for title/pr-card/outro scenes
++for (const s of plan.scenes) {
++  if (s.type === "title" || s.type === "pr-card" || s.type === "outro") {
++    prerenderSlide(s);
++  }
++}
++
++for (const scene of plan.scenes) {
++  const audioSec = durationById.get(scene.id);
++  if (audioSec === undefined) {
++    throw new Error(`Scene ${scene.id} has no manifest entry`);
++  }
++  const sleepSec = Math.max(
++    1.0,
++    (audioSec - TYPE_RENDER_OVERHEAD_SEC) * VHS_TIMESCALE,
++  );
++  const outputPath = `spike/walkthrough/segments/scene_${scene.id}.mp4`;
++  const tape = emitSceneTape(scene, sleepSec, outputPath);
++  const tapePath = `segments/scene_${scene.id}.tape`;
++
++  if (dryRun) {
++    console.log(`=== ${tapePath} (${scene.type}) ===`);
++    console.log(tape);
++  } else {
++    writeFileSync(tapePath, tape);
++  }
++}
++
++if (!dryRun) {
++  console.log(
++    `Wrote ${plan.scenes.length} per-scene tapes to segments/ (audio target ${manifest.totalDurationSec}s)`,
++  );
++}
+diff --git a/spike/walkthrough/tsconfig.json b/spike/walkthrough/tsconfig.json
+new file mode 100644
+index 0000000..36d4f4c
+--- /dev/null
++++ b/spike/walkthrough/tsconfig.json
+@@ -0,0 +1,15 @@
++{
++  "compilerOptions": {
++    "target": "ES2022",
++    "module": "ESNext",
++    "moduleResolution": "bundler",
++    "lib": ["ES2022"],
++    "types": ["bun"],
++    "strict": true,
++    "noEmit": true,
++    "skipLibCheck": true,
++    "esModuleInterop": true,
++    "allowImportingTsExtensions": true
++  },
++  "include": ["*.ts"]
++}
+diff --git a/spike/walkthrough/tts.ts b/spike/walkthrough/tts.ts
+new file mode 100644
+index 0000000..e3336d9
+--- /dev/null
++++ b/spike/walkthrough/tts.ts
+@@ -0,0 +1,253 @@
++#!/usr/bin/env bun
++import {
++  existsSync,
++  mkdirSync,
++  readFileSync,
++  writeFileSync,
++} from "node:fs";
++import { resolve } from "node:path";
++import { spawnSync } from "node:child_process";
++
++const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY;
++const CARTESIA_VOICE_ID =
++  process.env.CARTESIA_VOICE_ID ?? "a0e99841-438c-4a64-b679-ae501e7d6091"; // Barbershop Man
++const CARTESIA_VERSION = "2026-03-01";
++const CARTESIA_MODEL = "sonic-2";
++const SAMPLE_RATE = 24_000;
++
++if (!CARTESIA_API_KEY) {
++  console.error("CARTESIA_API_KEY is not set — export it (see ~/.bashrc)");
++  process.exit(1);
++}
++
++interface Scene {
++  id: number;
++  title: string;
++  titleCard?: string;
++  files: string[];
++  show: string;
++  narration: string;
++}
++
++function parsePlan(md: string): { title: string; scenes: Scene[] } {
++  const titleMatch = md.match(/^# Walkthrough:\s*(.+)$/m);
++  const title = titleMatch?.[1]?.trim() ?? "Walkthrough";
++
++  // Scene header: ## Scene N — name   (no duration; old format with (Ns) also tolerated)
++  const headerRe = /^## Scene (\d+)\s*[—-]\s*(.+?)(?:\s*\([^)]*\))?\s*$/gm;
++  const headers = [...md.matchAll(headerRe)];
++  const scenes: Scene[] = [];
++
++  for (let i = 0; i < headers.length; i++) {
++    const h = headers[i];
++    const start = h.index! + h[0].length;
++    const end = i + 1 < headers.length ? headers[i + 1].index! : md.length;
++    const body = md.slice(start, end);
++
++    const field = (name: string): string | undefined => {
++      const re = new RegExp(`^\\s*[-*]\\s*${name}:\\s*(.+)$`, "m");
++      const m = body.match(re);
++      if (!m) return undefined;
++      let v = m[1].trim();
++      if (v.startsWith("`") && v.endsWith("`")) v = v.slice(1, -1);
++      if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
++      return v;
++    };
++
++    const filesRaw = field("Files") ?? "";
++    const files =
++      filesRaw === "" || filesRaw.toLowerCase() === "none"
++        ? []
++        : filesRaw.split(",").map((s) => s.trim()).filter(Boolean);
++
++    scenes.push({
++      id: parseInt(h[1], 10),
++      title: h[2].trim(),
++      titleCard: field("Title card"),
++      files,
++      show: field("Show") ?? `echo "scene ${h[1]}: ${h[2].trim()}"`,
++      narration: field("Narration") ?? "",
++    });
++  }
++
++  return { title, scenes };
++}
++
++async function synthesize(transcript: string, outPath: string): Promise<void> {
++  const resp = await fetch("https://api.cartesia.ai/tts/bytes", {
++    method: "POST",
++    headers: {
++      "X-API-Key": CARTESIA_API_KEY!,
++      "Cartesia-Version": CARTESIA_VERSION,
++      "Content-Type": "application/json",
++    },
++    body: JSON.stringify({
++      model_id: CARTESIA_MODEL,
++      transcript,
++      voice: { mode: "id", id: CARTESIA_VOICE_ID },
++      output_format: {
++        container: "wav",
++        encoding: "pcm_s16le",
++        sample_rate: SAMPLE_RATE,
++      },
++      language: "en",
++    }),
++  });
++
++  if (!resp.ok) {
++    const body = await resp.text();
++    throw new Error(`Cartesia ${resp.status} ${resp.statusText}: ${body}`);
++  }
++  const bytes = new Uint8Array(await resp.arrayBuffer());
++  writeFileSync(outPath, bytes);
++}
++
++function durationOfWav(path: string): number {
++  const r = spawnSync(
++    "ffprobe",
++    [
++      "-v",
++      "error",
++      "-show_entries",
++      "format=duration",
++      "-of",
++      "default=noprint_wrappers=1:nokey=1",
++      path,
++    ],
++    { encoding: "utf8" },
++  );
++  return parseFloat(r.stdout.trim());
++}
++
++function makeSilenceWav(durationSec: number, outPath: string): void {
++  const r = spawnSync(
++    "ffmpeg",
++    [
++      "-y",
++      "-f",
++      "lavfi",
++      "-i",
++      `anullsrc=r=${SAMPLE_RATE}:cl=mono`,
++      "-t",
++      String(durationSec),
++      "-c:a",
++      "pcm_s16le",
++      outPath,
++    ],
++    { stdio: ["ignore", "ignore", "pipe"] },
++  );
++  if (r.status !== 0) {
++    throw new Error(`ffmpeg silence failed: ${r.stderr}`);
++  }
++}
++
++function concatWavs(paths: string[], outPath: string): void {
++  const listPath = `/tmp/concat-list-${process.pid}.txt`;
++  const abs = paths.map((p) => resolve(p));
++  writeFileSync(
++    listPath,
++    abs.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n") + "\n",
++  );
++  const r = spawnSync(
++    "ffmpeg",
++    [
++      "-y",
++      "-f",
++      "concat",
++      "-safe",
++      "0",
++      "-i",
++      listPath,
++      "-c",
++      "copy",
++      outPath,
++    ],
++    { stdio: ["ignore", "ignore", "pipe"] },
++  );
++  if (r.status !== 0) {
++    throw new Error(`ffmpeg concat failed: ${r.stderr}`);
++  }
++}
++
++async function main() {
++  const args = process.argv.slice(2);
++
++  if (args.includes("--text")) {
++    const text = args[args.indexOf("--text") + 1];
++    const out = args.includes("--out")
++      ? args[args.indexOf("--out") + 1]
++      : "/tmp/cartesia-test.wav";
++    await synthesize(text, out);
++    console.log(`Wrote ${out} (${durationOfWav(out).toFixed(2)}s)`);
++    return;
++  }
++
++  const planPath = args.find((a) => !a.startsWith("--")) ?? "narrative_plan.md";
++  const md = readFileSync(planPath, "utf8");
++  const plan = parsePlan(md);
++
++  if (plan.scenes.length === 0) {
++    console.error(
++      `No scenes found in ${planPath}. Expected '## Scene N — name' headers.`,
++    );
++    process.exit(1);
++  }
++
++  if (!existsSync("audio")) mkdirSync("audio", { recursive: true });
++
++  const sceneDurations: { id: number; title: string; durationSec: number; narration: string }[] = [];
++  const finalPaths: string[] = [];
++
++  for (const scene of plan.scenes) {
++    if (!scene.narration) {
++      console.warn(`Scene ${scene.id} has no Narration; skipping`);
++      continue;
++    }
++
++    const rawPath = `audio/scene_${scene.id}.wav`;
++    const paddedPath = `audio/scene_${scene.id}_padded.wav`;
++    const silencePath = `audio/scene_${scene.id}_tail.wav`;
++
++    const wordCount = scene.narration.split(/\s+/).filter(Boolean).length;
++    console.log(
++      `Scene ${scene.id} (${scene.title}): synthesizing ${wordCount} words`,
++    );
++    await synthesize(scene.narration, rawPath);
++
++    // Add 0.8s tail silence per scene so the viewer has a beat to register
++    // the on-screen state before the next scene cuts in.
++    const tailSec = 0.8;
++    makeSilenceWav(tailSec, silencePath);
++    concatWavs([rawPath, silencePath], paddedPath);
++
++    const dur = durationOfWav(paddedPath);
++    console.log(`  → ${dur.toFixed(2)}s (narration + ${tailSec}s tail)`);
++    sceneDurations.push({
++      id: scene.id,
++      title: scene.title,
++      durationSec: Math.round(dur * 100) / 100,
++      narration: scene.narration,
++    });
++    finalPaths.push(paddedPath);
++  }
++
++  concatWavs(finalPaths, "narration.wav");
++  const totalDur = durationOfWav("narration.wav");
++
++  const manifest = {
++    title: plan.title,
++    totalDurationSec: Math.round(totalDur * 100) / 100,
++    scenes: sceneDurations,
++    note: "Durations measured from synthesized WAVs (audio-first architecture). scene_planner.ts reads these to size vhs Sleeps so video aligns to audio per scene.",
++  };
++  writeFileSync("manifest.json", JSON.stringify(manifest, null, 2) + "\n");
++
++  console.log(
++    `Wrote narration.wav (${totalDur.toFixed(1)}s across ${finalPaths.length} scenes) + manifest.json`,
++  );
++}
++
++main().catch((e) => {
++  console.error(e?.message ?? e);
++  process.exit(1);
++});

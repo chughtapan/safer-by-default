@@ -10,7 +10,9 @@
 
 **Granted scope.** Per-sub-issue planned exits. The orchestrator dispatches the modality each sub-issue specifies, runs the verify gate where the plan calls for it, and updates the parent's `## Progress` section. No new sub-issues, no decomposition-table edits.
 
-## Contract
+## Autonomy contract
+
+**Mode.** burndown — work the existing epic; new sub-issues are out of scope
 
 **Goal.** Drive each open sub-issue on epic <https://github.com/OWNER/REPO/issues/198> to its planned exit state per the decomposition table.
 

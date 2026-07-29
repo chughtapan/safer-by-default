@@ -1,0 +1,12 @@
+ spike/walkthrough/.gitignore         |  14 ++
+ spike/walkthrough/README.md          | 137 ++++++++++++++
+ spike/walkthrough/VERDICT.md         | 108 +++++++++++
+ spike/walkthrough/composite.ts       | 177 +++++++++++++++++
+ spike/walkthrough/narrative_plan.md  |  47 +++++
+ spike/walkthrough/package.json       |  14 ++
+ spike/walkthrough/prompts/planner.md | 136 +++++++++++++
+ spike/walkthrough/render_scenes.ts   |  76 ++++++++
+ spike/walkthrough/scene_planner.ts   | 357 +++++++++++++++++++++++++++++++++++
+ spike/walkthrough/tsconfig.json      |  15 ++
+ spike/walkthrough/tts.ts             | 253 +++++++++++++++++++++++++
+ 11 files changed, 1334 insertions(+)

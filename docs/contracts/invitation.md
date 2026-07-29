@@ -9,9 +9,11 @@
 - "is this tractable?"
 - "check this out"
 
-**Granted scope.** A single `/safer:diagnose` (or `/safer:contract` / `/safer:research` / `/safer:spike`) dispatch. Nothing downstream. After the artifact publishes, the orchestrator asks the user what to authorize next.
+**Granted scope.** A single `/safer:diagnose` (or `/safer:requirements` / `/safer:research` / `/safer:spike`) dispatch. Nothing downstream. After the artifact publishes, the orchestrator asks the user what to authorize next.
 
-## Contract
+## Autonomy contract
+
+**Mode.** feature-ship — exploratory; a single investigative dispatch, nothing downstream
 
 **Goal.** Understand the source of latency on the dashboard route.
 

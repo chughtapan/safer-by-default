@@ -1,0 +1,19 @@
+PR #314: spike(walkthrough): narrated PR walkthrough video pipeline
+
+branch: spike/walkthrough-narration    by: chughtapan
+diff:   +812 / -0 across 9 files
+
+Spike scaffold + two end-to-end dogfood runs. See plan: `~/.claude/plans/i-want-to-spike-steady-puffin.md`
+
+## Walkthroughs
+
+| Version | Architecture | Asset |
+|---|---|---|
+| **v2** (current) | audio-first: TTS measures per-scene WAV, vhs Sleeps sized from that | https://github.com/chughtapan/safer-by-default/releases/download/untagged-303de75c9b1a2f846dd7/final.mp4 |
+| v1 (reference) | duration-first: planner allocates seconds, ffmpeg atempo reconciled the gap | https://github.com/chughtapan/safer-by-default/releases/download/untagged-597640ef0b7282bf4809/final.mp4 |
+
+Watch v1's scene 2 for the atempo crunch (1.6x compression), then v2 to compare alignment.
+
+<details><summary>v2 narrative plan (current)</summary>
+
+...
