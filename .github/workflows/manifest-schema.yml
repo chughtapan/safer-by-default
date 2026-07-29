@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate manifest against SchemaStore
         # Catches manifest drift when Claude Code's schema changes underneath us
-        # (e.g. lspServers shape change between 0.1.x and 0.2.x).
+        # (a field's shape changing between plugin-manifest versions).
         run: |
           set -euo pipefail
           pip install --quiet check-jsonschema

@@ -4,7 +4,7 @@ Install paths, dependency requirements, and troubleshooting for safer-by-default
 
 ## Prerequisites (read first)
 
-`/safer:setup` runs on any repository with a `package.json` or `tsconfig.json` and `gstack` installed. It detects your package manager (pnpm, npm, yarn, or bun) and wires the lint floor (`eslint-plugin-agent-code-guard` + strict `tsconfig` flags) and the LSP path on every run.
+`/safer:setup` runs on any repository with a `package.json` or `tsconfig.json` and `gstack` installed. It detects your package manager (pnpm, npm, yarn, or bun) and wires the lint floor (`eslint-plugin-agent-code-guard` + strict `tsconfig` flags) on every run.
 
 The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from npm as of v0.4.0) is wired only when the project is **TypeScript + vitest** — it adds a vitest reporter and a per-folder `MODULE.md` gate. On other projects, `/safer:setup` skips that one step with a note and the rest of setup still applies; nothing aborts the skill. There is no longer a dogfood-only pre-flight halt and no `link:`-protocol install against a vendored submodule.
 
@@ -98,31 +98,17 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
 
 ## Requirements
 
-- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator + the architecture LSP runtime).
+- `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator).
 - [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
-- `typescript-language-server`, `python3`, and `bun` on `PATH` for the LSP path, plus the upstream `lsp-proxy.py` in the cache. `/safer:setup` Step 10c provisions these: it installs `typescript-language-server` globally when missing (via `npm -g`, falling back to the detected package manager's global form), checks `python3` and `bun` (printing the install command for those — system-level, so you install them), and fetches `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) into `~/.cache/safer-by-default/`, fail-closed (a partial download never lands). If setup ran offline, fetch the proxy manually:
-
-  ```bash
-  mkdir -p ~/.cache/safer-by-default
-  curl -fsSL https://raw.githubusercontent.com/techee/lsp-proxy/9b5a2a5/lsp-proxy.py \
-    -o ~/.cache/safer-by-default/lsp-proxy.py
-  ```
-
-  `lsp-proxy.py` is GPL v2 and lives only in your local cache, never the plugin tree. If any binary or the proxy file is missing, `lsp/proxy/run.sh` exits with a pointer to `/safer:setup` and the rest of the plugin keeps working.
 - **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
 
-## LSP behavior at install time
+## Editor diagnostics at install time
 
-The plugin manifest declares one `lspServers` entry pointing at `lsp/proxy/run.sh` (see `ARCHITECTURE.md` → LSP integration). When Claude Code opens a TypeScript file, the wrapper templates `${CLAUDE_PLUGIN_ROOT}` into a generated config and execs `python3 ~/.cache/safer-by-default/lsp-proxy.py`. The proxy spawns two children and multiplexes them onto Claude Code's single LSP connection:
+This plugin declares no `lspServers` entry and ships no LSP runtime, so installing it starts no language server.
 
-- `typescript-language-server --stdio` (primary) — handles `documentSymbol`, `goToDefinition`, `findReferences`, `hover`, and the other code-intelligence operations Claude Code's `LSP` tool exposes. Also emits TS semantic diagnostics.
-- `bun lsp/architecture/server/index.ts` (sidecar) — the custom Effect-shaped architecture analyzer, runs TypeScript source directly, diagnostic-only.
+ESLint rules from `eslint-plugin-agent-code-guard` ship via the CLI surface that `/safer:setup` writes into each project's `eslint.config.js`. `/safer:verify` runs `eslint` as a ring-1 gate when the project has an eslint config but no `lint` script.
 
-Why the proxy: Claude Code's LSP dispatcher returns opaque "internal error" on every operation when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while internally fanning notifications to both children and merging their `publishDiagnostics` upward.
-
-If `~/.cache/safer-by-default/lsp-proxy.py` is missing, `lsp/proxy/run.sh` exits non-zero with a pointer to `/safer:setup` (Step 10c fetches it). If `bun`, `typescript-language-server`, or `python3` is missing, the proxy fails when it tries to spawn its children. Either way, the rest of the plugin (skills, bins) keeps working.
-
-ESLint syntax rules from `eslint-plugin-agent-code-guard` are NOT on the LSP path; they ship via the CLI surface that `/safer:setup` writes into each project's `eslint.config.js`, and `/safer:verify` runs `eslint` as a ring-1 gate when the project has an eslint config but no `lint` script.
+Architecture diagnostics live in [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp) and are installed from there. Its findings link to `PRINCIPLES.md` headings in this repo, so those headings stay stable.
 
 ## Troubleshooting
 
