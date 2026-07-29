@@ -103,16 +103,36 @@ const FolderChildLimitOverride = Schema.Struct({
 });
 type FolderChildLimitOverride = typeof FolderChildLimitOverride.Type;
 
+// Default thresholds for the architecture options, named so the schema reads as
+// policy and no-magic-numbers stays meaningful for genuinely-magic literals.
+const DEFAULT_MIN_EXPORTED_SIBLING_MODULES = 4;
+const DEFAULT_MAX_EXPORTED_SIBLING_RATIO = 0.6;
+const DEFAULT_MAX_SUBPATH_EXPORTS = 5;
+const DEFAULT_MAX_PUBLIC_EXPORTS = 20;
+const DEFAULT_MAX_PUBLIC_REEXPORTS = 12;
+const DEFAULT_MIN_PUBLIC_FACADE_MODULES = 6;
+const DEFAULT_MIN_PACKAGE_MESH_FOLDERS = 6;
+const DEFAULT_MAX_FOLDER_EDGE_DENSITY = 0.35;
+const DEFAULT_MAX_FOLDER_CHILDREN = 10;
+const DEFAULT_MAX_FOLDER_CHILDREN_INCLUDING_TESTS = 20;
+const DEFAULT_MAX_UNPAIRED_TEST_CHILDREN = 20;
+const DEFAULT_MIN_FOLDER_README_CHILDREN = 4;
+const DEFAULT_MAX_FOLDER_IMPORT_DISTANCE = 4;
+const DEFAULT_MIN_SHARED_KERNEL_EXPORTS = 6;
+const DEFAULT_MIN_SHARED_KERNEL_CONSUMERS = 4;
+const DEFAULT_MAX_SHARED_KERNEL_MEDIAN_OVERLAP = 0.25;
+const DEFAULT_CACHE_TTL_MS = 5_000;
+
 const ArchitectureOptionsSchema = Schema.Struct({
   projectRoot: Schema.optional(NonEmptyString),
   tsconfigPath: Schema.optional(NonEmptyString),
 
   // Inventory barrel thresholds.
   minExportedSiblingModules: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 4 }),
+    Schema.optionalWith({ default: () => DEFAULT_MIN_EXPORTED_SIBLING_MODULES }),
   ),
   maxExportedSiblingRatio: Ratio.pipe(
-    Schema.optionalWith({ default: () => 0.6 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_EXPORTED_SIBLING_RATIO }),
   ),
   countTypeOnlyExports: Schema.Boolean.pipe(
     Schema.optionalWith({ default: () => true }),
@@ -134,48 +154,48 @@ const ArchitectureOptionsSchema = Schema.Struct({
 
   // Public surface caps.
   maxSubpathExports: NonNegativeInt.pipe(
-    Schema.optionalWith({ default: () => 5 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_SUBPATH_EXPORTS }),
   ),
   maxWildcardExports: NonNegativeInt.pipe(
     Schema.optionalWith({ default: () => 0 }),
   ),
   maxPublicExports: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 20 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_PUBLIC_EXPORTS }),
   ),
   maxPublicReexports: NonNegativeInt.pipe(
-    Schema.optionalWith({ default: () => 12 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_PUBLIC_REEXPORTS }),
   ),
   minPublicFacadeModules: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 6 }),
+    Schema.optionalWith({ default: () => DEFAULT_MIN_PUBLIC_FACADE_MODULES }),
   ),
 
   // Folder graph thresholds.
   minPackageMeshFolders: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 6 }),
+    Schema.optionalWith({ default: () => DEFAULT_MIN_PACKAGE_MESH_FOLDERS }),
   ),
   maxFolderEdgeDensity: Ratio.pipe(
-    Schema.optionalWith({ default: () => 0.35 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_FOLDER_EDGE_DENSITY }),
   ),
   maxFolderCycles: NonNegativeInt.pipe(
     Schema.optionalWith({ default: () => 0 }),
   ),
   maxFolderChildren: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 10 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_FOLDER_CHILDREN }),
   ),
   maxFolderChildrenIncludingTests: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 20 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_FOLDER_CHILDREN_INCLUDING_TESTS }),
   ),
   maxUnpairedTestChildren: NonNegativeInt.pipe(
-    Schema.optionalWith({ default: () => 20 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_UNPAIRED_TEST_CHILDREN }),
   ),
   minFolderReadmeChildren: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 4 }),
+    Schema.optionalWith({ default: () => DEFAULT_MIN_FOLDER_README_CHILDREN }),
   ),
   folderReadmeFileNames: Schema.Array(NonEmptyString).pipe(
     Schema.optionalWith({ default: (): ReadonlyArray<string> => ["README.md"] }),
   ),
   maxFolderImportDistance: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 4 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_FOLDER_IMPORT_DISTANCE }),
   ),
   folderChildCountOverrides: Schema.Array(FolderChildLimitOverride).pipe(
     Schema.optionalWith({ default: (): ReadonlyArray<FolderChildLimitOverride> => [] }),
@@ -196,13 +216,13 @@ const ArchitectureOptionsSchema = Schema.Struct({
     Schema.optionalWith({ default: () => 2 }),
   ),
   minSharedKernelExports: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 6 }),
+    Schema.optionalWith({ default: () => DEFAULT_MIN_SHARED_KERNEL_EXPORTS }),
   ),
   minSharedKernelConsumers: PositiveInt.pipe(
-    Schema.optionalWith({ default: () => 4 }),
+    Schema.optionalWith({ default: () => DEFAULT_MIN_SHARED_KERNEL_CONSUMERS }),
   ),
   maxSharedKernelMedianOverlap: Ratio.pipe(
-    Schema.optionalWith({ default: () => 0.25 }),
+    Schema.optionalWith({ default: () => DEFAULT_MAX_SHARED_KERNEL_MEDIAN_OVERLAP }),
   ),
 
   sharedFolderNames: Schema.Array(SharedFolderAllowance).pipe(
@@ -231,7 +251,7 @@ const ArchitectureOptionsSchema = Schema.Struct({
 
   cacheTtlMs: Schema.Number.pipe(
     Schema.greaterThanOrEqualTo(0),
-    Schema.optionalWith({ default: () => 5_000 }),
+    Schema.optionalWith({ default: () => DEFAULT_CACHE_TTL_MS }),
   ),
 });
 

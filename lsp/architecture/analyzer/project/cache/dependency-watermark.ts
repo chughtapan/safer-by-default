@@ -51,10 +51,13 @@ export function dependencyWatermarks(
   ];
 }
 
+// sha256 hex is 64 chars; the first 32 (128 bits) suffice as a content watermark.
+const HASH_PREFIX_LENGTH = 32;
+
 function hashFileOrAbsent(filePath: string): string {
   try {
     const buf = fs.readFileSync(filePath);
-    return createHash("sha256").update(buf).digest("hex").slice(0, 32);
+    return createHash("sha256").update(buf).digest("hex").slice(0, HASH_PREFIX_LENGTH);
   } catch (error) {
     discardError(error);
     return "absent";

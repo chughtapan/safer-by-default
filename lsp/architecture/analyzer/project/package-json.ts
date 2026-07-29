@@ -13,10 +13,16 @@ export function readPackageJson(projectRoot: string): PackageJson | null {
   const parsed = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as unknown;
   if (!isJsonObject(parsed)) return null;
 
+  // exactOptionalPropertyTypes: omit absent optionals rather than set them
+  // to `undefined` (the optional fields are typed `string`, not `string | undefined`).
+  const name = readString(parsed.name);
+  const main = readString(parsed.main);
+  const types = readString(parsed.types);
+
   return {
-    name: readString(parsed.name),
-    main: readString(parsed.main),
-    types: readString(parsed.types),
+    ...(name !== undefined ? { name } : {}),
+    ...(main !== undefined ? { main } : {}),
+    ...(types !== undefined ? { types } : {}),
     exports: parsed.exports,
     dependencies: readStringMap(parsed.dependencies),
     devDependencies: readStringMap(parsed.devDependencies),

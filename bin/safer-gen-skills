@@ -30,7 +30,11 @@ set -euo pipefail
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PRINCIPLES_FILE="$PLUGIN_DIR/PRINCIPLES.md"
-VENDOR_SKILLS_ROOT="$PLUGIN_DIR/vendor/safer-spec-development/skills"
+# Committed snapshots of the codemod's wrapper-skill bodies (see
+# vendor/safer-spec-skills/README.md for source pin + refresh steps). The
+# runtime codemod installs from npm; these snapshots are the build-time source
+# for skill-body inlining only.
+VENDOR_SKILLS_ROOT="$PLUGIN_DIR/vendor/safer-spec-skills"
 SENTINEL='__SAFER_SPEC_VERSION__'
 # Single source of truth for the vendor-skill directive shape. Both the
 # shell-side pre-validator (grep) and the awk-side renderer match against

@@ -7,6 +7,9 @@ import {
 import type { ProjectArchitectureGraph } from "../imports/index.js";
 import type { ArchitectureDiagnostic, ResolvedArchitectureOptions } from "../project/api/index.js";
 
+// Cap on how many child names a too-large-folder diagnostic lists inline.
+const MAX_LISTED_CHILDREN = 6;
+
 interface FolderSizeStats {
   readonly productionChildren: readonly string[];
   readonly testChildren: readonly string[];
@@ -108,7 +111,7 @@ function largeFolderDiagnostic(
       `${stats.totalChildrenIncludingTests} children including tests (max ` +
       `${stats.maxChildrenIncludingTests}), and ${stats.unpairedTestChildren.length} ` +
       `unpaired test children (max ${stats.maxUnpairedTestChildren}): ` +
-      `${stats.visibleChildren.slice(0, 6).join(", ")}. ` +
+      `${stats.visibleChildren.slice(0, MAX_LISTED_CHILDREN).join(", ")}. ` +
       "Split broad package-tree folders into semantic subfolders or pair tests with the code they exercise.",
   };
 }

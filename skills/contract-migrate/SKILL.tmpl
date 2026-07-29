@@ -4,15 +4,15 @@ version: 0.1.0
 description: |
   Wrapper that exposes the sister codemod's safer-spec-migrate skill inside
   safer-by-default. The body of this skill is inlined at bin/safer-gen-skills
-  time from vendor/safer-spec-development/skills/safer-spec-migrate/SKILL.md.
+  time from vendor/safer-spec-skills/safer-spec-migrate/SKILL.md.
 
   Use when an adopter is migrating an existing module (with prior public
   exports) onto the living-spec layer. Do NOT use to bootstrap a fresh
   module; route to /safer:contract-init.
 
-  Do NOT edit the body block below. Edit the upstream
-  vendor/safer-spec-development/skills/safer-spec-migrate/SKILL.md (via sister
-  submodule bump) and re-run bin/safer-gen-skills.
+  Do NOT edit the body block below. Refresh the snapshot at
+  vendor/safer-spec-skills/safer-spec-migrate/SKILL.md (see that dir's README for
+  source pin + steps) and re-run bin/safer-gen-skills.
 triggers:
   - migrate module to living-spec
   - upgrade folder to MODULE.md

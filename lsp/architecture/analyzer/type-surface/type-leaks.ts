@@ -312,6 +312,7 @@ function resolvePackageNameFromSymbol(symbol: ts.Symbol | undefined): string | n
 
 function packageNameFromNodeModulesPath(afterNodeModules: string): string | null {
   const [firstSegment, secondSegment] = afterNodeModules.split("/");
+  if (firstSegment === undefined || firstSegment === "") return null;
   return firstSegment.startsWith("@") && secondSegment
     ? `${firstSegment}/${secondSegment}`
     : firstSegment;

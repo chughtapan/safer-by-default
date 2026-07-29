@@ -23,10 +23,10 @@ assert_ne() {
 #   $tmp/PRINCIPLES.md
 #   $tmp/bin/safer-gen-skills           (copy of the real binary)
 #   $tmp/skills/<name>/SKILL.tmpl
-#   $tmp/vendor/safer-spec-development/skills/<slug>/SKILL.md
+#   $tmp/vendor/safer-spec-skills/<slug>/SKILL.md
 build_fixture() {
   local tmp="$1"
-  mkdir -p "$tmp/bin" "$tmp/skills" "$tmp/vendor/safer-spec-development/skills"
+  mkdir -p "$tmp/bin" "$tmp/skills" "$tmp/vendor/safer-spec-skills"
   cat > "$tmp/PRINCIPLES.md" <<'EOF'
 # PRINCIPLES — fixture
 
@@ -39,8 +39,8 @@ EOF
 write_vendor_skill() {
   local tmp="$1"
   local slug="$2"
-  mkdir -p "$tmp/vendor/safer-spec-development/skills/$slug"
-  cat > "$tmp/vendor/safer-spec-development/skills/$slug/SKILL.md" <<EOF
+  mkdir -p "$tmp/vendor/safer-spec-skills/$slug"
+  cat > "$tmp/vendor/safer-spec-skills/$slug/SKILL.md" <<EOF
 ---
 name: $slug
 description: vendor skill fixture
@@ -136,8 +136,8 @@ test_check_release_fails_on_sentinel_via_vendor_indirection() {
   # greps the generated SKILL.md and trips. This is the "via vendor" case the
   # security reviewer asked be covered: a compromised sister-repo cannot smuggle
   # the sentinel past the release gate by hiding it in a vendor body.
-  mkdir -p "$tmp/vendor/safer-spec-development/skills/example-vendor"
-  cat > "$tmp/vendor/safer-spec-development/skills/example-vendor/SKILL.md" <<'EOF'
+  mkdir -p "$tmp/vendor/safer-spec-skills/example-vendor"
+  cat > "$tmp/vendor/safer-spec-skills/example-vendor/SKILL.md" <<'EOF'
 ---
 name: example-vendor
 ---
@@ -163,10 +163,10 @@ test_vendor_skill_symlink_refused() {
   write_vendor_skill "$tmp" "real-target"
   # Plant the leaf SKILL.md as a symlink to a host-private file (the
   # threat model: a compromised sister-repo merge plants a leaf symlink).
-  mkdir -p "$tmp/vendor/safer-spec-development/skills/example-vendor"
+  mkdir -p "$tmp/vendor/safer-spec-skills/example-vendor"
   local secret="$tmp/secret-host-file"
   echo "host-private-content-must-not-inline" > "$secret"
-  ln -s "$secret" "$tmp/vendor/safer-spec-development/skills/example-vendor/SKILL.md"
+  ln -s "$secret" "$tmp/vendor/safer-spec-skills/example-vendor/SKILL.md"
   write_wrapper_skill "$tmp" "example" "example-vendor"
 
   local rc
@@ -205,8 +205,8 @@ name: example-vendor
 SECRET-CONTENT-VIA-DIR-SYMLINK-9999 — host-private vector that must never inline.
 EOF
   # Plant the per-slug DIRECTORY as a symlink under the vendor tree.
-  mkdir -p "$tmp/vendor/safer-spec-development/skills"
-  ln -s "$attacker_dir" "$tmp/vendor/safer-spec-development/skills/example-vendor"
+  mkdir -p "$tmp/vendor/safer-spec-skills"
+  ln -s "$attacker_dir" "$tmp/vendor/safer-spec-skills/example-vendor"
   write_wrapper_skill "$tmp" "example" "example-vendor"
 
   local rc
@@ -231,8 +231,8 @@ test_vendor_skill_in_root_dir_symlink_refused() {
   local tmp; tmp=$(mktemp -d)
   build_fixture "$tmp"
   # Plant a real target inside the vendor root.
-  mkdir -p "$tmp/vendor/safer-spec-development/skills/real-target"
-  cat > "$tmp/vendor/safer-spec-development/skills/real-target/SKILL.md" <<'EOF'
+  mkdir -p "$tmp/vendor/safer-spec-skills/real-target"
+  cat > "$tmp/vendor/safer-spec-skills/real-target/SKILL.md" <<'EOF'
 ---
 name: real-target
 ---
@@ -242,8 +242,8 @@ name: real-target
 IN-ROOT-REDIRECT-TARGET — must not inline via a directory-symlink redirect.
 EOF
   # Plant a directory-symlink under the vendor root pointing at the in-root target.
-  ln -s "$tmp/vendor/safer-spec-development/skills/real-target" \
-    "$tmp/vendor/safer-spec-development/skills/example-vendor"
+  ln -s "$tmp/vendor/safer-spec-skills/real-target" \
+    "$tmp/vendor/safer-spec-skills/example-vendor"
   write_wrapper_skill "$tmp" "example" "example-vendor"
 
   local rc
@@ -277,8 +277,8 @@ name: example-vendor
 
 ESCAPE-TARGET-CONTENT — must not inline.
 EOF
-  mkdir -p "$tmp/vendor/safer-spec-development/skills"
-  ln -s "$outside_target" "$tmp/vendor/safer-spec-development/skills/example-vendor"
+  mkdir -p "$tmp/vendor/safer-spec-skills"
+  ln -s "$outside_target" "$tmp/vendor/safer-spec-skills/example-vendor"
   write_wrapper_skill "$tmp" "example" "example-vendor"
 
   local rc

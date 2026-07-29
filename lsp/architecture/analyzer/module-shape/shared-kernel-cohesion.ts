@@ -12,6 +12,9 @@ import type {
 } from "../imports/index.js";
 import type { ArchitectureDiagnostic, ResolvedArchitectureOptions } from "../project/api/index.js";
 
+// Number of overlap samples a shared-kernel-cohesion diagnostic includes.
+const MAX_OVERLAP_SAMPLES = 3;
+
 interface ExportConsumerSets {
   readonly consumedExports: readonly string[];
   readonly consumersByExport: ReadonlyMap<string, ReadonlySet<string>>;
@@ -106,7 +109,7 @@ function summarizeExportOverlap(
   return {
     medianScore: sorted[Math.floor(sorted.length / 2)]?.score ?? 0,
     comparisonCount: sorted.length,
-    samples: sorted.slice(0, 3).map(overlapSample),
+    samples: sorted.slice(0, MAX_OVERLAP_SAMPLES).map(overlapSample),
   };
 }
 

@@ -9,6 +9,7 @@ export {
   architectureOptionsJsonSchema,
   resolveArchitectureOptions,
   type ArchitectureOptionsInput,
+  type ArchitectureOptionsIssue,
 } from "../config.js";
 export { cachedProjectArchitecture, clearArchitectureCache } from "../cache/index.js";
 export {
