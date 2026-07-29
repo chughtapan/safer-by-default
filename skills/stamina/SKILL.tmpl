@@ -35,18 +35,18 @@ allowed-tools:
 
 ## How this modality projects from the doctrine
 
-- **Part 3 → Stamina** — this skill is the enforcement mechanism for the Stamina clause. The budget table lives there; this skill reads it. Every `N` you pick traces to a row.
-- **Principle 5 (Discipline over capability)** — stamina routes; it does not review. Every verdict comes from a dispatched reviewer.
-- **Principle 8 (Ratchet)** — any BLOCK verdict routes upstream (to the modality that authored the artifact), never sideways via a stamina-authored patch.
-- **Part 4 → Durable records** — the consolidated verdict is published to the target issue/PR; per-reviewer reports link to the reviewer's native artifact (`gh pr review`, issue comment).
+- **Part 3 → Stamina.** This skill is the enforcement mechanism for the Stamina clause. The budget table lives there; this skill reads it. Every `N` you pick traces to a row.
+- **Principle 5 (Discipline over capability).** Stamina routes; it does not review. Every verdict comes from a dispatched reviewer.
+- **Principle 8 (Ratchet).** Any BLOCK verdict routes upstream (to the modality that authored the artifact), never sideways via a stamina-authored patch.
+- **Part 4 → Durable records.** The consolidated verdict is published to the target issue/PR; per-reviewer reports link to the reviewer's native artifact (`gh pr review`, issue comment).
 
 ## Dispatch modes
 
 Stamina has two invocation modes depending on whether the invoker can spawn sub-teammates. Resolve the mode before Phase 1.
 
-- **Mode A — standalone or team-lead.** Invoker is the user, an orchestrator, or a team-lead. The `Agent` tool accepts `name` / `team_name` / `mode` parameters. Stamina fans out directly: one `Agent` call per dispatched reviewer, as documented in Phase 2 below. This is the default; all subsequent phase instructions assume it.
+- **Mode A: standalone or team-lead.** Invoker is the user, an orchestrator, or a team-lead. The `Agent` tool accepts `name` / `team_name` / `mode` parameters. Stamina fans out directly: one `Agent` call per dispatched reviewer, as documented in Phase 2 below. This is the default; all subsequent phase instructions assume it.
 
-- **Mode B — in-team teammate.** Stamina was itself dispatched as a teammate (e.g., a team-lead ran `Agent({ name: "stamina-...", team_name: "..." })`). The harness disables `name` / `team_name` / `mode` on the `Agent` tool for non-lead teammates, so stamina cannot spawn sub-reviewers. Fan-out is impossible from inside the team. Escalate the dispatch plan back to the team-lead via `SendMessage` and stop; the team-lead spawns the reviewers and reports consensus back to the original caller.
+- **Mode B: in-team teammate.** Stamina was itself dispatched as a teammate (e.g., a team-lead ran `Agent({ name: "stamina-...", team_name: "..." })`). The harness disables `name` / `team_name` / `mode` on the `Agent` tool for non-lead teammates, so stamina cannot spawn sub-reviewers. Fan-out is impossible from inside the team. Escalate the dispatch plan back to the team-lead via `SendMessage` and stop; the team-lead spawns the reviewers and reports consensus back to the original caller.
 
 ### Detection
 
@@ -61,7 +61,7 @@ The detection is one-shot. Once you are in Mode B for this invocation, all remai
 
 ### Mode B — escalation to team-lead
 
-Mode B is **fire-and-forget**. Stamina hands off the dispatch plan to the team-lead in one message and stops. The team-lead owns dispatch, collection, aggregation, AND publication. Stamina does not resume — there is no second turn waiting for results.
+Mode B is **fire-and-forget**. Stamina hands off the dispatch plan to the team-lead in one message and stops. The team-lead owns dispatch, collection, aggregation, AND publication. Stamina does not resume. There is no second turn waiting for results.
 
 In Mode B, stamina produces no consolidated GitHub comment and does not transition labels. Those artifacts are the team-lead's responsibility after it completes the fan-out stamina described. Stamina's deliverable in Mode B is the escalation message plus a status marker.
 
@@ -72,7 +72,7 @@ SendMessage({
   to: "team-lead",
   summary: "stamina Mode B: team-lead must dispatch N reviewers",
   message: """
-STATUS: ESCALATED (stamina Mode B — in-team teammate cannot spawn sub-teammates)
+STATUS: ESCALATED (stamina Mode B: in-team teammate cannot spawn sub-teammates)
 
 Correlation ID: $SESSION (use this in every dispatched reviewer's prompt and in the consolidated comment so all artifacts trace back to this stamina invocation)
 Target: <PR or sub-issue URL>
@@ -116,7 +116,7 @@ After sending, report `ESCALATED` on the last line of your reply with cause `STA
 
 > **Stamina routes; it does not review.**
 
-The failure mode this prevents: the stamina agent reading the diff "to sanity-check" the dispatched reviewers, then weighing in with its own opinion. Any reading not attributed to a dispatched reviewer is a violation of the iron rule. If stamina needs a verdict shape that no existing review skill produces, the review family is incomplete — escalate to spec, do not synthesize one inline. The consolidated comment is a routing table over the dispatched reviewers' verdicts, nothing more.
+The failure mode this prevents: the stamina agent reading the diff "to sanity-check" the dispatched reviewers, then weighing in with its own opinion. Any reading not attributed to a dispatched reviewer is a violation of the iron rule. If stamina needs a verdict shape that no existing review skill produces, the review family is incomplete. Escalate to spec, do not synthesize one inline. The consolidated comment is a routing table over the dispatched reviewers' verdicts, nothing more.
 
 ## Role
 
@@ -124,7 +124,7 @@ Stamina is a fan-out adapter above the review family. One invocation takes one a
 
 ## Inputs required
 
-- `--plan <sub-issue-URL>` or `--pr <pr-URL>` — exactly one. Both or neither is a `NEEDS_CONTEXT` stop.
+- `--plan <sub-issue-URL>` or `--pr <pr-URL>`. Exactly one. Both or neither is a `NEEDS_CONTEXT` stop.
 - `gh` CLI authenticated.
 - Blast-radius signal: `safer-diff-scope --pr <N>` output for `--pr` mode; sub-issue `safer:<modality>` label for `--plan` mode.
 - Optional: `--budget <N>` to override the table-inferred N (1 ≤ N ≤ 4; N>4 requires `safer-escalate --cause USER_BUDGET_OVERRIDE`).
@@ -157,7 +157,7 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 - Collecting each reviewer's published verdict from GitHub (not from agent return values).
 - Aggregating verdicts under the consensus rule.
 - Publishing one consolidated comment on the target issue/PR.
-- Transitioning exactly one label on the target sub-issue (plan mode) or leaving the PR label alone (PR mode — `/safer:verify` runs next).
+- Transitioning exactly one label on the target sub-issue (plan mode) or leaving the PR label alone (PR mode, `/safer:verify` runs next).
 
 **Forbidden:**
 - Reading the diff or the plan body to form a first-party opinion.
@@ -169,7 +169,7 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 
 ## Scope budget
 
-1. One consolidated comment per invocation. Not one per reviewer — dispatched reviewers publish their own native artifacts.
+1. One consolidated comment per invocation. Not one per reviewer. Dispatched reviewers publish their own native artifacts.
 2. N is bounded: floor N=1, ceiling N=4 table-default, N>4 requires explicit user approval (captured in `--budget` or `safer-escalate`).
 3. Review family (PR mode): `/safer:review-senior`, `/review`, `/simplify`, `/safer:dogfood`, `/codex`, `/security-review`. Fixed list; no additions in v1. The implement-* skills also run `/review` and `/simplify` as pre-PR hygiene gates; the stamina-time pass is a separate, independent review run that counts toward stamina N regardless of whether implement-* already ran them.
 4. Review family (plan mode): `/safer:dogfood`, `/safer:review-senior` (re-targeted at the plan body), `/codex` (cross-model). Fixed list; no additions in v1.
@@ -181,9 +181,9 @@ Emit `safer.stamina_gate` at start with the chosen N, N-source (`table` | `user-
 
 ### Workflow path (Claude Code, opt-in)
 
-When you are the **main-loop** invoker (stamina Mode A — the user or the orchestrate team-lead) on Claude Code AND the Workflow tool is available (the session is in ultracode mode, or the invocation opted in), you MAY execute Phases 2-4 deterministically by running `skills/stamina/dispatch.workflow.js` via the `Workflow` tool, passing the resolved dispatch set, N, mode, target URL, and `atCeiling`. The script fans the reviewers out in parallel and applies the Phase-4 consensus reducer (a mirror of `skills/stamina/consensus.mjs`, which carries the canonical reducer + its test).
+When you are the **main-loop** invoker (stamina Mode A, the user or the orchestrate team-lead) on Claude Code AND the Workflow tool is available (the session is in ultracode mode, or the invocation opted in), you MAY execute Phases 2-4 deterministically by running `skills/stamina/dispatch.workflow.js` via the `Workflow` tool, passing the resolved dispatch set, N, mode, target URL, and `atCeiling`. The script fans the reviewers out in parallel and applies the Phase-4 consensus reducer (a mirror of `skills/stamina/consensus.mjs`, which carries the canonical reducer + its test).
 
-The Workflow **executes the rulebook below**; it is not a second dispatcher (review-senior Invariant 11 holds). The prose below is **authoritative** and is the required path for a stamina dispatched as a teammate (Mode B — teammates cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. The Workflow returns the consensus verdict only — it never merges, transitions a label, or chains to verify; any BLOCKED/ESCALATED ratchets upstream and NEEDS_CONTEXT parks. Classification (which N, which set) and the CI gate (Phase 0) stay in this prose.
+The Workflow **executes the rulebook below**; it is not a second dispatcher (review-senior Invariant 11 holds). The prose below is **authoritative** and is the required path for a stamina dispatched as a teammate (Mode B, teammates cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. The Workflow returns the consensus verdict only. It never merges, transitions a label, or chains to verify; any BLOCKED/ESCALATED ratchets upstream and NEEDS_CONTEXT parks. Classification (which N, which set) and the CI gate (Phase 0) stay in this prose.
 
 ### Phase 0 — CI status gate (PR mode only)
 
@@ -209,11 +209,11 @@ Decision rule (caps the Phase 4 aggregate):
 | `CI_STATUS` | Effect on aggregate |
 |---|---|
 | `green` or `no-checks` | proceed to Phase 1; surface `CI status: <status>` in the consolidated comment |
-| `failing` | aggregate caps at `ESCALATED`. Surface `CI status: failing — <N tests>` with the failing-check names; route per Phase 6 (typically back to `/safer:implement-*`) |
+| `failing` | aggregate caps at `ESCALATED`. Surface `CI status: failing, <N tests>` with the failing-check names; route per Phase 6 (typically back to `/safer:implement-*`) |
 | `pending` | aggregate caps at `APPROVE-PENDING-CI`. Auto-monitor withholds merge until CI clears |
 | `unknown` | treat as `pending` (fail-safe); surface raw `statusCheckRollup` JSON for triage |
 
-Triage exception: a failing check verifiably pre-existing on the base branch — confirmed by running the test on `origin/<base>` — may proceed to APPROVE with both base-branch and PR-head outputs quoted in the verdict. "Verified" means a fresh run, not "I think it was already failing." No verbal-only triage.
+Triage exception: a failing check verifiably pre-existing on the base branch, confirmed by running the test on `origin/<base>`, may proceed to APPROVE with both base-branch and PR-head outputs quoted in the verdict. "Verified" means a fresh run, not "I think it was already failing." No verbal-only triage.
 
 This phase is non-skippable for PR mode. It is NOT a separate stamina N pass; it is the precondition gate for any aggregate APPROVE.
 
@@ -262,11 +262,11 @@ LABEL=$(gh issue view "$SUB_ISSUE" --json labels -q '.labels[].name' | grep '^sa
 | Role | Skill (PR mode) | Skill (plan mode) |
 |---|---|---|
 | acceptance-vs-diff | `/safer:review-senior` | `/safer:review-senior` (plan-body target) |
-| structural-diff | `/review` (gstack) | — |
-| simplification | `/simplify` (gstack) | — |
+| structural-diff | `/review` (gstack) | n/a |
+| simplification | `/simplify` (gstack) | n/a |
 | cold-start-read | `/safer:dogfood` | `/safer:dogfood` |
 | adversarial, cross-model | `/codex` | `/codex` |
-| security | `/security-review` (auto-skipped if no auth/crypto/secret touches per `safer-diff-scope`) | — |
+| security | `/security-review` (auto-skipped if no auth/crypto/secret touches per `safer-diff-scope`) | n/a |
 
 PR mode reaches |set| = 6 with all six roles fired. Plan mode reaches |set| = 3 (acceptance-vs-diff + cold-start-read + cross-model); N capped at 3 in plan mode. If the final set has fewer roles than N, cap N down to the set size and record `n-capped=true` in telemetry. If the capped N < 1 the classifier is broken → `NEEDS_CONTEXT`.
 
@@ -368,7 +368,7 @@ One consolidated comment on the target PR or sub-issue. Shape:
 
 - On `DONE`: label `review → plan-approved` (plan mode) / PR awaits `/safer:verify` (PR mode).
 - On `ESCALATED`: `safer-escalate --from stamina --to <authoring-modality> --cause REVIEWER_BLOCK`.
-- On `BLOCKED`: reviewer dispatch failed — <reviewer-name>, last-known state <state>.
+- On `BLOCKED`: reviewer dispatch failed: <reviewer-name>, last-known state <state>.
 - On `NEEDS_CONTEXT`: <the open question>.
 ```
 
@@ -378,7 +378,7 @@ Publish via `safer-publish` (one call; idempotent on retries). On plan mode `DON
 safer-transition-label --issue "$SUB_ISSUE" --from review --to plan-approved
 ```
 
-On PR mode `DONE`, do not transition the PR label — `/safer:verify` runs next and owns that transition.
+On PR mode `DONE`, do not transition the PR label. `/safer:verify` runs next and owns that transition.
 
 On `ESCALATED`:
 
@@ -413,7 +413,7 @@ Report the status marker on the last line of your reply.
 ## Stop rules
 
 1. **Reader, not writer.** If you start forming a first-party opinion on the artifact, the iron rule fired. Dispatch or escalate; do not summarize a reading you did yourself. → `ESCALATED` to spec with cause `STAMINA_IRON_RULE_FIRED`.
-2. **Homogeneous dispatch.** If the candidate dispatch set covers fewer than 2 distinct roles at N≥2, the persona-diversity rule fired — → `NEEDS_CONTEXT` to user, name the missing roles.
+2. **Homogeneous dispatch.** If the candidate dispatch set covers fewer than 2 distinct roles at N≥2, the persona-diversity rule fired. → `NEEDS_CONTEXT` to user, name the missing roles.
 3. **Missing artifact.** Target PR or sub-issue URL is unresolvable → `NEEDS_CONTEXT`.
 4. **No acceptance criteria.** Sub-issue has no acceptance checklist → `NEEDS_CONTEXT` to orchestrator.
 5. **Reviewer dispatch failed.** Any dispatched reviewer did not publish within the invocation window → `BLOCKED` with the reviewer name and last-known state.
@@ -426,17 +426,17 @@ When a stop fires, still emit `safer.stamina_gate` end with `outcome=<stop-tag>`
 
 ## Completion status
 
-- `DONE` — unanimous approve across the dispatch set; consolidated comment published; label transitioned (plan mode) or deliberately left for `/safer:verify` (PR mode).
-- `DONE_WITH_CONCERNS` — approve with reviewer-named concerns; each concern attributed to its source reviewer.
-- `ESCALATED` — any BLOCK / `CHANGES_REQUESTED` / `ESCALATED` fired; routed upstream via Ratchet.
-- `BLOCKED` — reviewer dispatch failed or external dep unresolved. Name the reviewer and the last-known state.
-- `NEEDS_CONTEXT` — partial approve at ceiling, missing acceptance criteria, classifier error, or N>4 without authorization. State the question.
+- `DONE`. Unanimous approve across the dispatch set; consolidated comment published; label transitioned (plan mode) or deliberately left for `/safer:verify` (PR mode).
+- `DONE_WITH_CONCERNS`. Approve with reviewer-named concerns; each concern attributed to its source reviewer.
+- `ESCALATED`. Any BLOCK / `CHANGES_REQUESTED` / `ESCALATED` fired; routed upstream via Ratchet.
+- `BLOCKED`. Reviewer dispatch failed or external dep unresolved. Name the reviewer and the last-known state.
+- `NEEDS_CONTEXT`. Partial approve at ceiling, missing acceptance criteria, classifier error, or N>4 without authorization. State the question.
 
 ## Publication map
 
 | Artifact | Destination |
 |---|---|
-| Per-reviewer verdict | Native to the reviewer (`gh pr review`, sub-issue comment) — stamina does not own it |
+| Per-reviewer verdict | Native to the reviewer (`gh pr review`, sub-issue comment), stamina does not own it |
 | Consolidated stamina verdict | One comment on the target PR or sub-issue |
 | Label transition | `safer-transition-label` on the target sub-issue (plan mode only); PR mode leaves the PR label alone |
 | Escalation | `safer-escalate --from stamina --to <authoring-mod>`; cross-linked from consolidated comment |
@@ -446,14 +446,14 @@ Nothing stamina produces lives outside GitHub.
 
 ## Anti-patterns
 
-- **"I'll read the diff myself and confirm the reviewers are right."** — Iron rule violation. Stamina routes; it does not review.
-- **"I'll run `/safer:review-senior` three times with different prompts to hit N=3."** — Independence rule violation. Three passes of the same skill on the same model is N=1.
-- **"Two reviewers approved, one hasn't replied; I'll ship."** — Incomplete dispatch is not consensus. `BLOCKED` until the last reviewer publishes or times out.
-- **"One reviewer blocked on a nit; I'll downgrade their verdict to a concern."** — Stamina does not grade reviewers. Any BLOCK routes upstream.
-- **"I'll invoke stamina on my own output before handing back."** — Principle 5 violation. Stamina is orchestrator-driven, not self-invoked.
-- **"The consolidated comment should summarize what each reviewer found."** — No. The consolidated comment is a routing table over verdict URLs. The findings live with the reviewers.
-- **"`safer-diff-scope` returned a field I do not recognize; I'll ignore it."** — Classifier drift is a real bug in the chain. `NEEDS_CONTEXT`; do not guess.
-- **"The table says N=4 but the ceiling cap dropped us to 3; close enough."** — Record `n-capped=true` in telemetry; name the missing role in the consolidated comment. Silent degradation is a calibration failure.
+- **"I'll read the diff myself and confirm the reviewers are right.".** Iron rule violation. Stamina routes; it does not review.
+- **"I'll run `/safer:review-senior` three times with different prompts to hit N=3.".** Independence rule violation. Three passes of the same skill on the same model is N=1.
+- **"Two reviewers approved, one hasn't replied; I'll ship.".** Incomplete dispatch is not consensus. `BLOCKED` until the last reviewer publishes or times out.
+- **"One reviewer blocked on a nit; I'll downgrade their verdict to a concern.".** Stamina does not grade reviewers. Any BLOCK routes upstream.
+- **"I'll invoke stamina on my own output before handing back.".** Principle 5 violation. Stamina is orchestrator-driven, not self-invoked.
+- **"The consolidated comment should summarize what each reviewer found.".** No. The consolidated comment is a routing table over verdict URLs. The findings live with the reviewers.
+- **"`safer-diff-scope` returned a field I do not recognize; I'll ignore it.".** Classifier drift is a real bug in the chain. `NEEDS_CONTEXT`; do not guess.
+- **"The table says N=4 but the ceiling cap dropped us to 3; close enough.".** Record `n-capped=true` in telemetry; name the missing role in the consolidated comment. Silent degradation is a calibration failure.
 
 ## Checklist before declaring DONE
 
@@ -503,7 +503,7 @@ Body:
 - Route to <modality>, specifically <what they should decide>.
 
 ## Confidence
-<LOW|MED|HIGH> — based on consensus arithmetic; stamina has no first-party evidence.
+<LOW|MED|HIGH>. Based on consensus arithmetic; stamina has no first-party evidence.
 ```
 
 Post on the target; leave the consolidated comment in place; do not delete the per-reviewer verdicts.

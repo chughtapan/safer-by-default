@@ -38,7 +38,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -60,18 +60,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -96,9 +96,9 @@ This is the craft floor, compressed. The full doctrine, with the reasoning, work
 
 ## How this modality projects from the doctrine
 
-- **Principles 1–4 (Craft)** — they apply at full intensity inside the module body you own, which is where every fork in the decision table below lives. The module's boundary is where Principle 2 bites; everything inside it is yours to make unrepresentable.
-- **Principle 5 (Discipline over capability)** — you do one module. The instinct "while I'm here" is the stop rule.
-- **Principle 6 (Budget Gate)** — shape of change is the budget, not volume. 500 LOC in one module is fine. 2 LOC across two modules is not.
+- **Principles 1–4 (Craft).** They apply at full intensity inside the module body you own, which is where every fork in the decision table below lives. The module's boundary is where Principle 2 bites; everything inside it is yours to make unrepresentable.
+- **Principle 5 (Discipline over capability).** You do one module. The instinct "while I'm here" is the stop rule.
+- **Principle 6 (Budget Gate).** Shape of change is the budget, not volume. 500 LOC in one module is fine. 2 LOC across two modules is not.
 
 ## Decision table
 
@@ -228,7 +228,7 @@ If the sub-issue URL was not passed with the invocation, ask. No sub-issue means
 - Writing a "quick fix" in a sibling module, even one line.
 - Rewriting the architect plan, even if you disagree.
 
-When the target module's folder already carries `MODULE.md` (the v0.2.0 living-spec layer the codemod manages), update `@spec.*` JSDoc directives on existing public exports to reflect changes in the diff. Introducing a new `@spec.kind`/`@spec.property`/`@spec.threshold` directive on a NEW public export is upstream architect-tier work — route via `safer-escalate --from implement-junior --to architect --cause NEW_SPEC_DIRECTIVE`. Editing the per-folder sidecar `.safer-spec/<slug>.json` by hand to clear a `safer-spec validate` error is the Principle 7 paper-over anti-pattern; route to `/safer:requirements` instead.
+When the target module's folder already carries `MODULE.md` (the v0.2.0 living-spec layer the codemod manages), update `@spec.*` JSDoc directives on existing public exports to reflect changes in the diff. Introducing a new `@spec.kind`/`@spec.property`/`@spec.threshold` directive on a NEW public export is upstream architect-tier work. Route via `safer-escalate --from implement-junior --to architect --cause NEW_SPEC_DIRECTIVE`. Editing the per-folder sidecar `.safer-spec/<slug>.json` by hand to clear a `safer-spec validate` error is the Principle 7 paper-over anti-pattern; route to `/safer:requirements` instead.
 
 ## Scope budget
 
@@ -237,7 +237,7 @@ Shape is the rule. Volume is a soft guide.
 | Dimension | Hard rule | Soft guide |
 |---|---|---|
 | Files touched | 1 module boundary | ≤ 10 files |
-| LOC | — | ≤ 500 |
+| LOC | n/a | ≤ 500 |
 | Exported signature changes | 0 | 0 |
 | New exported types | 0 | 0 |
 | New package deps | 0 | 0 |
@@ -331,7 +331,7 @@ Before opening the PR, run `/simplify` on the diff:
 /simplify
 ```
 
-Apply all findings. An empty result (no findings) is a valid outcome — note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored — skipped" and the reviewer decides whether to block.
+Apply all findings. An empty result (no findings) is a valid outcome, note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored, skipped" and the reviewer decides whether to block.
 
 **Does NOT count toward stamina N.** This is a pre-PR hygiene gate, not an independent stamina reviewer.
 
@@ -343,9 +343,9 @@ Before opening the PR, run `/review` on the diff:
 /review
 ```
 
-Apply all findings; cite skips in the PR body under "Review skips" with rationale. An empty result is a valid outcome — note "review: no findings". If `/review` errors, note "review: errored — skipped" and proceed.
+Apply all findings; cite skips in the PR body under "Review skips" with rationale. An empty result is a valid outcome, note "review: no findings". If `/review` errors, note "review: errored, skipped" and proceed.
 
-**Does NOT count toward stamina N.** Same reason as Phase 6a — pre-PR hygiene.
+**Does NOT count toward stamina N.** Same reason as Phase 6a, pre-PR hygiene.
 
 ### Phase 7 — Open the PR
 
@@ -374,7 +374,7 @@ Closes #$SUB_ISSUE
 - <bullet per new test>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 EOF
 )")
 
@@ -407,15 +407,15 @@ Report `DONE` with the PR URL. If you left concerns (flaky upstream test, open q
 5. **`safer-diff-scope --head HEAD` reports `senior` or `staff`.** → `ESCALATED` with the diff-scope output attached.
 6. **Tests fail and the fix requires a second module to change.** → `ESCALATED` to `implement-senior` or architect, depending on whether the plan covers the other module.
 7. **The stub you are filling in has no architect plan and no obvious-scope sub-issue.** → `NEEDS_CONTEXT`. Ask for the plan before writing code.
-8. **You caught yourself about to write `any`, `as T`, `catch {}`, or `throw new Error("...")`.** → Stop. Re-read Principles 1-4. The right typed shape requires architect-tier decisions (which branded type, which discriminated union, which tagged error class). Escalate via `safer-escalate --to architect --cause type-system-shortfall`. Do not ship the violation as `DONE_WITH_CONCERNS` — Principle 1-4 violations the agent caught itself about to write are stop rule fires, not concerns. The discriminator: could the agent have prevented this at junior tier? Choosing a different shape is always preventable, so it's a stop rule fire.
+8. **You caught yourself about to write `any`, `as T`, `catch {}`, or `throw new Error("...")`.** → Stop. Re-read Principles 1-4. The right typed shape requires architect-tier decisions (which branded type, which discriminated union, which tagged error class). Escalate via `safer-escalate --to architect --cause type-system-shortfall`. Do not ship the violation as `DONE_WITH_CONCERNS`. Principle 1-4 violations the agent caught itself about to write are stop rule fires, not concerns. The discriminator: could the agent have prevented this at junior tier? Choosing a different shape is always preventable, so it's a stop rule fire.
 
 ## Completion status
 
-- `DONE` — PR opened as draft, `safer-diff-scope` says `junior`, tests pass, sub-issue moved to `review`.
-- `DONE_WITH_CONCERNS` — as above, but 1-3 concerns named for the reviewer. Concerns must be things the agent could not have prevented at junior tier (test flake upstream, plan ambiguity that doesn't block this module, unrecoverable external state). Type workarounds are NOT concerns — they're stop rule fires that escalate via `safer-escalate` (Stop rule 8).
-- `ESCALATED` — stop rule fired; escalation artifact posted on the sub-issue.
-- `BLOCKED` — external dependency (failing CI on main, missing credential). Name the blocker.
-- `NEEDS_CONTEXT` — user-resolvable ambiguity; state the question.
+- `DONE`. PR opened as draft, `safer-diff-scope` says `junior`, tests pass, sub-issue moved to `review`.
+- `DONE_WITH_CONCERNS`, as above, but 1-3 concerns named for the reviewer. Concerns must be things the agent could not have prevented at junior tier (test flake upstream, plan ambiguity that doesn't block this module, unrecoverable external state). Type workarounds are NOT concerns, they're stop rule fires that escalate via `safer-escalate` (Stop rule 8).
+- `ESCALATED`. Stop rule fired; escalation artifact posted on the sub-issue.
+- `BLOCKED`. External dependency (failing CI on main, missing credential). Name the blocker.
+- `NEEDS_CONTEXT`. User-resolvable ambiguity; state the question.
 
 ## Escalation artifact template
 
@@ -435,7 +435,7 @@ Narrative body:
 **Cause:** <one line>
 
 ## Sub-issue
-#<N> — <title>
+#<N>: <title>
 
 ## What the plan says
 <quote>
@@ -450,7 +450,7 @@ Narrative body:
 - Route to <modality>, specifically <what they should decide>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 ```
 
 Post on the sub-issue; leave the branch in place with no cross-module edits committed. If you started a cross-module edit before noticing, revert it before escalating.
@@ -462,7 +462,7 @@ Post on the sub-issue; leave the branch in place with no cross-module edits comm
 | Draft PR | GitHub PR, title prefixed `[impl-junior]`, body references sub-issue | PR opens as draft |
 | Review request | Comment on the sub-issue with the PR URL | sub-issue: `implementing` → `review` |
 | Escalation | Comment on the sub-issue, plus `safer-escalate` event | sub-issue: stays at current state, escalation recorded |
-| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | — |
+| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | n/a |
 
 ## Anti-patterns
 

@@ -41,5 +41,5 @@ Diagnose must:
 
 **Rationale.** Post-refactor bugs that look novel are usually silent behavior deltas. Diagnose runs not primed for "compare to last-known-good" tend to publish repros that don't surface the delta, and codex then has nothing to evaluate. The brief addition primes the comparison in the REASONING section so codex sees the candidate hypothesis, and routes the default fix-shape toward restoration rather than reinvention.
 
-**When the dispatch is for `/safer:architect` after `/safer:diagnose` on a post-refactor regression.** Include the same `## Post-refactor context` section in the architect sub-issue body, plus a pointer to the diagnose artifact. The architect must read "what was this doing before?" before designing — restoration is a one-line plan; new pattern requires evidence.
+**When the dispatch is for `/safer:architect` after `/safer:diagnose` on a post-refactor regression.** Include the same `## Post-refactor context` section in the architect sub-issue body, plus a pointer to the diagnose artifact. The architect must read "what was this doing before?" before designing. Restoration is a one-line plan; new pattern requires evidence.
 

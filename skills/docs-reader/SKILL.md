@@ -3,7 +3,7 @@ name: docs-reader
 version: 0.1.0
 model: opus
 description: |
-  Read a docs artifact and dispatch 4 ephemeral opus personas for multi-perspective feedback. Aggregate verdicts via severity-weighted consensus; loop up to N=3 rounds (round 3 user-gated). Emit-only — does not revise the artifact.
+  Read a docs artifact and dispatch 4 ephemeral opus personas for multi-perspective feedback. Aggregate verdicts via severity-weighted consensus; loop up to N=3 rounds (round 3 user-gated). Emit-only, does not revise the artifact.
 triggers:
   - docs reader
   - personas feedback on this
@@ -36,7 +36,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -58,18 +58,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -213,7 +213,7 @@ Four personas live as prompt files in `prompts/`:
 
 Each file states: role, inputs accepted, evidence-citation rule, output schema, stop rules, status marker vocabulary. A persona not in this list is not shipped in v1; adding one is a new contract, not a staff call.
 
-A 5th `non-engineer-pm` persona was considered in contract Q1 and rejected for v1 (rationale: jargon-density overlaps with `cold-start-junior`; adding a persona later is cheap — one new prompt file, no new skill).
+A 5th `non-engineer-pm` persona was considered in contract Q1 and rejected for v1 (rationale: jargon-density overlaps with `cold-start-junior`; adding a persona later is cheap, one new prompt file, no new skill).
 
 ## Workflow
 
@@ -221,7 +221,7 @@ A 5th `non-engineer-pm` persona was considered in contract Q1 and rejected for v
 
 When you are the **main-loop** docs-reader on Claude Code AND the Workflow tool is available (ultracode mode, or the invocation opted in), you MAY execute ONE round's dispatch + aggregate by running `skills/docs-reader/personas.workflow.js` via the `Workflow` tool, passing the resolved artifact payload. The script spawns the 4 cold-start personas in parallel and runs the severity-weighted aggregator deterministically.
 
-The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched docs-reader teammate, for Codex, and for non-opted-in sessions. The Workflow runs **exactly one round** — round 2 and round 3 remain the human gates defined below and are never auto-advanced. Cold-start isolation (each persona reads only the artifact payload), CONTRADICTION → ESCALATED, and emit-only all hold.
+The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched docs-reader teammate, for Codex, and for non-opted-in sessions. The Workflow runs **exactly one round.** Round 2 and round 3 remain the human gates defined below and are never auto-advanced. Cold-start isolation (each persona reads only the artifact payload), CONTRADICTION → ESCALATED, and emit-only all hold.
 
 ### Phase 1 — Resolve inputs
 
@@ -322,7 +322,7 @@ Invariants:
 
 - `team_name` is always set. Standalone `Agent` is forbidden (Invariant §3).
 - `model: "opus"` is always set (Invariant §3: opus orchestrator, opus personas).
-- `description` is generic — it must not leak project identifiers into the sub-agent's bootstrap.
+- `description` is generic. It must not leak project identifiers into the sub-agent's bootstrap.
 - `name` is `persona-<slug>`, unique within the team; collisions fail the dispatch.
 
 All N personas are dispatched in parallel (one tool-use block with N `Agent` calls). Each sub-agent emits one structured verdict as its final message; the orchestrator collects each verdict from the `Agent` call's synchronous return value.
@@ -339,7 +339,7 @@ Each persona verdict is expected to match the schema defined in its template:
 **Verdict:** `SHIP` | `REVISE`
 
 ### Items
-- [severity: BLOCK | FRICTION | NIT] [location] — [why]
+- [severity: BLOCK | FRICTION | NIT] [location]: [why]
   Evidence: "<quoted phrase>" or <path or line ref>
 
 ### Axis scores
@@ -356,7 +356,7 @@ Mechanical validation per persona: verdict line is exactly `SHIP` or `REVISE`; e
 
 If a persona's reply fails validation, re-invoke that persona once with a reminder: "Your previous reply did not match the output schema. Emit only the schema block, no prose around it." Do not re-invoke more than once. Two failed validations for the same persona count as `SCHEMA_FAILURE` for that slot.
 
-**Aggregation — severity-weighted consensus (deterministic).**
+**Aggregation: severity-weighted consensus (deterministic).**
 
 Across the N persona verdicts, classify each distinct item by severity and persona count:
 
@@ -364,7 +364,7 @@ Across the N persona verdicts, classify each distinct item by severity and perso
 - An item with severity `FRICTION` emitted by ≥2 personas, keyed on the location+topic → **should-fix this round**.
 - An item with severity `FRICTION` emitted by exactly 1 persona → **logged, not acted**.
 - An item with severity `NIT` (any count) → **logged, not acted**.
-- A direct contradiction — persona A says "X is wrong," persona B says "X is right" on the same load-bearing claim — fires stop rule `CONTRADICTION`. Quote both personas in the escalation body. Do not auto-resolve.
+- A direct contradiction, persona A says "X is wrong," persona B says "X is right" on the same load-bearing claim, fires stop rule `CONTRADICTION`. Quote both personas in the escalation body. Do not auto-resolve.
 
 The "same item" keying rule is deterministic: an item key is the tuple `(<lowercased-section-anchor>, <failure-mode-token>)` where:
 
@@ -426,7 +426,7 @@ case "$KIND" in
 esac
 ```
 
-Tear down the team on every exit path — success, stop rule fired, crash handler:
+Tear down the team on every exit path. Success, stop rule fired, crash handler:
 
 ```
 TeamDelete({ team_name: "$TEAM_NAME" })
@@ -450,9 +450,9 @@ Each stop rule fires on a specific condition; on fire, tear down the team, produ
 
 1. **Artifact empty.** Payload is empty or whitespace-only. Status `BLOCKED`; cause `ARTIFACT_EMPTY`.
 2. **Artifact unresolvable.** `gh issue view` or `gh pr view` errors, or file path does not exist. Status `BLOCKED`; cause `ARTIFACT_MISSING`.
-3. **All personas failed.** Every persona's slot resolved to `SYSTEM_FAILURE` (dispatch-time error) or `SCHEMA_FAILURE` (reply failed validation twice — the initial attempt plus one re-invocation). Status `ESCALATED`; cause `PERSONA_DISPATCH_FAILURE`. Attach each persona's last attempt to the escalation body.
+3. **All personas failed.** Every persona's slot resolved to `SYSTEM_FAILURE` (dispatch-time error) or `SCHEMA_FAILURE` (reply failed validation twice, the initial attempt plus one re-invocation). Status `ESCALATED`; cause `PERSONA_DISPATCH_FAILURE`. Attach each persona's last attempt to the escalation body.
 4. **Contradiction between personas.** Two personas emit directly-opposing claims on the same load-bearing item. Status `ESCALATED`; cause `PERSONA_CONTRADICTION`. Quote both personas.
-5. **Round-3 requested without approval.** Round 2 ended with must-fix non-empty and `--allow-round-3` was not passed. Not an escalation — end the run as `DONE_WITH_CONCERNS` and include the remaining must-fix list in the report. The caller ratchets up.
+5. **Round-3 requested without approval.** Round 2 ended with must-fix non-empty and `--allow-round-3` was not passed. Not an escalation. End the run as `DONE_WITH_CONCERNS` and include the remaining must-fix list in the report. The caller ratchets up.
 6. **Context leak into personas.** The orchestrator is about to pass session history, sibling docs, or parent-epic text to a persona prompt. Brake fires. Status `ESCALATED`; cause `ORCHESTRATOR_LEAK`. The fix is to dispatch with the template + artifact only.
 7. **Invocation arguments invalid.** No `--issue` / `--pr` / `--file`, or more than one. Status `NEEDS_CONTEXT`; cause `INVALID_INVOCATION`.
 8. **Team teardown failed.** `TeamDelete` on the ephemeral run team returned non-zero after the aggregate report was produced. Status `ESCALATED`; cause `TEAM_TEARDOWN_FAILED`. Publish the aggregate report first, then escalate so the next tick can retry cleanup.
@@ -461,11 +461,11 @@ Each stop rule fires on a specific condition; on fire, tear down the team, produ
 
 One status marker on the last line of the final reply.
 
-- `DONE` — report published; orchestrator verdict is `SHIP`; must-fix list is empty; no schema failures.
-- `DONE_WITH_CONCERNS` — report published; orchestrator verdict is `REVISE`, or a persona hit `SCHEMA_FAILURE` but the aggregate still resolved, or round-limit exhausted with must-fix still non-empty.
-- `ESCALATED` — stop rule fired (contradiction, dispatch failure, leak). Escalation artifact posted on the sub-issue.
-- `BLOCKED` — artifact empty or unresolvable. Escalation artifact posted.
-- `NEEDS_CONTEXT` — invocation arguments invalid. Caller resupplies.
+- `DONE`. Report published; orchestrator verdict is `SHIP`; must-fix list is empty; no schema failures.
+- `DONE_WITH_CONCERNS`. Report published; orchestrator verdict is `REVISE`, or a persona hit `SCHEMA_FAILURE` but the aggregate still resolved, or round-limit exhausted with must-fix still non-empty.
+- `ESCALATED`. Stop rule fired (contradiction, dispatch failure, leak). Escalation artifact posted on the sub-issue.
+- `BLOCKED`. Artifact empty or unresolvable. Escalation artifact posted.
+- `NEEDS_CONTEXT`. Invocation arguments invalid. Caller resupplies.
 
 ## Escalation artifact template
 
@@ -494,7 +494,7 @@ One status marker on the last line of the final reply.
 - <one action: revise the artifact, resolve the contradiction, resupply inputs>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 ```
 
 ## Publication map
@@ -510,14 +510,14 @@ One status marker on the last line of the final reply.
 ## Anti-patterns
 
 - **"I'll pass the parent epic alongside the artifact so the personas have context."** Iron rule violation. Context is the bug, not the fix.
-- **"One persona said REVISE, three said SHIP — call it SHIP."** No. A single BLOCK is must-fix. Severity-weighted consensus is not majority vote.
+- **"One persona said REVISE, three said SHIP: call it SHIP."** No. A single BLOCK is must-fix. Severity-weighted consensus is not majority vote.
 - **"Round 3 is right there; just run it."** `--allow-round-3` is the gate, not a suggestion. Running round 3 without the flag is an Invariant §4 violation.
 - **"I'll re-word the persona's FRICTION finding so it's clearer."** No. The aggregator relays persona text verbatim. Rewording is inventing judgments the persona did not emit (Invariant §5).
-- **"Two personas disagreed — I'll pick the more experienced persona's side."** No. Direct contradictions are `ESCALATED`. The user resolves.
+- **"Two personas disagreed: I'll pick the more experienced persona's side."** No. Direct contradictions are `ESCALATED`. The user resolves.
 - **"I'll add a 5th persona `non-engineer-pm` since the spec mentioned it."** Spec Q1 defaulted to 4 personas for v1. Adding a 5th is a new spec, not a staff call.
-- **"The team cleanup failed — I'll leave it; the next run will collide."** No. Team lifecycle is mandatory. If `TeamDelete` fails, escalate with cause `TEAM_TEARDOWN_FAILED`.
+- **"The team cleanup failed: I'll leave it; the next run will collide."** No. Team lifecycle is mandatory. If `TeamDelete` fails, escalate with cause `TEAM_TEARDOWN_FAILED`.
 - **"The artifact scope is obvious; skip fetch, just hand the personas the file path."** No. Personas read cold. They read the payload, not a path.
-- **"I'll invoke the persona via in-session Skill instead of Agent — easier."** Invariant §3 violation. Personas are out-of-session sub-agents; in-session Skill leaks the caller's context.
+- **"I'll invoke the persona via in-session Skill instead of Agent: easier."** Invariant §3 violation. Personas are out-of-session sub-agents; in-session Skill leaks the caller's context.
 
 ## Checklist before declaring status
 

@@ -35,7 +35,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -57,18 +57,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -218,14 +218,14 @@ If multiple test targets exist (unit, integration, e2e), run all of them unless 
 
 If you cannot detect any command, `BLOCKED`; ask the user which commands to run. Do not guess.
 
-**Living-spec layer detection (ring-1).** When the adopter ran `/safer:setup` Step 4c on a TS+vitest repo, `@chughtapan/safer-spec-development` is installed (from npm) and its `safer-spec` bin sits in `node_modules/.bin/`. Phase 2 only *detects* the layer so Phase 3 knows whether to run the validate gate. There is no separate health probe: `safer-spec doctor` is an unimplemented stub in the published codemod, and version skew is already surfaced by `safer-spec validate`'s exit `10` in Phase 3 — a doctor probe would be redundant and would block on the stub.
+**Living-spec layer detection (ring-1).** When the adopter ran `/safer:setup` Step 4c on a TS+vitest repo, `@chughtapan/safer-spec-development` is installed (from npm) and its `safer-spec` bin sits in `node_modules/.bin/`. Phase 2 only *detects* the layer so Phase 3 knows whether to run the validate gate. There is no separate health probe: `safer-spec doctor` is an unimplemented stub in the published codemod, and version skew is already surfaced by `safer-spec validate`'s exit `10` in Phase 3. A doctor probe would be redundant and would block on the stub.
 
 ```bash
 SPEC_LAYER_PRESENT=0
 [ -x ./node_modules/.bin/safer-spec ] && SPEC_LAYER_PRESENT=1
 ```
 
-The `safer-spec` bin is invoked from `node_modules/.bin/` directly, so the validate gate below is package-manager-agnostic — it does not depend on `$PM exec` semantics or on which manager `/safer:setup` used to install the codemod.
+The `safer-spec` bin is invoked from `node_modules/.bin/` directly, so the validate gate below is package-manager-agnostic. It does not depend on `$PM exec` semantics or on which manager `/safer:setup` used to install the codemod.
 
 ### Phase 3 — Run
 
@@ -241,11 +241,11 @@ $TYPECHECK_CMD > /tmp/safer-verify-$PR/typecheck.log 2>&1; TYPE_EXIT=$?
 $TEST_CMD      > /tmp/safer-verify-$PR/test.log      2>&1; TEST_EXIT=$?
 ```
 
-Record exit codes (including `$BUILD_EXIT` when a build ran). A non-zero exit from any command is a failure; aggregate all failures into the findings section. Do not short-circuit on the first failure; run every detected command so the verdict reports the full picture. A failed build is a `HOLD` on its own — lint/typecheck/test results against an unbuilt tree are unreliable.
+Record exit codes (including `$BUILD_EXIT` when a build ran). A non-zero exit from any command is a failure; aggregate all failures into the findings section. Do not short-circuit on the first failure; run every detected command so the verdict reports the full picture. A failed build is a `HOLD` on its own. Lint/typecheck/test results against an unbuilt tree are unreliable.
 
 Flakiness: if a test failed with a pattern that suggests flakiness (timeout, network, port bind), re-run the failing test once with the same command. Record both runs. A pass-on-retry is `SHIP_WITH_CONCERNS` with "flaky test" as the concern; never `SHIP`.
 
-**Living-spec validate gate (ring-1).** When `SPEC_LAYER_PRESENT=1` (detected in Phase 2), run `./node_modules/.bin/safer-spec validate --implemented` after lint/typecheck/test, wrapped in a Node-based 60s timeout helper. The helper is one self-contained `node -e` invocation (Invariant 4 — no new `bin/` helper); it passes the command and its argv through `process.argv` rather than shell-interpolating into the `-e` string, eliminating shell-quoting risk. Skip this gate entirely when `SPEC_LAYER_PRESENT=0` (the repo has no living-spec layer).
+**Living-spec validate gate (ring-1).** When `SPEC_LAYER_PRESENT=1` (detected in Phase 2), run `./node_modules/.bin/safer-spec validate --implemented` after lint/typecheck/test, wrapped in a Node-based 60s timeout helper. The helper is one self-contained `node -e` invocation (Invariant 4, no new `bin/` helper); it passes the command and its argv through `process.argv` rather than shell-interpolating into the `-e` string, eliminating shell-quoting risk. Skip this gate entirely when `SPEC_LAYER_PRESENT=0` (the repo has no living-spec layer).
 
 ```bash
 if [ "$SPEC_LAYER_PRESENT" = "1" ]; then
@@ -278,7 +278,7 @@ Exit-code routing (Principle 8 mechanical): `0` proceeds (no HOLD from spec laye
 
 When you are the **main-loop** verify on Claude Code AND the Workflow tool is available (ultracode mode, or the invocation opted in), you MAY execute this Phase 3.5 fan-out deterministically by running `skills/verify/phase35.workflow.js` via the `Workflow` tool, passing the acceptance text, diff scope, deploy/QA URLs, and label state. The script evaluates each target's trigger, dispatches only the fired targets in parallel (report-only forms), and folds their verdicts through the precedence table below.
 
-The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched verify teammate, for Codex, and for non-opted-in sessions. Ring 1 (Phase 3) and the final SHIP/HOLD stay in verify — the Workflow returns an advisory Phase-3.5 verdict only, applies no fixes (verify never self-edits), and escalates any composed user-prompt rather than answering it.
+The Workflow **executes the rulebook below**; it is not a second dispatcher (Invariant 11 holds). The prose below is **authoritative** and is the required path for a dispatched verify teammate, for Codex, and for non-opted-in sessions. Ring 1 (Phase 3) and the final SHIP/HOLD stay in verify. The Workflow returns an advisory Phase-3.5 verdict only, applies no fixes (verify never self-edits), and escalates any composed user-prompt rather than answering it.
 
 Phase 3 owns ring 1 (the project's lint, typecheck, and test commands). Phase 3.5 dispatches ring 2 (whole-app QA) and ring 3 (cross-cutting quality dashboards) to gstack composition targets when the sub-issue's acceptance criteria, the diff scope, or the deploy state warrants. Defaults are conservative: skip a target when its trigger does not fire. Composed targets are advisory inputs to the verdict, not standalone gates.
 
@@ -384,13 +384,13 @@ Total: N  Passed: N  Failed: N  Skipped: N  Flaky: N
 
 ### Composed targets
 <one row per composed target dispatched in Phase 3.5; verdict + score verbatim, with link to the target's output artifact>
-- /health: <verdict> score <N/10> — <artifact URL>
-- /qa: <verdict> bugs <N> — <artifact URL>
+- /health: <verdict> score <N/10>, <artifact URL>
+- /qa: <verdict> bugs <N>, <artifact URL>
 - ... (omit rows for targets whose trigger did not fire)
 
 ### Per-folder spec gates
 <one row per folder with MODULE.md that the diff touched; SHIP/HOLD verdict per the sidecar-threshold checklist (Phase 4)>
-- <folder>: SHIP | HOLD — <missing directive | unmet threshold | itSpec.todo on N exports>
+- <folder>: SHIP | HOLD, <missing directive | unmet threshold | itSpec.todo on N exports>
 - ... (omit when the diff touched no MODULE.md folder)
 
 ### Codemod warnings
@@ -444,7 +444,7 @@ Each stop rule fires on a specific condition. When fired, produce an escalation 
 4. **Missing test infrastructure.** The repo has no runnable test command and no lint command. Status: `BLOCKED` to user; the repo is not verify-ready.
 5. **Persistent flakiness.** A test passes on retry but fails again on a third run. Status: `HOLD` with "flaky test is a regression" as the finding; route to `diagnose`. Do not `SHIP_WITH_CONCERNS` for a test that is unstable at this level.
 6. **Scope mismatch mid-run.** The diff grew between review-senior's review and your checkout (the author pushed more commits). Status: `BLOCKED`; ask review-senior to re-review the new head. Do not verify a diff that has not been reviewed at the current SHA.
-7. **Stale sidecar (living-spec).** `safer-spec validate` reports a sidecar `.safer-spec/<slug>.json` whose declared exports no longer match the folder's `index.ts` public surface (an export was renamed, removed, or its `@spec.kind` directive deleted in the diff). Status: `HOLD` → `/safer:requirements` via `safer-escalate --from verify --to requirements --cause STALE_SIDECAR`. The fix is upstream: the contract step authors the directive on the new export shape; verify does not edit sidecar JSON or `@spec.*` directives directly (Invariant 2 violation — editing the sidecar to clear the validate error is the Principle 7 anti-pattern "paper-over").
+7. **Stale sidecar (living-spec).** `safer-spec validate` reports a sidecar `.safer-spec/<slug>.json` whose declared exports no longer match the folder's `index.ts` public surface (an export was renamed, removed, or its `@spec.kind` directive deleted in the diff). Status: `HOLD` → `/safer:requirements` via `safer-escalate --from verify --to requirements --cause STALE_SIDECAR`. The fix is upstream: the contract step authors the directive on the new export shape; verify does not edit sidecar JSON or `@spec.*` directives directly (Invariant 2 violation, editing the sidecar to clear the validate error is the Principle 7 anti-pattern "paper-over").
 
 ## Completion status
 

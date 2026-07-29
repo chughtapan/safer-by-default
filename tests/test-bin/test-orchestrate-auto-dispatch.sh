@@ -275,7 +275,7 @@ test_epic_body_template_includes_linear_project_line() {
 
 # sbd#129: Step 5c.0 read-reviewer-body gate must be present.
 test_skill_md_has_step_5c0_read_reviewer_body() {
-  orch_grep -qF "Step 5c.0 — Read reviewer body before merging"
+  orch_grep -qF "Step 5c.0: Read reviewer body before merging"
 }
 
 test_skill_md_step5c0_has_gh_pr_view_command() {

@@ -15,7 +15,7 @@ elif [ ! -f vitest.config.ts ] && [ ! -f vitest.config.js ] && [ ! -f vitest.con
   SPEC_LAYER_SKIP_REASON="the living-spec reporter targets vitest, and no vitest.config.{ts,js,mts} is present"
 fi
 if [ -n "$SPEC_LAYER_SKIP_REASON" ]; then
-  echo "Step 4c: living-spec layer skipped — $SPEC_LAYER_SKIP_REASON."
+  echo "Step 4c: living-spec layer skipped: $SPEC_LAYER_SKIP_REASON."
   echo "  (The lint floor and strict flags from the other steps still apply.)"
   SPEC_LAYER_STATUS="skipped ($SPEC_LAYER_SKIP_REASON)"
 fi
@@ -23,7 +23,7 @@ fi
 
 Run every block below **only when `$SPEC_LAYER_SKIP_REASON` is empty**. Each block re-checks the flag so a mid-step failure (install or doctor) cleanly skips the rest without aborting setup.
 
-**Install the codemod from npm.** Pinned to the `~0.3.0` tilde range (Spec Invariant 3: codemod and plugin version-lock in pairs). Uses the package manager detected in Step 1; idempotent — skips when the dependency is already declared.
+**Install the codemod from npm.** Pinned to the `~0.3.0` tilde range (Spec Invariant 3: codemod and plugin version-lock in pairs). Uses the package manager detected in Step 1; idempotent. Skips when the dependency is already declared.
 
 ```bash
 if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
@@ -43,7 +43,7 @@ if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
 fi
 ```
 
-**Probe the codemod (liveness).** Confirm the CLI installed and runs. A non-running CLI is a concern, not a skill-fatal error: it records the layer as wired-but-unhealthy and skips the rest of Step 4c. The `safer-spec` bin is invoked from `node_modules/.bin/` directly, which is package-manager-agnostic. (`safer-spec doctor` — the intended health + version-skew probe — is not implemented in the published codemod yet, so this uses `--version` for liveness; upgrade the probe to `doctor` once the sister package ships it.)
+**Probe the codemod (liveness).** Confirm the CLI installed and runs. A non-running CLI is a concern, not a skill-fatal error: it records the layer as wired-but-unhealthy and skips the rest of Step 4c. The `safer-spec` bin is invoked from `node_modules/.bin/` directly, which is package-manager-agnostic. (`safer-spec doctor`, the intended health + version-skew probe, is not implemented in the published codemod yet, so this uses `--version` for liveness; upgrade the probe to `doctor` once the sister package ships it.)
 
 ```bash
 if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then

@@ -1,10 +1,10 @@
 <!--
   Template for a new safer-by-default skill.
 
-  Copy to skills/<modality>/SKILL.tmpl (NOT SKILL.md — SKILL.md is the
+  Copy to skills/<modality>/SKILL.tmpl (NOT SKILL.md, SKILL.md is the
   generated artifact). Anchor placeholders are written as {{LIKE_THIS}};
   replace each before shipping. The {{> principles-core}} marker is preserved
-  verbatim — bin/safer-gen-skills replaces it with PRINCIPLES.core.md content
+  verbatim. Bin/safer-gen-skills replaces it with PRINCIPLES.core.md content
   at render time.
 
   After editing, run:
@@ -25,7 +25,7 @@
   - Every published artifact goes through safer-publish. No "trust me" outputs.
   - PRINCIPLES.core.md is inlined verbatim via {{> principles-core}}; the
     projection section names which Parts/principles this modality leans on.
-    The full PRINCIPLES.md is NOT inlined — skills reference it by path at
+    The full PRINCIPLES.md is NOT inlined, skills reference it by path at
     the plugin root when a call is close or the artifact is high-blast-radius.
   - Keep the body to what this modality alone needs. Material that applies
     only in a rare branch belongs in skills/<name>/references/<topic>.md, which
@@ -40,8 +40,8 @@
 name: {{NAME}}
 version: 0.1.0
 description: |
-  {{ONE-LINE HOOK — the first sentence routes the agent.}} Use when the user
-  asks {{TRIGGER PHRASES}}. Do NOT use when {{ANTI-TRIGGERS — route to
+  {{ONE-LINE HOOK. The first sentence routes the agent.}} Use when the user
+  asks {{TRIGGER PHRASES}}. Do NOT use when {{ANTI-TRIGGERS, route to
   /safer:OTHER instead}}.
 triggers:
   - {{trigger phrase 1}}
@@ -73,12 +73,12 @@ allowed-tools:
 
 ## Role
 
-This skill is {{role description — what it does and what it produces}}. It is **not** {{anti-role — common confusions or adjacent modalities that should route elsewhere}}.
+This skill is {{role description, what it does and what it produces}}. It is **not** {{anti-role, common confusions or adjacent modalities that should route elsewhere}}.
 
 ## Inputs required
 
-- {{Input 1 — typically a GitHub issue/PR URL or a path. State the format.}}
-- {{Input 2 — optional or always-required, with default behavior on absence.}}
+- {{Input 1. Typically a GitHub issue/PR URL or a path. State the format.}}
+- {{Input 2. Optional or always-required, with default behavior on absence.}}
 
 If the required input is not provided with the invocation, ask via `AskUserQuestion` before proceeding. {{Stronger statement if applicable, e.g. "No contract, no architect."}}
 
@@ -117,16 +117,16 @@ If `safer-slug`, `safer-telemetry-log`, or `safer-update-check` is missing, cont
 - {{What this skill does, bulleted, present tense.}}
 
 **Out of scope:**
-- {{What this skill must not do — adjacent work that routes elsewhere. Name the target skill.}}
+- {{What this skill must not do. Adjacent work that routes elsewhere. Name the target skill.}}
 
 ## Scope budget
 
 | Constraint | Limit |
 |---|---|
-| Files touched | {{N — typical "one module" or "any number, contract-bound"}} |
-| Public-surface changes | {{yes / no — tied to modality tier}} |
-| New dependencies | {{yes / no — tied to modality tier}} |
-| Lines of code | {{soft cap — "shape, not volume"; cite Part 2 → Budget Gate if applicable}} |
+| Files touched | {{N, typical "one module" or "any number, contract-bound"}} |
+| Public-surface changes | {{yes / no, tied to modality tier}} |
+| New dependencies | {{yes / no, tied to modality tier}} |
+| Lines of code | {{soft cap, "shape, not volume"; cite Part 2 → Budget Gate if applicable}} |
 
 Out-of-budget work parks via `safer-escalate --to <higher-modality>` and stops.
 
@@ -168,7 +168,7 @@ Each rule names the trigger and the response. On fire: tear down any in-flight t
 
 | Rule | Trigger | Response |
 |---|---|---|
-| {{Stop rule 1}} | {{Condition}} | {{Action — usually escalate to a specific modality}} |
+| {{Stop rule 1}} | {{Condition}} | {{Action, usually escalate to a specific modality}} |
 | {{Stop rule 2}} | {{Condition}} | {{Action}} |
 | Out-of-budget | Workflow needs work outside `## Scope budget` | `safer-escalate --to <higher>`; park sub-issue |
 | Contract violation | A required input is missing or the contract's autonomy budget bars this work | Park; post `## Awaiting amendment` block; return `DONE_PARKED` |
@@ -177,11 +177,11 @@ Each rule names the trigger and the response. On fire: tear down any in-flight t
 
 ### Invokes
 
-- `/{{gstack-skill}}` — {{when and why this skill calls into gstack}}.
+- `/{{gstack-skill}}`. {{when and why this skill calls into gstack}}.
 
 ### Invoked by
 
-- `/safer:{{upstream-modality}}` — {{when this skill is dispatched as a sub-task of another modality}}.
+- `/safer:{{upstream-modality}}`. {{when this skill is dispatched as a sub-task of another modality}}.
 
 User-prompting gstack skills run hold-scope autonomous from inside this skill body. Surface user-facing prompts via `AskUserQuestion` only when this skill is invoked at the top level (no `SAFER_PARENT_ISSUE`); under orchestrate, route prompts up via the parent epic.
 
@@ -195,7 +195,7 @@ User-prompting gstack skills run hold-scope autonomous from inside this skill bo
 
 ## Anti-patterns
 
-- {{Common drift 1 — what to avoid and why}}.
+- {{Common drift 1, what to avoid and why}}.
 - {{Common drift 2}}.
 - **Sideways fix.** Touching a sibling module to "make it pass." Escalate.
 - **Skip the artifact.** Summarizing in chat instead of publishing. The forge is the record.

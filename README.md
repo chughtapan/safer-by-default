@@ -4,7 +4,7 @@ A Claude skill plugin that recalibrates your coding agent for type-safe, scope-d
 
 ## The Problem
 
-Your coding agent is miscalibrated. It was trained on human-written code — decades of it — written under one constraint that does not apply to it: typing was expensive for humans. That is why its training corpus is saturated with `throw new Error("bad")`, `as Record<string, unknown>`, `try { ... } catch {}`, `Promise<T>` return types, `if`-else without a `never` default, and untyped `process.env.FOO!` reads. Those were the compromises humans made when keyboard time was scarce. For an agent, keyboard time is not scarce. The agent can produce code that *eliminates classes of error by construction* — the way a compiler eliminates register-allocation bugs — if it is calibrated to do so.
+Your coding agent is miscalibrated. It was trained on human-written code. Decades of it ,  written under one constraint that does not apply to it: typing was expensive for humans. That is why its training corpus is saturated with `throw new Error("bad")`, `as Record<string, unknown>`, `try { ... } catch {}`, `Promise<T>` return types, `if`-else without a `never` default, and untyped `process.env.FOO!` reads. Those were the compromises humans made when keyboard time was scarce. For an agent, keyboard time is not scarce. The agent can produce code that *eliminates classes of error by construction*. The way a compiler eliminates register-allocation bugs ,  if it is calibrated to do so.
 
 It is not. This plugin recalibrates.
 
@@ -17,7 +17,7 @@ It is not. This plugin recalibrates.
 /plugin install safer@safer-by-default
 ```
 
-> **`/safer:setup` works on any TypeScript + vitest repository.** As of v0.4.0 the living-spec codemod (`@chughtapan/safer-spec-development`) is published to npm, so setup installs it from the registry — the earlier dogfood-only halt is gone. On other projects, setup still runs the lint floor and skips only the living-spec layer. See [Prerequisites](#prerequisites).
+> **`/safer:setup` works on any TypeScript + vitest repository.** As of v0.4.0 the living-spec codemod (`@chughtapan/safer-spec-development`) is published to npm, so setup installs it from the registry. The earlier dogfood-only halt is gone. On other projects, setup still runs the lint floor and skips only the living-spec layer. See [Prerequisites](#prerequisites).
 
 Skills load as `safer:<name>` (`/safer:requirements`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
@@ -28,7 +28,7 @@ git clone --depth 1 https://github.com/chughtapan/safer-by-default.git
 cd safer-by-default && ./setup-codex
 ```
 
-The script auto-detects an existing CC plugin install or clones to `~/.local/share/safer-by-default/`. Codex sees skills as `safer:<name>` wrappers. The clone is not the source of truth — delete it after.
+The script auto-detects an existing CC plugin install or clones to `~/.local/share/safer-by-default/`. Codex sees skills as `safer:<name>` wrappers. The clone is not the source of truth, delete it after.
 
 **Per-repo setup** (one-time, requires `gh` authenticated):
 
@@ -46,34 +46,34 @@ For dependency requirements, source-resolution detail, working from source, and 
 
 The ESLint syntax floor ships via CLI. `/safer:setup` writes an `eslint.config.js` that loads `eslint-plugin-agent-code-guard`'s rules; `/safer:verify` runs `eslint` against the project as part of the pre-merge acceptance loop, and any pre-commit or CI integration the project already has fires the same ruleset.
 
-Architecture diagnostics — the folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, and cycle detection — live in a separate repository, [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp). This plugin ships no LSP server; install that one if you want those findings in-editor.
+Architecture diagnostics, the folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, and cycle detection, live in a separate repository, [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp). This plugin ships no LSP server; install that one if you want those findings in-editor.
 
 ## Four parts
 
 The doctrine factors into four orthogonal axes. The first two govern *what code looks like*; the third governs *when it earns done*; the fourth governs *how work hands off*. Each safer skill projects from these four into one modality. The full text lives in [PRINCIPLES.md](./PRINCIPLES.md); the catalog of bullet points below is the operational summary.
 
-**Part 1 — Craft.** Four principles for compiler-grade output:
+**Part 1: Craft.** Four principles for compiler-grade output:
 
-- **Types beat tests.** Move constraints into the type system. Branded types, discriminated unions, exhaustive matches — the compiler catches every site, every reader, forever. Rules out `as Record<string, unknown>`, untagged optionals, runtime `typeof` checks for things the type already knows.
+- **Types beat tests.** Move constraints into the type system. Branded types, discriminated unions, exhaustive matches. The compiler catches every site, every reader, forever. Rules out `as Record<string, unknown>`, untagged optionals, runtime `typeof` checks for things the type already knows.
 - **Validate at every boundary.** Inside a module, trust your types. At boundaries (disk, env, network, another package), decode with a schema. Rules out `process.env.FOO!` reads, untyped `JSON.parse`, blind trust in external API shapes.
 - **Errors are typed, not thrown.** Tagged unions or discriminated results. No `throw new Error("bad")`, no bare `catch {}`, no `Promise<T>` that erases the error channel. Every error site has a name the caller can match on.
-- **Exhaustiveness over optionality.** Every `switch` ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches. Adding a new variant is a compile error at every site that didn't expect it — that's the point.
+- **Exhaustiveness over optionality.** Every `switch` ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches. Adding a new variant is a compile error at every site that didn't expect it, that's the point.
 
-**Part 2 — Discipline.** Four principles for scope:
+**Part 2: Discipline.** Four principles for scope:
 
 - **Discipline over capability.** The question is not "can I do this." The question is "is this mine to do." A skill with the *capability* to fix a sibling module's bug must still defer the work to the modality that owns it.
 - **The Budget Gate.** Shape, not volume. A 500-line addition to one module is fine; one line across two modules is not. The gate measures *how many places* a change touches, not how big it is.
 - **The Brake.** Stop rules are literal. When fired, stop writing code. Produce the escalation artifact and hand off. There is no "let me just finish this part first."
 - **The Ratchet.** Escalate up, never sideways. A junior implementer hitting a missing module routes to senior or staff; it does not "just add the module." A reviewer finding architectural issues routes to architect; it does not rewrite the code itself.
 
-**Part 3 — Stamina.** How leverage-class artifacts earn `done`. Higher blast radius warrants more review.
+**Part 3: Stamina.** How leverage-class artifacts earn `done`. Higher blast radius warrants more review.
 
 - **Blast radius × reversibility sets N.** A one-module internal change ships on N=1. Public-surface changes go to N=2. Doctrine, schema, or destructive changes go to N=3–4. The table lives in [PRINCIPLES.md](./PRINCIPLES.md) → Part 3.
-- **Passes are heterogeneous.** N is not "the same reviewer N times." It's N different lenses — code review, dogfood, security audit, simplify pass, codex challenge — each looking for what the others miss. Same lens twice is one pass.
+- **Passes are heterogeneous.** N is not "the same reviewer N times." It's N different lenses, code review, dogfood, security audit, simplify pass, codex challenge, each looking for what the others miss. Same lens twice is one pass.
 - **Capped at 4.** A 5th pass is a smell that the artifact is wrong, not under-reviewed. Park, rethink, narrow.
 - **Stamina is a router, not a reviewer.** `/safer:stamina` dispatches the heterogeneous passes and aggregates verdicts; it never produces findings of its own.
 
-**Part 4 — Communication.** How work hands off across sessions, agents, and time.
+**Part 4: Communication.** How work hands off across sessions, agents, and time.
 
 - **Contracts.** Autonomy is granted, not assumed. Every orchestration runs against a `## Autonomy contract` block (goal, acceptance, autonomy budget, always-park items) authored on the parent epic. Out-of-budget next steps park; ratchet-up always parks.
 - **Durable records.** The forge (GitHub) is the record. Edit in place; never amend. Every artifact is doctrine-SHA-stamped at OK time so the reviewer knows which doctrine the work was approved against. Code references pinned by file:line, never "the function we discussed."
@@ -92,7 +92,7 @@ The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from 
 
 Eighteen skills, grouped by **modality** (the type of work: design, execution, review, or bootstrap).
 
-Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:requirements` in Claude Code, and the skill runs in your session. Each skill's detailed signature — required arguments, flags, input shapes, and full workflow — is documented in the skill's `SKILL.md` file in this repository.
+Each skill is invoked as a **Claude slash-command** within a Claude Code session. Example: type `/safer:requirements` in Claude Code, and the skill runs in your session. Each skill's detailed signature, required arguments, flags, input shapes, and full workflow, is documented in the skill's `SKILL.md` file in this repository.
 
 ### Design / exploration
 
@@ -153,7 +153,7 @@ user intent
 
 **Parent epic + sub-issues:** The orchestrate skill breaks one user intent into a GitHub issue (parent epic) and creates child sub-issues for each work unit (contract, architecture, implementation, review). Each sub-issue tracks one modality of work.
 
-**Scope discipline:** The principles enforce that each skill works in isolation — one module, one design phase, one code review — without reaching sideways into sibling work. The `/safer:implement-junior` skill, for example, fills one module's internals and does not touch a second file. If a second file is needed, the work is escalated to a senior skill that has permission to cross module boundaries.
+**Scope discipline:** The principles enforce that each skill works in isolation, one module, one design phase, one code review, without reaching sideways into sibling work. The `/safer:implement-junior` skill, for example, fills one module's internals and does not touch a second file. If a second file is needed, the work is escalated to a senior skill that has permission to cross module boundaries.
 
 Every skill publishes its artifact to GitHub before considering itself done. Status lives in issue labels, not local files. `safer-vp` renders the project dashboard from events + `gh` outcomes.
 
@@ -167,14 +167,14 @@ Individual skills name their own gstack tool usage inline in the workflow prose 
 
 ## Composing with Claude Code workflows
 
-On Claude Code, three strong-fit skills (`stamina`, `verify`, `docs-reader`) plus `orchestrate`'s per-wave dispatch ship a runnable Workflow script that executes their fan-out deterministically — an opt-in optimization for the main-loop case. The prose rulebook stays authoritative and is the required path for Codex, dispatched teammates, and non-opted-in sessions; no Workflow advances a human gate. See [docs/workflow-composition.md](./docs/workflow-composition.md) for the deterministic-fan-out-vs-human-gate boundary, the 18-skill verdict table, and the feasibility limits.
+On Claude Code, three strong-fit skills (`stamina`, `verify`, `docs-reader`) plus `orchestrate`'s per-wave dispatch ship a runnable Workflow script that executes their fan-out deterministically. An opt-in optimization for the main-loop case. The prose rulebook stays authoritative and is the required path for Codex, dispatched teammates, and non-opted-in sessions; no Workflow advances a human gate. See [docs/workflow-composition.md](./docs/workflow-composition.md) for the deterministic-fan-out-vs-human-gate boundary, the 18-skill verdict table, and the feasibility limits.
 
 ## Companion projects
 
 This plugin does not stand alone. Two companions:
 
-- **[`eslint-plugin-agent-code-guard`](https://github.com/chughtapan/agent-code-guard)** — the lint floor. The `setup` skill installs it. It catches the patterns an agent must not ship (bare catches, unsafe casts, raw SQL, mocked integration tests, hardcoded secrets). The plugin is the floor. This skill catalog is the ceiling.
-- **[`zapbot`](https://github.com/chughtapan/zapbot)** — GitHub webhook bot + bridge. If installed, `safer-publish` composes with `/zapbot-publish` to get plannotator review links on published specs/plans. Absent it, `safer-publish` uses plain `gh`.
+- **[`eslint-plugin-agent-code-guard`](https://github.com/chughtapan/agent-code-guard).** The lint floor. The `setup` skill installs it. It catches the patterns an agent must not ship (bare catches, unsafe casts, raw SQL, mocked integration tests, hardcoded secrets). The plugin is the floor. This skill catalog is the ceiling.
+- **[`zapbot`](https://github.com/chughtapan/zapbot).** GitHub webhook bot + bridge. If installed, `safer-publish` composes with `/zapbot-publish` to get plannotator review links on published specs/plans. Absent it, `safer-publish` uses plain `gh`.
 
 ## Telemetry
 

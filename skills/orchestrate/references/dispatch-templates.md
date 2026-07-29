@@ -2,19 +2,19 @@
 
 Step 6d dispatches by filling the template that matches the sub-issue's `safer:<modality>` label. Every template is a copy-pasteable block. Every template carries the `source: orchestrate-auto-dispatch` header so a post-hoc audit can separate auto-dispatched work from human-driven dispatches. Every template ends with the mandatory status-marker instruction.
 
-**Placeholder schema.** Every template draws from this fixed set — no template may introduce a placeholder outside it, and every placeholder below has one definition used consistently across all seven templates:
+**Placeholder schema.** Every template draws from this fixed set. No template may introduce a placeholder outside it, and every placeholder below has one definition used consistently across all seven templates:
 
 | Placeholder | Source | Notes |
 |---|---|---|
 | `{TEAM}` | `~/.claude/teams/<team-name>/config.json` → `name` | the team the dispatching orchestrator runs under; the dispatched teammate joins this team |
 | `{ISSUE_URL}` | sub-issue `url` from `gh issue list --json url` | full URL including host |
 | `{PARENT_URL}` | parent epic URL resolved from `Parent: #N` or `## Parent` in the sub-issue body | full URL; empty only if the epic is missing (which is itself a Step 6 skip case) |
-| `{ACCEPTANCE}` | the `Acceptance:` line verbatim from the sub-issue body | if the sub-issue has no such line, skip the candidate — Step 6 never synthesizes acceptance |
+| `{ACCEPTANCE}` | the `Acceptance:` line verbatim from the sub-issue body | if the sub-issue has no such line, skip the candidate, Step 6 never synthesizes acceptance |
 | `{BRANCH_HINT}` | derived; see format below | empty string for modalities that produce no branch (`verify`, `research`, `contract`) |
 
 `{BRANCH_HINT}` format: `<modality-short>/<issue-number>-<slug>` where
 
-- `<modality-short>` is one of `junior`, `senior`, `staff`, `verify`, `spike`, `research`, `requirements` — the final token of the `safer:<modality>` label (drop the `implement-` prefix).
+- `<modality-short>` is one of `junior`, `senior`, `staff`, `verify`, `spike`, `research`, `requirements`. The final token of the `safer:<modality>` label (drop the `implement-` prefix).
 - `<issue-number>` is the sub-issue number with no `#` prefix.
 - `<slug>` is the sub-issue title lowercased, non-alphanumerics collapsed to `-`, trimmed of leading/trailing `-`, and truncated to 40 characters. Example: sub-issue `#66` titled `[impl-senior] orchestrate: Step 6 work-queue scan` becomes `senior/66-impl-senior-orchestrate-step-6-work`.
 
@@ -38,7 +38,7 @@ Acceptance: {ACCEPTANCE}
 
 Scope is ONE module. If you need to touch a second module, stop and escalate.
 Before opening the PR, run /simplify and /review on the diff (mandatory; apply
-findings; neither counts toward stamina N — they are pre-PR hygiene gates).
+findings; neither counts toward stamina N; they are pre-PR hygiene gates).
 Open a draft PR titled `[impl-junior] ...`. Move the sub-issue to `review`.
 Emit a status marker (DONE / DONE_WITH_CONCERNS / ESCALATED / BLOCKED /
 NEEDS_CONTEXT) on your final output and SendMessage the team lead with the PR URL.
@@ -64,8 +64,8 @@ Scope is cross-module WITHIN the plan. Do not introduce new modules, new public
 surface outside the plan, or new deps. `safer-diff-scope --head HEAD` must report
 `senior`. Before opening the PR, run /simplify and /review on the diff (both
 mandatory; apply findings unless a finding conflicts with a plan-approved
-decision — cite the plan line in the PR body for any skipped finding). Neither
-counts toward stamina N — pre-PR hygiene gates, not independent reviewers.
+decision. Cite the plan line in the PR body for any skipped finding). Neither
+counts toward stamina N; pre-PR hygiene gates, not independent reviewers.
 Open a draft PR titled `[impl-senior] ...` with a plan-anchor table.
 /safer:review-senior is mandatory before merge.
 Status marker + SendMessage the team lead with the PR URL.
@@ -83,16 +83,16 @@ Parent epic: {PARENT_URL}
 Branch: {BRANCH_HINT}
 
 PRECONDITION: the parent epic carries label `plan-approved`. If not, STOP and
-escalate — staff-tier work without architect sign-off is a Ratchet violation.
+escalate. Staff-tier work without architect sign-off is a Ratchet violation.
 
 Read PRINCIPLES.md and skills/implement-staff/SKILL.md at the plugin root.
 Read the approved spec + architect plan the parent epic references.
 
 Acceptance: {ACCEPTANCE}
 
-You may introduce new modules, new public interfaces, and new deps — all of
+You may introduce new modules, new public interfaces, and new deps, all of
 which must trace to the approved plan. Before opening the PR:
-1. Run /simplify on the diff (mandatory, stricter than senior — apply every
+1. Run /simplify on the diff (mandatory, stricter than senior: apply every
    finding unless it conflicts with a plan-approved architect decision; cite the
    plan line in the PR body for any skipped finding). Does NOT count toward stamina N.
 2. Run /codex on the PR diff (mandatory): post the codex verdict as a PR comment
@@ -122,7 +122,7 @@ Read PRINCIPLES.md and skills/verify/SKILL.md at the plugin root.
 Acceptance: {ACCEPTANCE}
 
 Run the repo test suite and lint. Post a ship/hold verdict as a PR comment
-naming each acceptance criterion. Do NOT apply fixes — hand back if anything
+naming each acceptance criterion. Do NOT apply fixes. Hand back if anything
 fails. Status marker + SendMessage the team lead with the verdict URL.
 ```
 
@@ -135,7 +135,7 @@ You are a teammate on team `{TEAM}` invoking `/safer:spike`.
 
 Sub-issue: {ISSUE_URL}
 Parent epic: {PARENT_URL}
-Branch: {BRANCH_HINT}  (throwaway — do NOT merge)
+Branch: {BRANCH_HINT}  (throwaway, do NOT merge)
 
 Read PRINCIPLES.md and skills/spike/SKILL.md at the plugin root.
 

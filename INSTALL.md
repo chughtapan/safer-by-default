@@ -6,7 +6,7 @@ Install paths, dependency requirements, and troubleshooting for safer-by-default
 
 `/safer:setup` runs on any repository with a `package.json` or `tsconfig.json` and `gstack` installed. It detects your package manager (pnpm, npm, yarn, or bun) and wires the lint floor (`eslint-plugin-agent-code-guard` + strict `tsconfig` flags) on every run.
 
-The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from npm as of v0.4.0) is wired only when the project is **TypeScript + vitest** — it adds a vitest reporter and a per-folder `MODULE.md` gate. On other projects, `/safer:setup` skips that one step with a note and the rest of setup still applies; nothing aborts the skill. There is no longer a dogfood-only pre-flight halt and no `link:`-protocol install against a vendored submodule.
+The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from npm as of v0.4.0) is wired only when the project is **TypeScript + vitest.** It adds a vitest reporter and a per-folder `MODULE.md` gate. On other projects, `/safer:setup` skips that one step with a note and the rest of setup still applies; nothing aborts the skill. There is no longer a dogfood-only pre-flight halt and no `link:`-protocol install against a vendored submodule.
 
 ## Claude Code (canonical)
 
@@ -48,11 +48,11 @@ cd safer-by-default
 
 `./setup-codex` resolves the safer-by-default source in this order:
 
-1. `$SAFER_SOURCE_DIR` if set (developer escape hatch — points at any working tree).
+1. `$SAFER_SOURCE_DIR` if set (developer escape hatch, points at any working tree).
 2. The Claude Code plugin cache at `~/.claude/plugins/cache/safer-by-default/safer/<latest>` if you've already installed via the CC marketplace. Reuses that cache instead of duplicating files.
-3. `~/.local/share/safer-by-default/` — cloned fresh from GitHub if absent, refreshed otherwise.
+3. `~/.local/share/safer-by-default/`. Cloned fresh from GitHub if absent, refreshed otherwise.
 
-It then symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex skill wrappers at `~/.codex/skills/safer-<name>/`. Restart Codex to pick them up. The clone you used to invoke the script is **not** the source of truth — it can be deleted; subsequent runs resolve from the CC cache or the XDG location.
+It then symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex skill wrappers at `~/.codex/skills/safer-<name>/`. Restart Codex to pick them up. The clone you used to invoke the script is **not** the source of truth. It can be deleted; subsequent runs resolve from the CC cache or the XDG location.
 
 **Env-var overrides**:
 
@@ -76,7 +76,7 @@ After the plugin is installed:
 safer-setup-labels
 ```
 
-Creates the labels the skills publish under: the parent-epic marker `safer:parent` plus the modality labels `safer:requirements`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:research`, `safer:spike`, `safer:deferred`. Per-stage state labels (`planning`, `review`, `implementing`, `verifying`, `done`) are created on demand as `/safer:orchestrate` runs a pipeline. Requires `gh` authenticated with `repo` scope and write access. Idempotent — running it twice on the same repo is safe.
+Creates the labels the skills publish under: the parent-epic marker `safer:parent` plus the modality labels `safer:requirements`, `safer:architect`, `safer:implement-junior`, `safer:implement-senior`, `safer:implement-staff`, `safer:research`, `safer:spike`, `safer:deferred`. Per-stage state labels (`planning`, `review`, `implementing`, `verifying`, `done`) are created on demand as `/safer:orchestrate` runs a pipeline. Requires `gh` authenticated with `repo` scope and write access. Idempotent. Running it twice on the same repo is safe.
 
 ## Working from source (developers)
 
@@ -99,7 +99,7 @@ Covers `bin/` helpers and the Codex compatibility layer. Each test runs in an is
 ## Requirements
 
 - `gh` (authenticated with `repo` scope), `git`, `bash`, `bun` (template generator).
-- [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency — every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
+- [gstack](https://github.com/garrytan/gstack) installed at `~/.claude/skills/gstack/`. safer-by-default treats gstack as a hard dependency. Every safer skill calls gstack tools (`/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/security-review`, `/ship`, etc.) inline. `/safer:setup` fails fast if gstack is absent.
 - **Optional:** [`zapbot`](https://github.com/chughtapan/zapbot) for richer publish paths (falls back to `gh` cleanly if absent).
 
 ## Editor diagnostics at install time
@@ -116,7 +116,7 @@ Architecture diagnostics live in [chughtapan/safer-architecture-lsp](https://git
 Install GitHub CLI (`gh`) and run `gh auth login`. Choose `repo` scope. Skills that publish to GitHub will not start until this passes.
 
 **Skill descriptions dropped from the listing (`/doctor` warning).**
-The skill registry exceeded the budget for description text. Either bump `skillListingBudgetFraction` in `~/.claude/settings.json` (e.g. `0.02` for ~20k tokens), or move user-skills you don't auto-route on to a `~/.claude/skills.disabled/` directory. Dispatched skills (called by other skills, not by the user) work fine with truncated descriptions — they're invoked by name, not discovered.
+The skill registry exceeded the budget for description text. Either bump `skillListingBudgetFraction` in `~/.claude/settings.json` (e.g. `0.02` for ~20k tokens), or move user-skills you don't auto-route on to a `~/.claude/skills.disabled/` directory. Dispatched skills (called by other skills, not by the user) work fine with truncated descriptions. They're invoked by name, not discovered.
 
 **Plugin install ID changed (was `safer-by-default@safer-by-default`, now `safer@safer-by-default`).**
 The plugin slug in the marketplace was renamed. Run:
@@ -130,12 +130,12 @@ Then reload plugins. Stale entries in `~/.claude/plugins/installed_plugins.json`
 Set `$SAFER_SOURCE_DIR` to your working tree path, or install via the CC marketplace first so the script can reuse that cache. The XDG fallback only activates when neither override nor cache is available.
 
 **Skills halt with `PRECONDITION_FAIL` after `safer-update-check` reports `UPGRADE_AVAILABLE`.**
-This is the upgrade gate working as intended. (`safer-update-check` only reports the mismatch; the entry skills' preambles emit the `PRECONDITION_FAIL` halt.) Run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default`, then re-invoke the skill. To skip the gate inside an autonomous orchestration, ensure `SAFER_PARENT_ISSUE` is set — the gate suppresses itself for dispatched runs.
+This is the upgrade gate working as intended. (`safer-update-check` only reports the mismatch; the entry skills' preambles emit the `PRECONDITION_FAIL` halt.) Run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default`, then re-invoke the skill. To skip the gate inside an autonomous orchestration, ensure `SAFER_PARENT_ISSUE` is set. The gate suppresses itself for dispatched runs.
 
 **State directory.**
 Local state lives at `~/.safer/`:
-- `analytics/events.jsonl` — modality run events. Always local; never sent.
-- `last-update-check` — 1h cache for the version poll.
+- `analytics/events.jsonl`. Modality run events. Always local; never sent.
+- `last-update-check`, 1h cache for the version poll.
 
 To purge: `rm -rf ~/.safer`. The next skill invocation recreates what it needs.
 

@@ -40,7 +40,7 @@ This skill runs the `safer-spec-migrate` flow from `@chughtapan/safer-spec-devel
 
 The authoritative instructions are the codemod's, not this file's. Read `node_modules/@chughtapan/safer-spec-development/skills/safer-spec-migrate/SKILL.md` and follow it. That file ships with the package, so it is versioned with the `safer-spec` binary the project actually has installed and cannot drift from it.
 
-If that file is absent the living-spec layer is not installed: stop with `BLOCKED`, and name the fix (`/safer:setup`, or `<pm> add -D @chughtapan/safer-spec-development@~0.3.0`). Do not reconstruct the flow from memory and do not hand-write a `MODULE.md` or sidecar — the sidecar is the codemod's machine-readable record, and authoring it by hand is the paper-over anti-pattern Principle 7 rejects.
+If that file is absent the living-spec layer is not installed: stop with `BLOCKED`, and name the fix (`/safer:setup`, or `<pm> add -D @chughtapan/safer-spec-development@~0.3.0`). Do not reconstruct the flow from memory and do not hand-write a `MODULE.md` or sidecar. The sidecar is the codemod's machine-readable record, and authoring it by hand is the paper-over anti-pattern Principle 7 rejects.
 
 ## Scope
 
@@ -55,10 +55,10 @@ If that file is absent the living-spec layer is not installed: stop with `BLOCKE
 
 ## Completion status
 
-- `DONE` — the codemod's flow completed; `MODULE.md` and the sidecar reflect the folder's current exports; `safer-spec validate` was run and its exit code reported.
-- `DONE_WITH_CONCERNS` — the flow completed but exports remain unspecified. Name each and its route.
-- `BLOCKED` — the codemod is not installed, or its flow exited non-zero for a reason outside this folder.
-- `NEEDS_CONTEXT` — the target folder or the intended `SPEC_FORMAT_VERSION` is ambiguous.
+- `DONE`. The codemod's flow completed; `MODULE.md` and the sidecar reflect the folder's current exports; `safer-spec validate` was run and its exit code reported.
+- `DONE_WITH_CONCERNS`. The flow completed but exports remain unspecified. Name each and its route.
+- `BLOCKED`. The codemod is not installed, or its flow exited non-zero for a reason outside this folder.
+- `NEEDS_CONTEXT`. The target folder or the intended `SPEC_FORMAT_VERSION` is ambiguous.
 
 ## Voice (reminder)
 

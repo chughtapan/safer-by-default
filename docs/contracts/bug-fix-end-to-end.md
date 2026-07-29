@@ -1,6 +1,6 @@
 # Bug fix end-to-end
 
-**When.** A reproducible bug is filed. You want the orchestrator to diagnose, fix, verify, and merge — without pinging you on routine progress. Most common dispatch shape.
+**When.** A reproducible bug is filed. You want the orchestrator to diagnose, fix, verify, and merge. Without pinging you on routine progress. Most common dispatch shape.
 
 **User instruction looks like:**
 
@@ -12,7 +12,7 @@
 
 ## Autonomy contract
 
-**Mode.** feature-ship — ship the fix; adjacent findings defer to follow-up issues
+**Mode.** feature-ship. Ship the fix; adjacent findings defer to follow-up issues
 
 **Goal.** Fix the day_vote phase regression so DAY_VOTE exits on quorum reached, in the running game and in tests.
 
@@ -43,5 +43,5 @@ OK'd: `<ts>` by `<user@github>`
 ## Common variants
 
 - **Strict-merge gate.** Add `Always-park: Merging the final PR (require explicit OK before merge)`. The chain runs autonomously through verify, then parks. Use when you want to read the diff yourself before it lands.
-- **Restore-don't-rebuild.** When the bug is a regression in code that was working, the diagnose artifact's `confirmed-root-cause` codex verdict typically names the refactor as the cause; the orchestrator's default routing is "restore pre-refactor behavior" through `implement-junior`. The contract above already handles this — `implement-junior` is in the budget. No changes needed; the recommendation flows through.
+- **Restore-don't-rebuild.** When the bug is a regression in code that was working, the diagnose artifact's `confirmed-root-cause` codex verdict typically names the refactor as the cause; the orchestrator's default routing is "restore pre-refactor behavior" through `implement-junior`. The contract above already handles this. `implement-junior` is in the budget. No changes needed; the recommendation flows through.
 - **Sleep mode.** When dispatched late in the day with "by morning" framing, the orchestrator runs in digest-notification mode (one wake-up summary at end of session) instead of milestone notifications. No contract change; just an `Autonomy budget` line: `Notification mode: digest-on-completion`.

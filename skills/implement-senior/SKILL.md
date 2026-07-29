@@ -38,7 +38,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -60,18 +60,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -96,19 +96,19 @@ This is the craft floor, compressed. The full doctrine, with the reasoning, work
 
 ## How this modality projects from the doctrine
 
-- **Principle 1 (Types beat tests)** — cross-module work multiplies the cost of a weak type. Every new internal type earns its keep by making a class of bug unrepresentable across the seam you are stitching.
-- **Principle 2 (Validate at every boundary)** — a module-to-module seam is not always a boundary, but anywhere data comes from outside the package, schemas decode it once.
-- **Principle 3 (Errors are typed, not thrown)** — when composing functions across modules, the error channel of the composed function is the union of the component error channels. Name it.
-- **Principle 4 (Exhaustiveness over optionality)** — cross-module switches fan out fast. Every switch ends in `absurd`. No exceptions.
-- **Principle 5 (Discipline over capability)** — senior is still junior to the architect. The plan is your scope. Capability to revise it is not the instruction to revise it.
-- **Principle 6 (Budget Gate)** — shape is "multi-module refactor inside one feature area per the plan." New modules and new public contracts are out of scope.
-- **Principle 8 (The Ratchet)** — if the plan needs revision, ratchet back to architect. Never sideways: no boolean flags to patch a plan gap, no workarounds to avoid re-opening the architect step.
+- **Principle 1 (Types beat tests).** Cross-module work multiplies the cost of a weak type. Every new internal type earns its keep by making a class of bug unrepresentable across the seam you are stitching.
+- **Principle 2 (Validate at every boundary).** A module-to-module seam is not always a boundary, but anywhere data comes from outside the package, schemas decode it once.
+- **Principle 3 (Errors are typed, not thrown).** When composing functions across modules, the error channel of the composed function is the union of the component error channels. Name it.
+- **Principle 4 (Exhaustiveness over optionality).** Cross-module switches fan out fast. Every switch ends in `absurd`. No exceptions.
+- **Principle 5 (Discipline over capability).** Senior is still junior to the architect. The plan is your scope. Capability to revise it is not the instruction to revise it.
+- **Principle 6 (Budget Gate).** Shape is "multi-module refactor inside one feature area per the plan." New modules and new public contracts are out of scope.
+- **Principle 8 (The Ratchet).** If the plan needs revision, ratchet back to architect. Never sideways: no boolean flags to patch a plan gap, no workarounds to avoid re-opening the architect step.
 
 The decision table below names the Effect-runtime and testing-strategy forks senior owns. Single-module Principle 1–4 forks live in `/safer:implement-junior`; cross-service contract and CI/mutation gating live in `/safer:implement-staff`.
 
 ## Decision table
 
-Every row below is a cross-module fork where the agent feels pulled toward the human-era shortcut. Pick the agent-era full version. Each row corresponds to a runtime-wiring or testing-strategy decision that lives at the seam between modules — the wiring senior coordinates.
+Every row below is a cross-module fork where the agent feels pulled toward the human-era shortcut. Pick the agent-era full version. Each row corresponds to a runtime-wiring or testing-strategy decision that lives at the seam between modules, the wiring senior coordinates.
 
 | Scenario | Human-era shortcut | Agent-era full version |
 |---|---|---|
@@ -203,7 +203,7 @@ If the architect plan URL was not passed with the invocation, stop and ask. No p
 - Touching infrastructure (CI, build, deploy config).
 - Doing work that cannot be traced to a specific line in the plan. Every edit has a plan anchor.
 
-When the modules in the plan carry `MODULE.md` (the v0.2.0 living-spec layer), update `@spec.*` JSDoc directives on existing public exports across the touched modules to reflect the diff. Introducing a new `@spec.*` directive on a NEW public export is upstream architect-tier work — route via `safer-escalate --from implement-senior --to architect --cause NEW_SPEC_DIRECTIVE`. Editing per-folder `.safer-spec/<slug>.json` sidecars by hand to clear `safer-spec validate` errors is the Principle 7 paper-over anti-pattern; route to `/safer:requirements` instead.
+When the modules in the plan carry `MODULE.md` (the v0.2.0 living-spec layer), update `@spec.*` JSDoc directives on existing public exports across the touched modules to reflect the diff. Introducing a new `@spec.*` directive on a NEW public export is upstream architect-tier work. Route via `safer-escalate --from implement-senior --to architect --cause NEW_SPEC_DIRECTIVE`. Editing per-folder `.safer-spec/<slug>.json` sidecars by hand to clear `safer-spec validate` errors is the Principle 7 paper-over anti-pattern; route to `/safer:requirements` instead.
 
 ## Scope budget
 
@@ -212,7 +212,7 @@ Shape is the rule; volume is a soft guide.
 | Dimension | Hard rule | Soft guide |
 |---|---|---|
 | Modules touched | all named in the plan, none outside it | typically 2-6 |
-| LOC | — | ≤ 2000 |
+| LOC | n/a | ≤ 2000 |
 | Files touched | every file traces to a plan line | ≤ 30 |
 | New modules | 0 | 0 |
 | New public signatures outside the plan | 0 | 0 |
@@ -312,7 +312,7 @@ Before opening the PR, run `/simplify` on the diff:
 /simplify
 ```
 
-Apply all findings unless a finding would conflict with a plan-approved architect decision. For each skipped finding, cite the plan line in the PR body under "Simplify skips." An empty result (no findings) is a valid outcome — note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored — skipped" in the PR body and proceed; the reviewer decides whether to block.
+Apply all findings unless a finding would conflict with a plan-approved architect decision. For each skipped finding, cite the plan line in the PR body under "Simplify skips." An empty result (no findings) is a valid outcome, note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored, skipped" in the PR body and proceed; the reviewer decides whether to block.
 
 **Does NOT count toward stamina N.** Pre-PR hygiene gate, not an independent stamina reviewer.
 
@@ -324,7 +324,7 @@ Before opening the PR, run `/review` on the diff:
 /review
 ```
 
-Apply all findings unless a finding conflicts with a plan-approved architect decision; cite skips in the PR body under "Review skips" with the plan line. An empty result is valid — note "review: no findings" in the PR body. If `/review` errors, note "review: errored — skipped" and proceed.
+Apply all findings unless a finding conflicts with a plan-approved architect decision; cite skips in the PR body under "Review skips" with the plan line. An empty result is valid, note "review: no findings" in the PR body. If `/review` errors, note "review: errored, skipped" and proceed.
 
 **Does NOT count toward stamina N.** Same reason as Phase 6a.
 
@@ -360,7 +360,7 @@ Architect plan: <URL>
 - <bullet per restructured or added test>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 EOF
 )")
 
@@ -397,11 +397,11 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults, report
 
 ## Completion status
 
-- `DONE` — PR opened as draft, `safer-diff-scope` says `senior`, every edit traces to a plan line, tests pass, sub-issue moved to `review`.
-- `DONE_WITH_CONCERNS` — as above, plus 1-3 concerns: plan defaults applied, upstream flake, internal type tightened beyond the plan (name each).
-- `ESCALATED` — stop rule fired; escalation artifact posted.
-- `BLOCKED` — external dependency (CI broken on main, missing infra). Name it.
-- `NEEDS_CONTEXT` — user-resolvable ambiguity; state the question.
+- `DONE`. PR opened as draft, `safer-diff-scope` says `senior`, every edit traces to a plan line, tests pass, sub-issue moved to `review`.
+- `DONE_WITH_CONCERNS`. As above, plus 1-3 concerns: plan defaults applied, upstream flake, internal type tightened beyond the plan (name each).
+- `ESCALATED`. Stop rule fired; escalation artifact posted.
+- `BLOCKED`. External dependency (CI broken on main, missing infra). Name it.
+- `NEEDS_CONTEXT`. User-resolvable ambiguity; state the question.
 
 ## Escalation artifact template
 
@@ -421,7 +421,7 @@ Body:
 **Cause:** <one line>
 
 ## Sub-issue
-#<N> — <title>
+#<N>: <title>
 
 ## Plan reference
 <doc URL, with section anchor>
@@ -442,7 +442,7 @@ Body:
 - Route to <modality>, specifically <what they should decide>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 ```
 
 Post on the sub-issue; leave the branch in place; revert any speculative cross-module edits you made before noticing the stop.
@@ -454,7 +454,7 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 | Draft PR | GitHub PR, title prefixed `[impl-senior]`, body includes plan-anchor table | PR opens as draft |
 | Review request | Comment on the sub-issue with the PR URL and tier | sub-issue: `implementing` → `review` |
 | Escalation | Comment on the sub-issue, plus `safer-escalate` event | sub-issue: stays at current state, escalation recorded |
-| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | — |
+| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | n/a |
 
 ## Anti-patterns
 

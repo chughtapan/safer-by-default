@@ -40,7 +40,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -62,18 +62,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -175,7 +175,7 @@ echo "REPO_ROOT: $REPO_ROOT"
 echo "SESSION:   $SESSION"
 ```
 
-If `safer-update-check` or `safer-telemetry-log` is missing, continue. Telemetry is optional. gstack itself is not optional — the preconditions check above fails fast if it is absent.
+If `safer-update-check` or `safer-telemetry-log` is missing, continue. Telemetry is optional. gstack itself is not optional. The preconditions check above fails fast if it is absent.
 
 ## Scope
 
@@ -277,7 +277,7 @@ Do not attempt the migration yourself. That belongs to the user's judgement abou
 
 Lockfile drift between local and CI is a recurring debt pattern: three CI-vs-local `bun.lock` mismatch cycles caused by local `bun` and CI `setup-bun@latest` diverging. The fix is to pin the toolchain version in `package.json` `packageManager` field from commit one. Setup writes that field if `package.json` exists.
 
-Idempotent: skip if `packageManager` is already set (any value — do not overwrite the user's choice).
+Idempotent: skip if `packageManager` is already set (any value, do not overwrite the user's choice).
 
 ```bash
 if [ -f package.json ]; then
@@ -302,7 +302,7 @@ if [ -f package.json ]; then
 fi
 ```
 
-Then probe CI workflow files for unpinned setup actions and warn (advisory only — no auto-edit):
+Then probe CI workflow files for unpinned setup actions and warn (advisory only, no auto-edit):
 
 ```bash
 if [ -d .github/workflows ]; then
@@ -412,7 +412,7 @@ Testing is a craft dimension of the principles, not a separate modality. Princip
 
 Ask four `AskUserQuestion` prompts, in order. Record each answer (A/B/C) and the resulting install command (or "skipped") for the Step 11 receipt.
 
-**Question 1 — fast-check (always recommended).**
+**Question 1: fast-check (always recommended).**
 
 > `fast-check` is the TypeScript property-based tester. It is the default tool when a function has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement). Install as a dev dependency?
 > - A) Yes, install now. (Recommended default.)
@@ -420,7 +420,7 @@ Ask four `AskUserQuestion` prompts, in order. Record each answer (A/B/C) and the
 
 If A: `$PM add -D fast-check`. If B: record skipped.
 
-**Question 2 — testcontainers-node (ask when DB/cache/queue present).**
+**Question 2: testcontainers-node (ask when DB/cache/queue present).**
 
 Detect DB/cache/queue clients in `package.json` to pre-answer the prompt:
 
@@ -439,7 +439,7 @@ echo "TC_HINT:$TC_HINT"
 
 If A: install `testcontainers` plus the specific `@testcontainers/<service>` modules that match detected clients (one `$PM add -D` command). If B or C: record skipped.
 
-**Question 3 — Stryker mutation testing (ask when critical modules exist).**
+**Question 3: Stryker mutation testing (ask when critical modules exist).**
 
 > Stryker runs mutation tests; `@stryker-mutator/typescript-checker` filters type-ill-formed mutants via `tsc` (direct synergy with principle 1). Recommended only for critical modules (auth, billing, parsing, crypto). Does this repo have such a module?
 > - A) Yes; install `@stryker-mutator/core` + `@stryker-mutator/typescript-checker` and I will scope it to a glob later.
@@ -448,7 +448,7 @@ If A: install `testcontainers` plus the specific `@testcontainers/<service>` mod
 
 If A: `$PM add -D @stryker-mutator/core @stryker-mutator/typescript-checker`. If B or C: record skipped.
 
-**Question 4 — Playwright (ask when a critical UI flow exists).**
+**Question 4: Playwright (ask when a critical UI flow exists).**
 
 > Playwright runs end-to-end browser tests. Recommended only for critical UI flows (signup, checkout, main workflow). Does this repo own such a flow?
 > - A) Yes; install `@playwright/test`.

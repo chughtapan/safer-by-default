@@ -12,7 +12,7 @@
 
 ## Autonomy contract
 
-**Mode.** feature-ship — land the plan; implementation is not yet authorized
+**Mode.** feature-ship. Land the plan; implementation is not yet authorized
 
 **Goal.** Produce an architect design doc + interface stubs that satisfy the spec at <https://github.com/OWNER/REPO/issues/198#issuecomment-XXX>.
 
@@ -42,9 +42,9 @@ OK'd: `<ts>` by `<user@github>`
 
 Orchestrator posts: "Architect plan published at `<URL>`. What autonomy do you want to grant for implementation?" Common follow-ups:
 
-- `AMEND CONTRACT: extend to implement-senior + review-senior + verify + merge` — autonomous build against the plan.
-- `AMEND CONTRACT: extend to implement-senior + stop after PR opened` — see the diff before merging.
-- `AMEND CONTRACT: ratchet back to spec; the plan revealed a gap` — re-open the spec dialog.
-- `STOP CONTRACT: I'll dispatch impl in a separate epic` — close this epic; the architect plan is the deliverable.
+- `AMEND CONTRACT: extend to implement-senior + review-senior + verify + merge`. Autonomous build against the plan.
+- `AMEND CONTRACT: extend to implement-senior + stop after PR opened`, see the diff before merging.
+- `AMEND CONTRACT: ratchet back to spec; the plan revealed a gap`, re-open the spec dialog.
+- `STOP CONTRACT: I'll dispatch impl in a separate epic`. Close this epic; the architect plan is the deliverable.
 
 This shape is the natural midpoint between [`invitation.md`](./invitation.md) (dialog only, no execution) and [`bug-fix-end-to-end.md`](./bug-fix-end-to-end.md) (full autonomy through merge). Pick it when the design choices are load-bearing enough that you want to read them before the implementation depends on them.

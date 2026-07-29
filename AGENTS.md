@@ -4,9 +4,9 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 ## Read first
 
-1. [`PRINCIPLES.md`](./PRINCIPLES.md) — four-part doctrine (craft, discipline, stamina, communication). Every skill projects from these principles.
+1. [`PRINCIPLES.md`](./PRINCIPLES.md). Four-part doctrine (craft, discipline, stamina, communication). Every skill projects from these principles.
 2. The skill you're about to invoke. Read its `SKILL.md` end-to-end before running its workflow.
-3. The parent epic's `## Autonomy contract` block (if dispatched by `/safer:orchestrate`). The contract bounds your autonomy — goal, acceptance criteria, autonomy budget, and always-park items.
+3. The parent epic's `## Autonomy contract` block (if dispatched by `/safer:orchestrate`). The contract bounds your autonomy. Goal, acceptance criteria, autonomy budget, and always-park items.
 
 ## Skills by modality
 
@@ -45,12 +45,12 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 ## Where things live
 
-- **Skills**: `skills/<name>/SKILL.md` — one folder per modality. Each is self-contained.
-- **CLI helpers**: `bin/safer-*` — auto-prepended to `PATH` in any session with the plugin enabled. Skills invoke them by bare name. Reference table in [`ARCHITECTURE.md`](./ARCHITECTURE.md#cli-helpers-binsafer) lists every helper's purpose, signature, and exit codes; consult it when you hit a `safer-*` call you haven't seen before.
+- **Skills**: `skills/<name>/SKILL.md`. One folder per modality. Each is self-contained.
+- **CLI helpers**: `bin/safer-*`: auto-prepended to `PATH` in any session with the plugin enabled. Skills invoke them by bare name. Reference table in [`ARCHITECTURE.md`](./ARCHITECTURE.md#cli-helpers-binsafer) lists every helper's purpose, signature, and exit codes; consult it when you hit a `safer-*` call you haven't seen before.
 - **Doctrine**: [`PRINCIPLES.md`](./PRINCIPLES.md) at repo root.
 - **Architecture map**: [`ARCHITECTURE.md`](./ARCHITECTURE.md).
-- **Contract templates**: `docs/contracts/` — worked examples for orchestration contracts.
-- **Calibration suite**: `scenarios/` — cc-judge eval scenarios for doctrine adherence.
+- **Contract templates**: `docs/contracts/`. Worked examples for orchestration contracts.
+- **Calibration suite**: `scenarios/`. Cc-judge eval scenarios for doctrine adherence.
 - **Local state**: `~/.safer/analytics/events.jsonl` (modality events) and `~/.safer/last-update-check` (1h cache).
 - **Pipeline state**: GitHub issues. Parent epic carries the contract; sub-issues track each modality's work.
 
@@ -58,7 +58,7 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 User-initiated entry-point skills (`/safer:requirements`, `/safer:architect`, `/safer:diagnose`, `/safer:spike`, `/safer:research`, `/safer:setup`, `/safer:ux-audit`) halt at the preamble when `safer-update-check` reports an upgrade and `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. The user is told to run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` before re-running.
 
-`/safer:orchestrate` gates only on fresh-pipeline starts (no open `safer:parent` epic exists yet). Autonomous re-entry — cron-loop ticks, parent-epic polling — skips the gate so in-flight pipelines drain.
+`/safer:orchestrate` gates only on fresh-pipeline starts (no open `safer:parent` epic exists yet). Autonomous re-entry, cron-loop ticks, parent-epic polling, skips the gate so in-flight pipelines drain.
 
 Dispatched skills (when running under `SAFER_PARENT_ISSUE`) skip the gate entirely. The pipeline finishes; the user upgrades after.
 
@@ -84,14 +84,14 @@ User-prompting gstack skills run hold-scope autonomous when invoked from inside 
 Skills are generated from `.tmpl` source files. Edit the template, run the generator, commit both.
 
 1. Copy [`SKILL.md.tmpl`](./SKILL.md.tmpl) to `skills/<name>/SKILL.tmpl` (note: `.tmpl` extension, not `.md`).
-2. Fill in the sections. The `{{> principles-core}}` marker is preserved verbatim — the generator inlines `PRINCIPLES.core.md` there at render time. Keep the body to what this modality alone needs; rare-branch material belongs in a sibling reference file the skill reads on demand.
+2. Fill in the sections. The `{{> principles-core}}` marker is preserved verbatim. The generator inlines `PRINCIPLES.core.md` there at render time. Keep the body to what this modality alone needs; rare-branch material belongs in a sibling reference file the skill reads on demand.
 3. Run `bin/safer-gen-skills` to produce `skills/<name>/SKILL.md`. Both files are committed.
 4. Update `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json` description if the skill count changes.
 5. Add a row to the table at the top of this file.
 6. Run `tests/run-tests.sh` to confirm nothing regressed.
 7. Bump VERSION + add a CHANGELOG entry.
 
-**Editing an existing skill**: edit `skills/<name>/SKILL.tmpl`, then run `bin/safer-gen-skills`. The `SKILL.md` carries an `AUTO-GENERATED` marker — manual edits to it will be overwritten on the next render.
+**Editing an existing skill**: edit `skills/<name>/SKILL.tmpl`, then run `bin/safer-gen-skills`. The `SKILL.md` carries an `AUTO-GENERATED` marker. Manual edits to it will be overwritten on the next render.
 
 **Updating doctrine**: doctrine lives in two layers. `PRINCIPLES.core.md` is the compressed craft floor inlined into every skill body; `PRINCIPLES.md` is the full doctrine skills read by path at the plugin root. Changing a rule means updating both, then running `bin/safer-gen-skills` to propagate the core. CI should fail if `bin/safer-gen-skills --check` finds any stale `SKILL.md`.
 

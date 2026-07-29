@@ -18,7 +18,7 @@ A Claude Code skill plugin (also Codex-compatible) that recalibrates a coding ag
 
 ## Other assets
 
-`docs/contracts/` holds four worked-example contract templates with a README on when to reach for each. `scenarios/` is the cc-judge calibration suite. `bin/` holds the shared helpers (see `ARCHITECTURE.md` → CLI helpers); anything only one skill calls stays inline in that skill. The architecture analyzer and its LSP server are a separate repository, [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp) — this plugin ships no LSP runtime.
+`docs/contracts/` holds four worked-example contract templates with a README on when to reach for each. `scenarios/` is the cc-judge calibration suite. `bin/` holds the shared helpers (see `ARCHITECTURE.md` → CLI helpers); anything only one skill calls stays inline in that skill. The architecture analyzer and its LSP server are a separate repository, [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp). This plugin ships no LSP runtime.
 
 ## Skill routing
 
