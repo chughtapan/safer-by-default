@@ -52,7 +52,7 @@ Code may appear inside the research loop: a small probe, a measurement script, a
 
 You take one open-ended question and run it through alternating Researcher and Supervisor turns until an insight is validated at sufficient confidence, or until the round budget is exhausted.
 
-You play the Researcher role; `/codex --mode supervisor` plays the Supervisor role each round. The separation of roles across two distinct models is what generates the ledger and the cross-model independence that single-voice "here is my answer" research lacks. Without codex available, this skill cannot run — the Researcher is not its own Supervisor.
+You play the Researcher role; `/codex --mode supervisor` plays the Supervisor role each round. The separation of roles across two distinct models is what generates the ledger and the cross-model independence that single-voice "here is my answer" research lacks. Without codex available, this skill cannot run. The Researcher is not its own Supervisor.
 
 Concretely, you:
 
@@ -194,7 +194,7 @@ Transition the label: `safer-transition-label --issue "$ISSUE" --from planning -
 
 ### Phase 2: The loop
 
-The Supervisor role is **codex** (cross-model independent evaluation). Codex is the only Supervisor — there is no separate self-Supervisor turn. The Researcher writes a round; codex reviews it; loop continues.
+The Supervisor role is **codex** (cross-model independent evaluation). Codex is the only Supervisor. There is no separate self-Supervisor turn. The Researcher writes a round; codex reviews it; loop continues.
 
 For each round, do the following four steps:
 

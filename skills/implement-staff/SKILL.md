@@ -37,7 +37,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -59,18 +59,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -95,19 +95,19 @@ This is the craft floor, compressed. The full doctrine, with the reasoning, work
 
 ## How this modality projects from the doctrine
 
-- **Principle 1 (Types beat tests)** — new modules are new surface. The type system you choose for the public interface is a test suite that runs on every caller, forever. Pick branded types, discriminated unions, tagged errors before you pick an algorithm.
-- **Principle 2 (Validate at every boundary)** — new deps are new boundaries. Every external call, every JSON decode, every env var read is a schema site. No `as` casts across those seams.
-- **Principle 3 (Errors are typed, not thrown)** — a new public API declares its error channel. `Promise<T>` on a failing path is a failure by you. Callers inherit what you declare.
-- **Principle 4 (Exhaustiveness over optionality)** — unions you introduce on the public surface become switches at every caller. Every switch ends in `absurd`. Design for it.
-- **Principle 5 (Discipline over capability)** — staff is still junior to the spec. You do not revise the spec. Capability is not the instruction.
-- **Principle 6 (Budget Gate)** — shape is "new modules and new surface traceable to spec lines." No LOC ceiling. Every line traces.
-- **Principle 8 (The Ratchet)** — if the spec needs revision, ratchet up to spec. Never invent scope the spec did not authorize.
+- **Principle 1 (Types beat tests).** New modules are new surface. The type system you choose for the public interface is a test suite that runs on every caller, forever. Pick branded types, discriminated unions, tagged errors before you pick an algorithm.
+- **Principle 2 (Validate at every boundary).** New deps are new boundaries. Every external call, every JSON decode, every env var read is a schema site. No `as` casts across those seams.
+- **Principle 3 (Errors are typed, not thrown).** A new public API declares its error channel. `Promise<T>` on a failing path is a failure by you. Callers inherit what you declare.
+- **Principle 4 (Exhaustiveness over optionality).** Unions you introduce on the public surface become switches at every caller. Every switch ends in `absurd`. Design for it.
+- **Principle 5 (Discipline over capability).** Staff is still junior to the spec. You do not revise the spec. Capability is not the instruction.
+- **Principle 6 (Budget Gate).** Shape is "new modules and new surface traceable to spec lines." No LOC ceiling. Every line traces.
+- **Principle 8 (The Ratchet).** If the spec needs revision, ratchet up to spec. Never invent scope the spec did not authorize.
 
 The decision table below names the cross-service contract and CI / mutation-gating forks staff owns. Single-module Principle 1–4 forks live in `/safer:implement-junior`; Effect-runtime and testing-strategy forks at the module seam live in `/safer:implement-senior`.
 
 ## Decision table
 
-Every row below is a new-surface fork where the agent feels pulled toward the human-era shortcut. Pick the agent-era full version. Each row corresponds to a cross-service contract decision or a CI gate that lives at a new package boundary — the surface staff introduces.
+Every row below is a new-surface fork where the agent feels pulled toward the human-era shortcut. Pick the agent-era full version. Each row corresponds to a cross-service contract decision or a CI gate that lives at a new package boundary, the surface staff introduces.
 
 | Scenario | Human-era shortcut | Agent-era full version |
 |---|---|---|
@@ -202,7 +202,7 @@ If the spec URL was not passed with the invocation, stop and ask. No spec, no st
 Staff has no LOC ceiling and a 5-module cap. Two budgets, working at different scales:
 
 - **Traceability** is the line-level rule. Every line in the diff has a spec-anchor or a plan-anchor; no anchor → no ship.
-- **The 5-module cap** is the architectural-blast-radius safety net. Past 5 new modules per orchestration, traceability stops being a sufficient guard because reviewer cognitive budget runs out — even if every line is anchored, the reviewer can't hold the cross-module structure in working memory long enough to catch coordination defects. Bigger work decomposes upstream into multi-orchestration sequences; staff doesn't try to absorb it.
+- **The 5-module cap** is the architectural-blast-radius safety net. Past 5 new modules per orchestration, traceability stops being a sufficient guard because reviewer cognitive budget runs out. Even if every line is anchored, the reviewer can't hold the cross-module structure in working memory long enough to catch coordination defects. Bigger work decomposes upstream into multi-orchestration sequences; staff doesn't try to absorb it.
 
 Both budgets must hold. Staff hits 5 modules with all-anchored lines = ship. Hits 6 modules even fully anchored = escalate.
 
@@ -213,7 +213,7 @@ Hard rules:
 3. Every new dep in `package.json` maps to a spec constraint. The mapping goes in the PR body and the Dependencies table.
 4. Every file is reachable from a named module.
 5. No "while I'm here" edits to pre-existing modules, except barrel `export` updates that the plan authorized.
-6. **Module-count cap (inherited from architect).** Staff implements at most 5 new modules per orchestration. Architect's hard cap at the design stage carries forward to staff at the implementation stage; both modalities operate against the same authorized scope. Designs that legitimately need more than 5 new modules decompose upstream — spec authors a multi-orchestration sequence (e.g., "module batch 1 of N"), each batch ≤5 modules. Bigger work that arrives at staff under one orchestration is not authorized; escalate to spec via `safer-escalate --from implement-staff --to requirements --cause module-cap-exceeded`.
+6. **Module-count cap (inherited from architect).** Staff implements at most 5 new modules per orchestration. Architect's hard cap at the design stage carries forward to staff at the implementation stage; both modalities operate against the same authorized scope. Designs that legitimately need more than 5 new modules decompose upstream. Spec authors a multi-orchestration sequence (e.g., "module batch 1 of N"), each batch ≤5 modules. Bigger work that arrives at staff under one orchestration is not authorized; escalate to spec via `safer-escalate --from implement-staff --to requirements --cause module-cap-exceeded`.
 
 Soft guides:
 
@@ -251,10 +251,10 @@ Before writing code, write out the full spec-anchor table:
 
 | New artifact | Kind | Spec anchor | Plan anchor | Sidecar property |
 |---|---|---|---|---|
-| `packages/auth/src/oauth/` (module) | module | Spec §2.3 "OAuth login flow" | Plan §2 "Modules: oauth" | — |
+| `packages/auth/src/oauth/` (module) | module | Spec §2.3 "OAuth login flow" | Plan §2 "Modules: oauth" | n/a |
 | `signInWithProvider(provider: Provider, code: Code): Effect<Session, OAuthError>` | public fn | Spec Acceptance 4 | Plan §3 "Interfaces" | `Roundtrip` |
-| `OAuthError` tagged union | public type | Spec Invariant 2 | Plan §5 "Errors" | — |
-| `openid-client` dep | dep | Spec §2.3 "OAuth provider" | Plan §6 "Dependencies" | — |
+| `OAuthError` tagged union | public type | Spec Invariant 2 | Plan §5 "Errors" | n/a |
+| `openid-client` dep | dep | Spec §2.3 "OAuth provider" | Plan §6 "Dependencies" | n/a |
 
 Every new module, every new export, every new dep has a row. A row without an anchor means you have scope drift; drop the row or escalate. Public functions in a `MODULE.md`-bearing area also carry their **Sidecar property** (the architect plan's Property-test gates entry); the implementer writes the `itSpec` / `itSpec.todo` invocations that exercise it (Phase 7). The table goes into the PR body under "Traceability" for the reviewer and for verify.
 
@@ -360,7 +360,7 @@ Before opening the PR, run `/simplify` on the diff:
 /simplify
 ```
 
-Apply **every** finding unless it conflicts with a plan-approved architect decision. For each skipped finding, cite the specific plan line in the PR body under "Simplify skips." Skipping a finding without a plan citation is a stop-rule-adjacent signal; escalate if uncertain. An empty result (no findings) is a valid outcome — note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored — skipped" and the reviewer decides whether to block.
+Apply **every** finding unless it conflicts with a plan-approved architect decision. For each skipped finding, cite the specific plan line in the PR body under "Simplify skips." Skipping a finding without a plan citation is a stop-rule-adjacent signal; escalate if uncertain. An empty result (no findings) is a valid outcome, note "simplify: no findings" in the PR body. If `/simplify` errors, note "simplify: errored, skipped" and the reviewer decides whether to block.
 
 ### Phase 8b — Codex diff review (mandatory)
 
@@ -380,7 +380,7 @@ Before opening the PR, run `/review` on the diff:
 /review
 ```
 
-Apply all findings unless a finding conflicts with a plan-approved architect decision; cite skips in the PR body under "Review skips" with the specific plan line. An empty result is valid — note "review: no findings" in the PR body. If `/review` errors, note "review: errored — skipped" and proceed.
+Apply all findings unless a finding conflicts with a plan-approved architect decision; cite skips in the PR body under "Review skips" with the specific plan line. An empty result is valid, note "review: no findings" in the PR body. If `/review` errors, note "review: errored, skipped" and proceed.
 
 **Does NOT count toward stamina N.** Pre-PR hygiene gate; only `/codex` (Phase 8b) counts as the staff-tier independent stamina pass.
 
@@ -427,13 +427,13 @@ Architect plan: <URL or 'none'>
 | <symbol> | <Roundtrip|Idempotence|Invariant|OracleAgreement> | `itSpec` | yes |
 
 ## Simplify skips
-- <plan line> — <reason finding was skipped> (or "none")
+- <plan line>: <reason finding was skipped> (or "none")
 
 ## Codex diff review
 - <codex verdict summary>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 EOF
 )")
 
@@ -471,11 +471,11 @@ Report `DONE` with the PR URL. If you resolved plan-recommended defaults or left
 
 ## Completion status
 
-- `DONE` — draft PR opened, `safer-diff-scope` says `staff`, every artifact traces to a spec line, deps pinned with license notes, tests pass, sub-issue moved to `review`.
-- `DONE_WITH_CONCERNS` — as above, plus 1-3 concerns: plan defaults applied, invariants left for verify, upstream flake. Name each.
-- `ESCALATED` — stop rule fired; escalation artifact posted.
-- `BLOCKED` — external dependency (dep not yet on npm, CI infra broken, waiting on external review).
-- `NEEDS_CONTEXT` — user-resolvable ambiguity; state the question.
+- `DONE`. Draft PR opened, `safer-diff-scope` says `staff`, every artifact traces to a spec line, deps pinned with license notes, tests pass, sub-issue moved to `review`.
+- `DONE_WITH_CONCERNS`. As above, plus 1-3 concerns: plan defaults applied, invariants left for verify, upstream flake. Name each.
+- `ESCALATED`. Stop rule fired; escalation artifact posted.
+- `BLOCKED`. External dependency (dep not yet on npm, CI infra broken, waiting on external review).
+- `NEEDS_CONTEXT`. User-resolvable ambiguity; state the question.
 
 ## Escalation artifact template
 
@@ -495,7 +495,7 @@ Body:
 **Cause:** <one line>
 
 ## Sub-issue
-#<N> — <title>
+#<N>: <title>
 
 ## Spec reference
 <issue URL, with section anchor>
@@ -518,7 +518,7 @@ Body:
 - Route to <modality>, specifically <what they should decide>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 ```
 
 Post on the sub-issue; leave the branch in place with the anchored work committed; revert unanchored work before escalating.
@@ -530,7 +530,7 @@ Post on the sub-issue; leave the branch in place with the anchored work committe
 | Draft PR | GitHub PR, title prefixed `[impl-staff]`, body includes traceability table and deps table | PR opens as draft |
 | Review request | Comment on the sub-issue with the PR URL and tier | sub-issue: `implementing` → `review` |
 | Escalation | Comment on the sub-issue, plus `safer-escalate` event | sub-issue: stays at current state, escalation recorded |
-| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | — |
+| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | n/a |
 
 ## Anti-patterns
 

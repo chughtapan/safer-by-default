@@ -37,7 +37,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -59,18 +59,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -95,43 +95,43 @@ This is the craft floor, compressed. The full doctrine, with the reasoning, work
 
 ## How this modality projects from the doctrine
 
-- **Principle 5 (Discipline over capability)** — architect is its own scope, not a meta-scope. You define the shape. You do not fill it in.
-- **Principle 6 (Budget Gate)** — your output shape is "design doc plus interface stubs plus updated docs." Function bodies are out of scope. Always.
-- **Principle 3 (Errors are typed, not thrown)** — every interface you declare names its error channel. `Promise<T>` is a failure by you, not a shorthand.
-- **Principle 4 (Exhaustiveness over optionality)** — every discriminated union you introduce in the interface carries the branches implementations must handle. Name them all at the interface.
+- **Principle 5 (Discipline over capability).** Architect is its own scope, not a meta-scope. You define the shape. You do not fill it in.
+- **Principle 6 (Budget Gate).** Your output shape is "design doc plus interface stubs plus updated docs." Function bodies are out of scope. Always.
+- **Principle 3 (Errors are typed, not thrown).** Every interface you declare names its error channel. `Promise<T>` is a failure by you, not a shorthand.
+- **Principle 4 (Exhaustiveness over optionality).** Every discriminated union you introduce in the interface carries the branches implementations must handle. Name them all at the interface.
 
 ## Iron rule
 
 > **You ship everything but the function bodies. If you find yourself writing a function body, your stop rule has already fired.**
 
-The branch architect publishes is a complete intent specification — interfaces, docs, configs, and infrastructure all current to the new design. The only thing missing is the function bodies that downstream `implement-*` fills in. Stubs with `throw new Error("not implemented")` bodies are interfaces, not implementations. The instinct "I'll just sketch the happy path to show what I mean" is the exact failure mode the rule prevents, because the sketch becomes the ghost implementation that downstream copies instead of thinking.
+The branch architect publishes is a complete intent specification. Interfaces, docs, configs, and infrastructure all current to the new design. The only thing missing is the function bodies that downstream `implement-*` fills in. Stubs with `throw new Error("not implemented")` bodies are interfaces, not implementations. The instinct "I'll just sketch the happy path to show what I mean" is the exact failure mode the rule prevents, because the sketch becomes the ghost implementation that downstream copies instead of thinking.
 
 ## Role
 
-Architect takes a published spec and lays out the shape of code that satisfies it. One design doc, one branch carrying every artifact that defines what the system *is* — except function bodies. Every module you name has a purpose, a public surface, a dependency list, and an error channel. Every data flow arrow is explicit. Every library choice is justified by a spec constraint, not a preference. Every documentation surface, setup script, deployment file, and CI workflow that describes the changed surface is current on this branch — the implementer should be able to read the design and the configs alone and know what to build.
+Architect takes a published spec and lays out the shape of code that satisfies it. One design doc, one branch carrying every artifact that defines what the system *is*. Except function bodies. Every module you name has a purpose, a public surface, a dependency list, and an error channel. Every data flow arrow is explicit. Every library choice is justified by a spec constraint, not a preference. Every documentation surface, setup script, deployment file, and CI workflow that describes the changed surface is current on this branch. The implementer should be able to read the design and the configs alone and know what to build.
 
 Architect does not write function bodies, pick algorithms beyond naming them ("uses a bounded LRU cache"; the implementation of the cache is downstream), run tests against the new code, or modify files unrelated to the design. Architect does not revise the spec. If the spec has a gap, the ratchet sends it back to `/safer:requirements`.
 
 ### The complete intent specification
 
-The branch architect publishes contains every artifact that answers "what is this system" — interfaces, docs, configs, build, deploy, CI. Implementer's job collapses to flipping stubs into bodies and running the existing tests; everything else is already in place. If the implementer has to make a design call about how something is configured, deployed, or built, the architect under-specified.
+The branch architect publishes contains every artifact that answers "what is this system": interfaces, docs, configs, build, deploy, CI. Implementer's job collapses to flipping stubs into bodies and running the existing tests; everything else is already in place. If the implementer has to make a design call about how something is configured, deployed, or built, the architect under-specified.
 
 What's in scope on the architect branch:
 
-- **Interfaces** — typed signatures with `throw new Error("not implemented")` bodies. One file per module.
-- **Docs** — README, AGENTS.md, in-tree doctrine docs, type/schema docs, ADRs, examples, runbooks, in-tree comments that describe the changed surface.
-- **Setup scripts** — `bin/setup`, `scripts/setup-*`, anything that bootstraps a fresh checkout to the new design's expected state. New env vars, new deps, new local services.
-- **Deployment files** — `Dockerfile`, `docker-compose.yml`, `fly.toml`, `vercel.json`, `railway.toml`, `netlify.toml`, k8s manifests, `Procfile`. If the design changes runtime requirements, ports, env, services — architect updates these.
-- **CI workflows** — `.github/workflows/*.yml`, `.gitlab-ci.yml`, equivalent. New jobs, new test targets, new lint passes, new artifacts the design introduces are wired here.
-- **Env files** — `.env.example`, `.envrc`, `dev.vars`. New env vars the design requires are declared with example values.
-- **Build configs** — `package.json` `scripts` section, `tsconfig.json` updates relevant to the design, `eslint.config.js` updates relevant, bundler configs.
-- **Test infrastructure** — runner config, `testcontainers` setup, fixtures the design requires. Test bodies stay as `it.todo("...")` for the implementer.
+- **Interfaces.** Typed signatures with `throw new Error("not implemented")` bodies. One file per module.
+- **Docs.** README, AGENTS.md, in-tree doctrine docs, type/schema docs, ADRs, examples, runbooks, in-tree comments that describe the changed surface.
+- **Setup scripts.** `bin/setup`, `scripts/setup-*`, anything that bootstraps a fresh checkout to the new design's expected state. New env vars, new deps, new local services.
+- **Deployment files.** `Dockerfile`, `docker-compose.yml`, `fly.toml`, `vercel.json`, `railway.toml`, `netlify.toml`, k8s manifests, `Procfile`. If the design changes runtime requirements, ports, env, services, architect updates these.
+- **CI workflows.** `.github/workflows/*.yml`, `.gitlab-ci.yml`, equivalent. New jobs, new test targets, new lint passes, new artifacts the design introduces are wired here.
+- **Env files.** `.env.example`, `.envrc`, `dev.vars`. New env vars the design requires are declared with example values.
+- **Build configs.** `package.json` `scripts` section, `tsconfig.json` updates relevant to the design, `eslint.config.js` updates relevant, bundler configs.
+- **Test infrastructure.** Runner config, `testcontainers` setup, fixtures the design requires. Test bodies stay as `it.todo("...")` for the implementer.
 
 ### Bounded by the changed surface
 
 Architect updates files the design changes. Architect does NOT update files unrelated to the design. The operational test: if a file (doc, script, config, workflow, env) references a thing the design renames, removes, adds, or changes the contract of, update it. If the file is unrelated, leave it.
 
-The architect is not a repo-wide janitor. A design that adds a new module should not trigger a rewrite of every CI workflow in the repo — only the workflows that the new module touches. A README section unrelated to the changed surface stays unmodified.
+The architect is not a repo-wide janitor. A design that adds a new module should not trigger a rewrite of every CI workflow in the repo. Only the workflows that the new module touches. A README section unrelated to the changed surface stays unmodified.
 
 ## Peer channel (when dispatched under a roster)
 
@@ -187,7 +187,7 @@ If the spec URL was not provided with the invocation, ask for it via `AskUserQue
 - Writing a design doc with the fixed section structure below.
 - Publishing the design doc as a comment on the parent epic, or as the body of a `safer:architect` sub-issue.
 - Committing interface stubs to a branch named `arch/<slug>` and opening a draft PR marked "architecture only; not for merge."
-- **Updating every artifact that defines what the system is — bounded by the changed surface:**
+- **Updating every artifact that defines what the system is: bounded by the changed surface:**
   - **Docs:** README, AGENTS.md, in-tree doctrine docs, type/schema docs, API docs, ADRs, examples, runbooks, in-tree comments.
   - **Setup scripts:** `bin/setup`, `scripts/setup-*`, anything that bootstraps a fresh checkout.
   - **Deployment files:** `Dockerfile`, `docker-compose.yml`, `fly.toml`, `vercel.json`, `railway.toml`, `netlify.toml`, k8s manifests, `Procfile`.
@@ -217,24 +217,24 @@ Architect's budget is about output shape, not line count. Hard rules:
 
 The design doc has exactly these sections, in this order:
 
-1. **Summary** — one paragraph. What shape of code satisfies the spec.
-2. **Modules** — numbered list. Each entry names the module, one-line purpose, public surface, dependencies (other modules and external libs).
-3. **Interfaces** — the exported type signatures, copied from the stub files for readability, with a one-line comment on each explaining intent.
-4. **Data flow** — textual walk of the dominant path(s), plus a small ASCII diagram.
-5. **Errors** — the error tags and discriminated unions each public function exposes.
-6. **Dependencies** — table of external libraries. Columns: library, version, license, why this one.
-7. **Traceability** — table mapping spec goals and acceptance criteria to modules or interfaces.
-8. **Open questions** — every decision you could not lock down; each has a recommended default and an escalation target.
+1. **Summary.** One paragraph. What shape of code satisfies the spec.
+2. **Modules.** Numbered list. Each entry names the module, one-line purpose, public surface, dependencies (other modules and external libs).
+3. **Interfaces.** The exported type signatures, copied from the stub files for readability, with a one-line comment on each explaining intent.
+4. **Data flow.** Textual walk of the dominant path(s), plus a small ASCII diagram.
+5. **Errors.** The error tags and discriminated unions each public function exposes.
+6. **Dependencies.** Table of external libraries. Columns: library, version, license, why this one.
+7. **Traceability.** Table mapping spec goals and acceptance criteria to modules or interfaces.
+8. **Open questions.** Every decision you could not lock down; each has a recommended default and an escalation target.
 
 Every section is required. Empty sections are a signal that the design is incomplete; fill them or escalate.
 
 ## Design-tradition framing
 
-An architect's job is to translate a spec into a structure that future readers — agents and humans — can navigate without explanation. The classical software-design vocabulary names the moves: **encapsulation** (every module's interior is private; the public surface is the contract), **cohesion** (each module does one thing thoroughly; the things in a folder belong together), **coupling** (modules touch each other through narrow, named interfaces; not through shared mutable state, not through reaching past the facade), **separation of concerns** (cross-cutting responsibilities like logging, persistence, and auth are factored into kernel modules, not duplicated across siblings), and **design patterns** (Adapter at vendor boundaries, Strategy for swappable algorithms, Repository for storage, Facade for public exports — these are *vocabulary*, not goals; reach for them when they describe a real shape).
+An architect's job is to translate a spec into a structure that future readers, agents and humans, can navigate without explanation. The classical software-design vocabulary names the moves: **encapsulation** (every module's interior is private; the public surface is the contract), **cohesion** (each module does one thing thoroughly; the things in a folder belong together), **coupling** (modules touch each other through narrow, named interfaces; not through shared mutable state, not through reaching past the facade), **separation of concerns** (cross-cutting responsibilities like logging, persistence, and auth are factored into kernel modules, not duplicated across siblings), and **design patterns** (Adapter at vendor boundaries, Strategy for swappable algorithms, Repository for storage, Facade for public exports, these are *vocabulary*, not goals; reach for them when they describe a real shape).
 
-Two heuristics that disagree are usually a signal that one of these principles is being violated. *"This module should know how that module stores its data" → coupling.* *"This folder has files that touch wildly different responsibilities" → cohesion.* *"Adding a feature here means changing six unrelated callers" → encapsulation broke.* The lint floor (`eslint-plugin-agent-code-guard` Architecture rules) catches the worst of these mechanically — folder cycles, public-surface bleed, vendor types in boundaries, package mesh — but the architect's job is to design so the lint never fires. The agent doesn't optimize for satisfying the linter; the agent designs the system, and the linter agrees.
+Two heuristics that disagree are usually a signal that one of these principles is being violated. *"This module should know how that module stores its data" → coupling.* *"This folder has files that touch wildly different responsibilities" → cohesion.* *"Adding a feature here means changing six unrelated callers" → encapsulation broke.* The lint floor (`eslint-plugin-agent-code-guard` Architecture rules) catches the worst of these mechanically, folder cycles, public-surface bleed, vendor types in boundaries, package mesh, but the architect's job is to design so the lint never fires. The agent doesn't optimize for satisfying the linter; the agent designs the system, and the linter agrees.
 
-Concretely: as you decompose, name the design pattern (if one fits), declare the cohesion grouping (which modules belong in this folder and why), and check the coupling shape (does this dependency arrow point in one direction, or does it pass through a shared kernel?). Every folder of structural significance should be obvious in its intent within ten seconds of opening it — that's the cohesion test.
+Concretely: as you decompose, name the design pattern (if one fits), declare the cohesion grouping (which modules belong in this folder and why), and check the coupling shape (does this dependency arrow point in one direction, or does it pass through a shared kernel?). Every folder of structural significance should be obvious in its intent within ten seconds of opening it, that's the cohesion test.
 
 ## Workflow
 
@@ -247,7 +247,7 @@ cat /tmp/safer-arch-context.md
 
 Read the full spec. Read the parent epic if one exists. Read the existing codebase layout for modules in the surrounding area. You are aligning with conventions, not inventing them.
 
-**Adjacent `MODULE.md` reads.** When the surrounding area carries `MODULE.md` files (the per-folder living-spec layer the codemod manages), read every adjacent one — they declare the public surface, `@spec.*` directives, and `PropertyType` thresholds the architect's plan must align with. New modules in a `MODULE.md`-bearing area inherit the same surface discipline: every new export needs an `@spec.kind` directive and a nameable `PropertyType` for its residual test.
+**Adjacent `MODULE.md` reads.** When the surrounding area carries `MODULE.md` files (the per-folder living-spec layer the codemod manages), read every adjacent one. They declare the public surface, `@spec.*` directives, and `PropertyType` thresholds the architect's plan must align with. New modules in a `MODULE.md`-bearing area inherit the same surface discipline: every new export needs an `@spec.kind` directive and a nameable `PropertyType` for its residual test.
 
 ### Phase 2 — Classify readiness
 
@@ -261,7 +261,7 @@ Is the spec architect-ready? Check each:
 
 If the spec fails any check, stop. Escalate to `/safer:requirements` via `safer-escalate --from architect --to requirements --cause <CAUSE>`. Do not fill the gap yourself.
 
-The readiness gate applies regardless of who authored the spec — `/safer:requirements` skill, the user directly, or an upstream pipeline. A spec is architect-ready or it isn't; authorship doesn't change the requirement.
+The readiness gate applies regardless of who authored the spec. `/safer:requirements` skill, the user directly, or an upstream pipeline. A spec is architect-ready or it isn't; authorship doesn't change the requirement.
 
 ### Phase 3 — Decompose into modules
 
@@ -275,7 +275,7 @@ Rules for module naming:
 
 ### Phase 3b — Folder shape
 
-Before drafting interfaces, decide each folder's shape. **Layer-shaped** folders stack: `transport/` → `network/` → `application/`, where each child reads in one direction (upper imports lower per the chosen convention; the lower never imports the upper). Layering encodes coupling discipline structurally. **Tree-shaped** folders compose independent concerns: an orchestrator depends on N peer modules, peers don't depend on each other. Trees encode cohesion structurally — each peer is one bounded responsibility; the orchestrator is the composition root. The two shapes are not interchangeable. Don't mix them at the same level — sibling folders that look like peers but are actually layers (or vice versa) confuse every reader and every linter. Pick one shape per level, declare the layer order if layered, and create folders so the shape is visible from the directory listing alone.
+Before drafting interfaces, decide each folder's shape. **Layer-shaped** folders stack: `transport/` → `network/` → `application/`, where each child reads in one direction (upper imports lower per the chosen convention; the lower never imports the upper). Layering encodes coupling discipline structurally. **Tree-shaped** folders compose independent concerns: an orchestrator depends on N peer modules, peers don't depend on each other. Trees encode cohesion structurally, each peer is one bounded responsibility; the orchestrator is the composition root. The two shapes are not interchangeable. Don't mix them at the same level, sibling folders that look like peers but are actually layers (or vice versa) confuse every reader and every linter. Pick one shape per level, declare the layer order if layered, and create folders so the shape is visible from the directory listing alone.
 
 **Pre-scaffold per new folder (v0.2.0 dogfood).** When the design names a new folder under a `MODULE.md`-bearing area, run `pnpm exec safer-spec generate --skeleton-only --dry-run <folder>` and embed the output as a fenced block in the design doc's Modules section. The skeleton previews the `MODULE.md` + `.safer-spec/<slug>.json` sidecar shape the implementer will materialize. `--dry-run` writes nothing; the fenced block in the design doc is the architect-level commitment to that surface.
 
@@ -377,7 +377,7 @@ rm -f "$TMP"
 
 **plan-eng-review (architecture-quality gate, runs first).** Before transitioning to `review`, run gstack's `/plan-eng-review` on the design doc. The structured audit surfaces missing edge cases, weak data flow, and untyped error channels; running it first means codex is challenging an already-audited plan, not raw output.
 
-The threshold rule: if the design doc names the implementation tier as `implement-junior` (single-module internals only, no new public surface, no new dep), `/plan-eng-review` is OPTIONAL — log the skip-decision on the sub-issue and proceed. For `implement-senior` and `implement-staff` tiers, `/plan-eng-review` is MANDATORY.
+The threshold rule: if the design doc names the implementation tier as `implement-junior` (single-module internals only, no new public surface, no new dep), `/plan-eng-review` is OPTIONAL. Log the skip-decision on the sub-issue and proceed. For `implement-senior` and `implement-staff` tiers, `/plan-eng-review` is MANDATORY.
 
 `/plan-eng-review` is interactive by default. Within `/safer:architect` it runs **hold-scope autonomous**: the architect invokes it programmatically; user-facing prompts are forbidden inside the gstack body and route up to `/safer:orchestrate`. The architect treats the review's recommended defaults as the autonomous answer.
 
@@ -401,7 +401,7 @@ Apply findings against the parent epic's `## Autonomy contract` autonomy budget:
 - `changes-requested` → apply per the same in-budget vs cross-budget rule above. In-budget: revise (one round), re-publish, re-run codex. Cross-budget: escalate via `safer-escalate --to requirements --cause PLAN_EXPANSION_FROM_CODEX`.
 - `reject` → escalate to user; do NOT transition.
 
-The motivation: `/plan-eng-review` is a structured architecture-quality audit (catches missing edge cases by going through a checklist); `/codex` is a cross-model independent challenge (catches blind spots in the audit's own framing). Plan-eng-review first means codex sees the audited plan, not the raw one — codex spends its budget on what plan-eng-review missed, not on what plan-eng-review would have caught.
+The motivation: `/plan-eng-review` is a structured architecture-quality audit (catches missing edge cases by going through a checklist); `/codex` is a cross-model independent challenge (catches blind spots in the audit's own framing). Plan-eng-review first means codex sees the audited plan, not the raw one. Codex spends its budget on what plan-eng-review missed, not on what plan-eng-review would have caught.
 
 ```bash
 safer-transition-label --issue "$ARCH_SUB_ISSUE" --from planning --to review
@@ -431,11 +431,11 @@ Report `DONE` or `DONE_WITH_CONCERNS` with the design doc URL and the draft PR U
 
 Your final message to the caller carries exactly one status marker on the last line. No other output format is valid.
 
-- `DONE` — design doc published, stubs PR opened, every section filled, every open question has a recommended default, traceability table is complete.
-- `DONE_WITH_CONCERNS` — as above, but 1-3 open questions remain. Name each concern; state which downstream modality must resolve it.
-- `ESCALATED` — stop rule fired; handed back upstream via `safer-escalate`.
-- `BLOCKED` — external dependency unresolved (e.g., library license unclear and repo owners have not responded).
-- `NEEDS_CONTEXT` — user-resolvable ambiguity; state the question.
+- `DONE`. Design doc published, stubs PR opened, every section filled, every open question has a recommended default, traceability table is complete.
+- `DONE_WITH_CONCERNS`. As above, but 1-3 open questions remain. Name each concern; state which downstream modality must resolve it.
+- `ESCALATED`. Stop rule fired; handed back upstream via `safer-escalate`.
+- `BLOCKED`. External dependency unresolved (e.g., library license unclear and repo owners have not responded).
+- `NEEDS_CONTEXT`. User-resolvable ambiguity; state the question.
 
 ## Escalation artifact template
 
@@ -465,7 +465,7 @@ The tool populates the body from structured flags. If you need to add narrative,
 - <exact modality and question to answer>
 
 ## Confidence
-<LOW|MED|HIGH> — <evidence>
+<LOW|MED|HIGH>. <evidence>
 ```
 
 Post as a comment on the architect sub-issue; cross-link on the parent epic.
@@ -477,7 +477,7 @@ Post as a comment on the architect sub-issue; cross-link on the parent epic.
 | Design doc | Comment on parent epic, or body of `safer:architect` sub-issue | sub-issue: `planning` → `review` |
 | Interface stubs | Draft PR on branch `arch/<slug>`, title prefixed `[arch]` | PR stays draft |
 | Open questions | In the design doc under "Open questions" | resolved downstream |
-| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | — |
+| Telemetry | `safer.skill_run` at preamble, `safer.skill_end` at close | n/a |
 
 Nothing architect produces lives outside GitHub. No local-only design files. No `.safer/design.md`.
 

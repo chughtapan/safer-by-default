@@ -19,7 +19,7 @@ Build the section in a temp file (avoids shell-quoting hazards in `awk`). Trap c
 SECTION_FILE=$(mktemp)
 trap 'rm -f "$SECTION_FILE"' EXIT INT TERM
 cat > "$SECTION_FILE" <<EOF
-## Project structural choices (managed by /safer:setup — do not edit manually; rerun the skill to change)
+## Project structural choices (managed by /safer:setup, do not edit manually; rerun the skill to change)
 
 - Schema library: ${SCHEMA_LIB}
 - Database access: ${DB_TOOL}

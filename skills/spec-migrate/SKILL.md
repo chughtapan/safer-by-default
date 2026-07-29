@@ -33,7 +33,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -55,18 +55,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -100,7 +100,7 @@ This skill runs the `safer-spec-migrate` flow from `@chughtapan/safer-spec-devel
 
 The authoritative instructions are the codemod's, not this file's. Read `node_modules/@chughtapan/safer-spec-development/skills/safer-spec-migrate/SKILL.md` and follow it. That file ships with the package, so it is versioned with the `safer-spec` binary the project actually has installed and cannot drift from it.
 
-If that file is absent the living-spec layer is not installed: stop with `BLOCKED`, and name the fix (`/safer:setup`, or `<pm> add -D @chughtapan/safer-spec-development@~0.3.0`). Do not reconstruct the flow from memory and do not hand-write a `MODULE.md` or sidecar — the sidecar is the codemod's machine-readable record, and authoring it by hand is the paper-over anti-pattern Principle 7 rejects.
+If that file is absent the living-spec layer is not installed: stop with `BLOCKED`, and name the fix (`/safer:setup`, or `<pm> add -D @chughtapan/safer-spec-development@~0.3.0`). Do not reconstruct the flow from memory and do not hand-write a `MODULE.md` or sidecar. The sidecar is the codemod's machine-readable record, and authoring it by hand is the paper-over anti-pattern Principle 7 rejects.
 
 ## Scope
 
@@ -115,10 +115,10 @@ If that file is absent the living-spec layer is not installed: stop with `BLOCKE
 
 ## Completion status
 
-- `DONE` — the codemod's flow completed; `MODULE.md` and the sidecar reflect the folder's current exports; `safer-spec validate` was run and its exit code reported.
-- `DONE_WITH_CONCERNS` — the flow completed but exports remain unspecified. Name each and its route.
-- `BLOCKED` — the codemod is not installed, or its flow exited non-zero for a reason outside this folder.
-- `NEEDS_CONTEXT` — the target folder or the intended `SPEC_FORMAT_VERSION` is ambiguous.
+- `DONE`. The codemod's flow completed; `MODULE.md` and the sidecar reflect the folder's current exports; `safer-spec validate` was run and its exit code reported.
+- `DONE_WITH_CONCERNS`. The flow completed but exports remain unspecified. Name each and its route.
+- `BLOCKED`. The codemod is not installed, or its flow exited non-zero for a reason outside this folder.
+- `NEEDS_CONTEXT`. The target folder or the intended `SPEC_FORMAT_VERSION` is ambiguous.
 
 ## Voice (reminder)
 

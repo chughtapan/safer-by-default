@@ -25,4 +25,4 @@ The diagnose artifact carries a `## CODEX VERDICT` section. Read it; do not summ
 
 If the artifact is missing the `## CODEX VERDICT` section, treat as a stop-rule violation: post a comment on the sub-issue requesting the diagnose teammate to run `/codex --mode diagnose --hold-scope` and re-publish. Do not invent a verdict; codex's stamp is mandatory.
 
-**Three-splits stop rule.** If the parent epic's `## Diagnose splits (count: N)` reaches 3 and no fork has returned `confirmed-root-cause`, fire runtime stop condition #6 (Three diagnose splits without convergence — see Stop rules below). Park the active sub-issues; escalate to spec/architect.
+**Three-splits stop rule.** If the parent epic's `## Diagnose splits (count: N)` reaches 3 and no fork has returned `confirmed-root-cause`, fire runtime stop condition #6 (Three diagnose splits without convergence, see Stop rules below). Park the active sub-issues; escalate to spec/architect.

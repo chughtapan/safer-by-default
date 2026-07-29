@@ -116,7 +116,7 @@ One artifact per invocation. One report per artifact. The report has exactly the
 |---|---|
 | Artifacts per invocation | 1 |
 | Subagent invocations | 1 (re-invoke only on subagent timeout, max 2 total) |
-| Axes scored | 4 numeric axes (clarity, completeness, actionability, trust) plus a friction list (not a fifth axis — it's a list of evidenced findings keyed to one or more axes) |
+| Axes scored | 4 numeric axes (clarity, completeness, actionability, trust) plus a friction list (not a fifth axis, it's a list of evidenced findings keyed to one or more axes) |
 | Score range | 0 to 10 per axis, integer |
 | Verdict options | `SHIP`, `REVISE`, or `REJECT`, exactly one |
 | Report destinations | 1 (the artifact's own thread, or stdout for local files) |
@@ -313,7 +313,7 @@ Agent({
 })
 ```
 
-The `description` stays generic so no project-specific context leaks into the subagent's bootstrap. The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file — the subagent is the only reader of the artifact text. That is the architectural enforcement.
+The `description` stays generic so no project-specific context leaks into the subagent's bootstrap. The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file. The subagent is the only reader of the artifact text. That is the architectural enforcement.
 
 The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file. The subagent is the only reader of the artifact text. That is the architectural enforcement.
 

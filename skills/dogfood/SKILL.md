@@ -39,7 +39,7 @@ You are a new translation layer from intent to code, not a faster junior develop
 
 The cost of the same mistake compounds: roughly 1x this session, 10x next sprint, 100x a year later. "We'll clean it up later" is almost always false, because by later the debt is load-bearing and the next agent cannot tell which parts of the shape were intentional.
 
-## Part 1 — Craft
+## Part 1: Craft
 
 1. **Types beat tests.** Encode the constraint in the type system rather than asserting it in a test. Brand ids, make illegal states unrepresentable. Tests are the residual; when the residual has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement), write the property, not one hand-picked example.
 2. **Validate at every boundary.** Data crossing a boundary is decoded by a schema. Inside, your types are truths; outside, they are wishes. Boundaries: disk, network, env vars, user input, dynamic imports, any other package. A cast is not a decode.
@@ -61,18 +61,18 @@ Add a fourth status and `absurd(s)` becomes a type error at this call site. That
 
 **Back-compat is not a default.** Migrating a caller costs an agent seconds. When a new design is better, ship it and update the callers in the same PR. No deprecated shims, no dual-path flags, no "support both for a transition period." Exception: the user names a consumer to protect.
 
-## Part 2 — Discipline
+## Part 2: Discipline
 
 5. **Discipline over capability.** The question is not "can I do this," it is "is this mine to do." You can type 500 correct-looking lines in two minutes; that capability is the problem, not the solution. When scope is unclear, the user decides.
 6. **The Budget Gate.** Every modality's budget is about the *shape* of change (which boundaries you cross), not the *volume* (how much you type). A junior task can legitimately produce 500 LOC and still not change a module's public surface.
 7. **The Brake.** When a stop rule fires, stop writing code and produce the escalation artifact. Not "note it and keep going," not "finish this function first." A Principle 1-4 violation you catch yourself about to write IS a stop rule firing; the route is `safer-escalate`, not `DONE_WITH_CONCERNS`. The discriminator between the two: could you have prevented this at this tier? If yes, it is a stop rule.
 8. **The Ratchet.** Escalate up, not around. Forward is legal when the upstream artifact is ready. Up is legal. Sideways (a local workaround that patches a structural problem upstream) is forbidden. A sub-task re-triaged three times is mis-scoped; escalate to the user.
 
-## Part 3 — Stamina
+## Part 3: Stamina
 
 One reviewer on a high-blast-radius artifact is one data point, not a consensus. Stamina is N *heterogeneous* passes, where N is set by blast radius times reversibility. Floor N=1, ceiling N=4 (above that requires recorded user approval). Passes must differ in role or model; three runs of the same skill on the same model is N=1. The authoring modality never self-invokes stamina, because that is Principle 5 self-polishing. Full N table: `PRINCIPLES.md` → Part 3.
 
-## Part 4 — Communication
+## Part 4: Communication
 
 **Contracts.** Autonomy is granted, not assumed. The default is NOT autonomous. Ratchet-up always parks for re-authorization, even when the higher modality is technically inside the granted budget.
 
@@ -176,7 +176,7 @@ One artifact per invocation. One report per artifact. The report has exactly the
 |---|---|
 | Artifacts per invocation | 1 |
 | Subagent invocations | 1 (re-invoke only on subagent timeout, max 2 total) |
-| Axes scored | 4 numeric axes (clarity, completeness, actionability, trust) plus a friction list (not a fifth axis — it's a list of evidenced findings keyed to one or more axes) |
+| Axes scored | 4 numeric axes (clarity, completeness, actionability, trust) plus a friction list (not a fifth axis, it's a list of evidenced findings keyed to one or more axes) |
 | Score range | 0 to 10 per axis, integer |
 | Verdict options | `SHIP`, `REVISE`, or `REJECT`, exactly one |
 | Report destinations | 1 (the artifact's own thread, or stdout for local files) |
@@ -373,7 +373,7 @@ Agent({
 })
 ```
 
-The `description` stays generic so no project-specific context leaks into the subagent's bootstrap. The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file — the subagent is the only reader of the artifact text. That is the architectural enforcement.
+The `description` stays generic so no project-specific context leaks into the subagent's bootstrap. The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file. The subagent is the only reader of the artifact text. That is the architectural enforcement.
 
 The skill's own body never reads `$PAYLOAD` beyond piping it to the prompt file. The subagent is the only reader of the artifact text. That is the architectural enforcement.
 

@@ -38,7 +38,7 @@ allowed-tools:
 
 `/safer:review-senior` itself never writes to the diff. In normal mode it dispatches composed gstack skills; some of those (notably `/review`) may write their own comments and some legacy flows write edits. The safer-side posture is read-only review: aggregate verdicts and publish a comment, never a patch. If the instinct to "just fix this one line" appears, it is the stop rule firing. Write the comment; let the author push the fix.
 
-Mode carve-out: when no gstack composed skill is available (full environment miss), the skill runs in **fallback mode** — it reads the diff and emits the review itself, still as a comment, never a patch. This is a deliberate consumer-contract concession: orchestrate and stamina expect a verdict back, not BLOCKED. Fallback mode preserves the comment-not-patch posture and tags the verdict so consumers know the environment is degraded. See "Fallback mode (no gstack available)" below.
+Mode carve-out: when no gstack composed skill is available (full environment miss), the skill runs in **fallback mode.** It reads the diff and emits the review itself, still as a comment, never a patch. This is a deliberate consumer-contract concession: orchestrate and stamina expect a verdict back, not BLOCKED. Fallback mode preserves the comment-not-patch posture and tags the verdict so consumers know the environment is degraded. See "Fallback mode (no gstack available)" below.
 
 ## Role
 
@@ -152,8 +152,8 @@ configuration problem that must be surfaced, not a reason to approve.
 ### Fallback mode (no gstack available)
 
 If NO composed gstack skills are available (full environment miss, not
-partial), do NOT block the review. Other shipped skills — notably
-`skills/orchestrate/SKILL.md` and `skills/stamina/SKILL.md` — treat
+partial), do NOT block the review. Other shipped skills, notably
+`skills/orchestrate/SKILL.md` and `skills/stamina/SKILL.md`, treat
 `/safer:review-senior` as the fallback reviewer; returning only
 `BLOCKED` breaks those consumers.
 
@@ -303,7 +303,7 @@ threaded comments on the artifact URL.
 Partial-miss handling (SOME composed skills missing): emit
 `DONE_WITH_CONCERNS` with the missing skill name; continue dispatch
 to the skills that ARE available (do NOT stop on the first miss).
-Do NOT attempt to "do the work" of a missing skill here — that
+Do NOT attempt to "do the work" of a missing skill here, that
 collapses the separation between dispatcher and reviewer.
 
 Full-miss handling (EVERY composed skill in the row is missing):
@@ -361,17 +361,17 @@ When operating under `/safer:orchestrate`:
 
 Every invocation ends with exactly one status marker on the last line:
 
-- `DONE` — dispatch complete; aggregate verdict published.
+- `DONE`. Dispatch complete; aggregate verdict published.
 - `HOLD` review posted with `## Verdict\nHOLD` body; the aggregate verdict
   is HOLD (a composed skill returned HOLD); label transitioned to
   `verifying`; consumer route is `/safer:verify`. HOLD is a valid
   terminal output for review-senior.
-- `DONE_WITH_CONCERNS` — dispatch complete, with either (a) the
+- `DONE_WITH_CONCERNS`. Dispatch complete, with either (a) the
   aggregate verdict itself being DONE_WITH_CONCERNS, or (b) one or more
   composed gstack skills unavailable.
-- `ESCALATED` — stop rule 3 fired.
-- `BLOCKED` — stop rule 2 or 4 fired.
-- `NEEDS_CONTEXT` — stop rule 1 fired.
+- `ESCALATED`, stop rule 3 fired.
+- `BLOCKED`, stop rule 2 or 4 fired.
+- `NEEDS_CONTEXT`, stop rule 1 fired.
 
 ## Anti-patterns
 

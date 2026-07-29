@@ -13,7 +13,7 @@
 
 ## Autonomy contract
 
-**Mode.** feature-ship — exploratory; a single investigative dispatch, nothing downstream
+**Mode.** feature-ship. Exploratory; a single investigative dispatch, nothing downstream
 
 **Goal.** Understand the source of latency on the dashboard route.
 
@@ -43,8 +43,8 @@ OK'd: `<ts>` by `<user@github>`
 
 After the diagnose artifact lands, orchestrator posts a follow-up question: "Diagnosis done. What autonomy do you want to grant for the fix?" Options typically include:
 
-- `AMEND CONTRACT: extend to vp-engg through-merge` — autonomous fix end-to-end (see [`bug-fix-end-to-end.md`](./bug-fix-end-to-end.md)).
-- `AMEND CONTRACT: extend to architect → stop` — see the design before implementation (see [`architect-and-stop.md`](./architect-and-stop.md)).
-- `STOP CONTRACT: handing off to a human` — close the epic; the diagnose artifact is the deliverable.
+- `AMEND CONTRACT: extend to vp-engg through-merge`. Autonomous fix end-to-end (see [`bug-fix-end-to-end.md`](./bug-fix-end-to-end.md)).
+- `AMEND CONTRACT: extend to architect → stop`. See the design before implementation (see [`architect-and-stop.md`](./architect-and-stop.md)).
+- `STOP CONTRACT: handing off to a human`. Close the epic; the diagnose artifact is the deliverable.
 
 The orchestrator never auto-advances from invitation; the user explicitly grants the next phase.

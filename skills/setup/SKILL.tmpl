@@ -115,7 +115,7 @@ echo "REPO_ROOT: $REPO_ROOT"
 echo "SESSION:   $SESSION"
 ```
 
-If `safer-update-check` or `safer-telemetry-log` is missing, continue. Telemetry is optional. gstack itself is not optional — the preconditions check above fails fast if it is absent.
+If `safer-update-check` or `safer-telemetry-log` is missing, continue. Telemetry is optional. gstack itself is not optional. The preconditions check above fails fast if it is absent.
 
 ## Scope
 
@@ -217,7 +217,7 @@ Do not attempt the migration yourself. That belongs to the user's judgement abou
 
 Lockfile drift between local and CI is a recurring debt pattern: three CI-vs-local `bun.lock` mismatch cycles caused by local `bun` and CI `setup-bun@latest` diverging. The fix is to pin the toolchain version in `package.json` `packageManager` field from commit one. Setup writes that field if `package.json` exists.
 
-Idempotent: skip if `packageManager` is already set (any value — do not overwrite the user's choice).
+Idempotent: skip if `packageManager` is already set (any value, do not overwrite the user's choice).
 
 ```bash
 if [ -f package.json ]; then
@@ -242,7 +242,7 @@ if [ -f package.json ]; then
 fi
 ```
 
-Then probe CI workflow files for unpinned setup actions and warn (advisory only — no auto-edit):
+Then probe CI workflow files for unpinned setup actions and warn (advisory only, no auto-edit):
 
 ```bash
 if [ -d .github/workflows ]; then
@@ -352,7 +352,7 @@ Testing is a craft dimension of the principles, not a separate modality. Princip
 
 Ask four `AskUserQuestion` prompts, in order. Record each answer (A/B/C) and the resulting install command (or "skipped") for the Step 11 receipt.
 
-**Question 1 — fast-check (always recommended).**
+**Question 1: fast-check (always recommended).**
 
 > `fast-check` is the TypeScript property-based tester. It is the default tool when a function has a nameable algebraic property (roundtrip, idempotence, invariant, oracle agreement). Install as a dev dependency?
 > - A) Yes, install now. (Recommended default.)
@@ -360,7 +360,7 @@ Ask four `AskUserQuestion` prompts, in order. Record each answer (A/B/C) and the
 
 If A: `$PM add -D fast-check`. If B: record skipped.
 
-**Question 2 — testcontainers-node (ask when DB/cache/queue present).**
+**Question 2: testcontainers-node (ask when DB/cache/queue present).**
 
 Detect DB/cache/queue clients in `package.json` to pre-answer the prompt:
 
@@ -379,7 +379,7 @@ echo "TC_HINT:$TC_HINT"
 
 If A: install `testcontainers` plus the specific `@testcontainers/<service>` modules that match detected clients (one `$PM add -D` command). If B or C: record skipped.
 
-**Question 3 — Stryker mutation testing (ask when critical modules exist).**
+**Question 3: Stryker mutation testing (ask when critical modules exist).**
 
 > Stryker runs mutation tests; `@stryker-mutator/typescript-checker` filters type-ill-formed mutants via `tsc` (direct synergy with principle 1). Recommended only for critical modules (auth, billing, parsing, crypto). Does this repo have such a module?
 > - A) Yes; install `@stryker-mutator/core` + `@stryker-mutator/typescript-checker` and I will scope it to a glob later.
@@ -388,7 +388,7 @@ If A: install `testcontainers` plus the specific `@testcontainers/<service>` mod
 
 If A: `$PM add -D @stryker-mutator/core @stryker-mutator/typescript-checker`. If B or C: record skipped.
 
-**Question 4 — Playwright (ask when a critical UI flow exists).**
+**Question 4: Playwright (ask when a critical UI flow exists).**
 
 > Playwright runs end-to-end browser tests. Recommended only for critical UI flows (signup, checkout, main workflow). Does this repo own such a flow?
 > - A) Yes; install `@playwright/test`.

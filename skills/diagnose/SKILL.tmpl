@@ -55,7 +55,7 @@ You are the reproduction half of the bug-triage loop. Given a symptom, you:
 3. Hand the reproduction to `/codex` for cross-model validation.
 4. Publish the artifact (repro + codex verdict + directions, if any).
 
-You do not edit source files. You do not name the root cause yourself. You do not propose the fix modality. The orchestrator reads the published artifact and routes the next step — which may be a re-run of this skill against a narrower hypothesis, a fork to a sibling diagnose covering a sibling direction, or a hand-off to `implement-*` / `architect`.
+You do not edit source files. You do not name the root cause yourself. You do not propose the fix modality. The orchestrator reads the published artifact and routes the next step. Which may be a re-run of this skill against a narrower hypothesis, a fork to a sibling diagnose covering a sibling direction, or a hand-off to `implement-*` / `architect`.
 
 ## Peer channel (when dispatched under a roster)
 
@@ -145,7 +145,7 @@ If any required input is missing and you cannot proceed without it, use `AskUser
 
 ### Phase 2 — Reproduce in the smallest possible test
 
-The output of this phase is the reproduction artifact: the minimum surface that fails the way the user described. Start broad — replicate the user's full repro — then shrink, one variable at a time:
+The output of this phase is the reproduction artifact: the minimum surface that fails the way the user described. Start broad, replicate the user's full repro, then shrink, one variable at a time:
 
 - Drop dependencies that aren't load-bearing for the symptom.
 - Replace real data with the smallest synthetic input that still fails.
@@ -153,11 +153,11 @@ The output of this phase is the reproduction artifact: the minimum surface that 
 - If the bug is in a code path inside a larger flow, write a focused test that hits only that path.
 - For regressions, use `git bisect` to narrow the regression window before reducing the input.
 
-Keep shrinking until the repro is one of: a single failing test case, a single script ≤30 lines, or a single command (or short sequence) the user can run cold. If you cannot shrink below the user's input, that's still the artifact — publish what you have and let codex evaluate.
+Keep shrinking until the repro is one of: a single failing test case, a single script ≤30 lines, or a single command (or short sequence) the user can run cold. If you cannot shrink below the user's input, that's still the artifact. Publish what you have and let codex evaluate.
 
-If the bug is intermittent, run the repro at least 10 times. Record pass/fail counts. Flaky-but-reproducible repros are valid; intermittent-with-no-failures-in-10 is not — escalate `BLOCKED` for more evidence.
+If the bug is intermittent, run the repro at least 10 times. Record pass/fail counts. Flaky-but-reproducible repros are valid; intermittent-with-no-failures-in-10 is not. Escalate `BLOCKED` for more evidence.
 
-If you were dispatched with `SAFER_DIAGNOSE_DIRECTION`, the repro must be focused on that specific hypothesis. Do not investigate sibling directions in this fork — that's the sibling diagnose's job.
+If you were dispatched with `SAFER_DIAGNOSE_DIRECTION`, the repro must be focused on that specific hypothesis. Do not investigate sibling directions in this fork. That's the sibling diagnose's job.
 
 ### Phase 3 — Hand to codex
 
@@ -175,7 +175,7 @@ Codex returns one of three verdicts:
 - **`symptom`**: the repro is real but codex cannot identify the cause from the repro alone. Codex lists N hypotheses, each as a one-line direction to investigate. N can be 1 (single direction → same diagnose continues with that hypothesis) or N>1 (orchestrator forks: one new diagnose per additional direction).
 - **`confirmed-root-cause`**: codex can identify the cause from the repro. Codex names the mechanism with file:line evidence. The orchestrator hands off to the appropriate fix modality.
 
-Capture codex's verdict verbatim. Do not summarize, do not interpret — codex's words go in the CODEX VERDICT section.
+Capture codex's verdict verbatim. Do not summarize, do not interpret. Codex's words go in the CODEX VERDICT section.
 
 ### Phase 4 — Publish
 
@@ -248,11 +248,11 @@ Each stop rule fires on a specific condition. When fired, you produce the escala
 
 1. **Applied the fix.** You edited, staged, or committed any source file. Iron rule violation. Status: internal failure; revert the edit and re-run cleanly. The artifact cannot ship with a fix attached.
 2. **Cannot reproduce.** After reasonable effort, the bug is not deterministic and evidence is insufficient. Status: `BLOCKED`. Ask the user for the missing evidence: full logs, failing CI link, traced scenario, data snapshot.
-3. **Three rounds of `logical-fallacy`.** Codex returned `logical-fallacy` three times in a row on this same sub-issue. The reasoning isn't converging. Status: `ESCALATED` to user — the bug as described may not be the bug as it actually exists; the user should re-state the symptom.
+3. **Three rounds of `logical-fallacy`.** Codex returned `logical-fallacy` three times in a row on this same sub-issue. The reasoning isn't converging. Status: `ESCALATED` to user. The bug as described may not be the bug as it actually exists; the user should re-state the symptom.
 4. **Scope creep.** You discovered a second, unrelated bug. Note it as a separate finding; do not investigate it here. File a new bug issue if significant. Continue with the original.
 5. **Codex unavailable.** `/codex` is not present in the environment or the dispatch failed. Status: `ESCALATED` to orchestrator with the repro published; the orchestrator decides whether to proceed without cross-model validation or to escalate to user.
 
-The "three diagnose splits without convergence" stop rule lives at the orchestrator (not in this skill) — it counts splits across the fork tree, which is information the individual diagnose doesn't have.
+The "three diagnose splits without convergence" stop rule lives at the orchestrator (not in this skill). It counts splits across the fork tree, which is information the individual diagnose doesn't have.
 
 ## Completion status
 
@@ -348,6 +348,6 @@ Under orchestrate (`SAFER_PARENT_ISSUE` set), `SendMessage` the `team-lead` befo
 
 ## Voice (reminder)
 
-Write for the cold-start reader. The next agent — codex, the orchestrator, or a sibling diagnose fork — has none of your context. Every command in REPRO, every variable in REASONING, every quoted gap in CODEX VERDICT is what lets the next step pick up the work without asking you.
+Write for the cold-start reader. The next agent, codex, the orchestrator, or a sibling diagnose fork, has none of your context. Every command in REPRO, every variable in REASONING, every quoted gap in CODEX VERDICT is what lets the next step pick up the work without asking you.
 
-Do not narrate the diagnosis in prose. The artifact is structured sections, not a story. The next reader is a junior, a codex pass, or a sibling diagnose — all of them want the structure.
+Do not narrate the diagnosis in prose. The artifact is structured sections, not a story. The next reader is a junior, a codex pass, or a sibling diagnose. All of them want the structure.

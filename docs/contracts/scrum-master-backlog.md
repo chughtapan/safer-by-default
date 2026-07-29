@@ -12,7 +12,7 @@
 
 ## Autonomy contract
 
-**Mode.** burndown — work the existing epic; new sub-issues are out of scope
+**Mode.** burndown. Work the existing epic; new sub-issues are out of scope
 
 **Goal.** Drive each open sub-issue on epic <https://github.com/OWNER/REPO/issues/198> to its planned exit state per the decomposition table.
 
@@ -45,6 +45,6 @@ OK'd: `<ts>` by `<user@github>`
 
 ## What this contract is for
 
-Scrum-master is the tightest of the common shapes. The decomposition table is the contract; the orchestrator's job is to execute it faithfully. Anything that would expand the backlog parks for explicit user authorization — the user retains exclusive say over what counts as "in this epic."
+Scrum-master is the tightest of the common shapes. The decomposition table is the contract; the orchestrator's job is to execute it faithfully. Anything that would expand the backlog parks for explicit user authorization. The user retains exclusive say over what counts as "in this epic."
 
 Compare with [`bug-fix-end-to-end.md`](./bug-fix-end-to-end.md), where the budget is shape-defined ("any modality in this chain"); here the budget is enumeration-defined ("these 8 specific sub-issues, period").
