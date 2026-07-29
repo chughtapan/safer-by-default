@@ -4,13 +4,17 @@
 #
 # safer-gen-skills --check compares each SKILL.tmpl against its rendered
 # SKILL.md. That catches an un-rendered edit. It does not read prose, so it
-# passes happily while AGENTS.md points at a PRINCIPLES.md heading that was
-# never written, or scenarios/README.md links a spec file that was deleted.
-# Both of those shipped and survived until a human went looking.
+# passes happily while AGENTS.md points at a PRINCIPLES.md heading nobody
+# wrote, or scenarios/README.md links a spec file that was deleted. Both
+# shipped and survived until a human went looking.
 #
-# Two checks, both cheap and both local:
-#   1. Relative markdown links in the docs resolve to a real path.
-#   2. `PRINCIPLES.md` -> "Heading" citations name a heading that exists.
+# This checker has itself reported green on the defect it was written for
+# twice, so every check below carries a control that plants the REAL defect
+# shape rather than a synthetic one:
+#   - v1 matched only the bare-filename citation form, so it never saw the
+#     markdown-link form that AGENTS.md actually uses.
+#   - v2 compared with `grep -qF`, a substring match, so renaming a heading
+#     to "<original> RENAMED" still matched and the run stayed green.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
@@ -18,133 +22,208 @@ source "$HERE/../test-helpers.sh"
 
 ROOT="$(cd "$HERE/../.." && pwd)"
 
-# Docs a cold-start reader actually opens.
+# Every hand-authored doc that can carry a citation.
 #
-# Two exclusions, both principled rather than convenient:
+# Generated `SKILL.md` files are excluded because they are renders of
+# `SKILL.tmpl`, which IS in this set, so a bad citation is caught at its
+# source. That claim is only true because the templates are listed below; an
+# earlier version of this comment asserted the coverage while the templates
+# were out of scope, which is exactly the kind of unchecked claim this file
+# exists to catch.
 #
-#   - Skill bodies. They are generated, and their citations are covered by the
-#     templates they render from.
-#   - CHANGELOG.md. A changelog describes the past, including headings that were
-#     renamed away and files that were deleted on purpose. "Removed the LSP
-#     layer" and "cited a heading that did not exist" are correct entries whose
-#     targets must NOT resolve. Requiring them to resolve would make an accurate
-#     changelog unwritable, and would also flag any entry that quotes the
-#     citation pattern while explaining it.
+# `CHANGELOG.md` is included. An earlier version excluded it on the theory
+# that a changelog legitimately names deleted files and renamed headings.
+# That theory is currently hypothetical: reimplementing both predicates
+# against the file finds zero broken links and exactly one unresolved
+# citation, and that one is a meta-example describing this checker rather
+# than a historical record. Excluding a whole file to dodge one sentence is
+# the wrong trade; the sentence is reworded instead. Revisit only when a real
+# historical entry fails.
 doc_set() {
-  find "$ROOT" -maxdepth 1 -name '*.md' -type f ! -name 'CHANGELOG.md'
+  find "$ROOT" -maxdepth 1 -name '*.md' -type f
   find "$ROOT/scenarios" "$ROOT/docs" -name '*.md' -type f 2>/dev/null
-}
-
-# ---------------------------------------------------------------------------
-# 1. Relative markdown links resolve.
-
-test_relative_links_resolve() {
-  local broken=""
-  local doc target resolved
-  while IFS= read -r doc; do
-    [ -f "$doc" ] || continue
-    # ](path) where path is relative, not a URL, not an anchor-only ref.
-    while IFS= read -r target; do
-      [ -n "$target" ] || continue
-      case "$target" in
-        http://*|https://*|mailto:*|'#'*) continue ;;
-      esac
-      # Strip any #anchor suffix; the path is what must exist.
-      resolved="$(dirname "$doc")/${target%%#*}"
-      [ -e "$resolved" ] || broken="$broken\n  $doc -> $target"
-    done < <(grep -oE '\]\([^)]+\)' "$doc" | sed 's/^](//; s/)$//')
-  done < <(doc_set)
-
-  if [ -n "$broken" ]; then
-    printf 'broken relative links:%b\n' "$broken" >&2
-    return 1
-  fi
-  return 0
-}
-
-# ---------------------------------------------------------------------------
-# 2. `PRINCIPLES.md` -> "Heading" citations name a real heading.
-#
-# This is the exact shape of the AGENTS.md:69 defect: a citation written as
-# prose rather than as a link, so no link checker would ever see it.
-
-# Extract every heading name cited from a doc. A citation is any line that
-# mentions PRINCIPLES.md, then an arrow, then a quoted name. The mention is
-# usually a markdown link (`[`PRINCIPLES.md`](./PRINCIPLES.md) -> "X"`), so
-# anchoring the arrow directly to the filename misses the common form. It did:
-# the first version of this check reported green on the exact AGENTS.md defect
-# that motivated writing it.
-cited_headings() {
-  grep -E 'PRINCIPLES\.md.*(->|→)[[:space:]]*"' "$1" 2>/dev/null \
-    | sed 's/.*\(->\|→\)[[:space:]]*"\([^"]*\)".*/\2/'
+  find "$ROOT/skills" -name 'SKILL.tmpl' -type f 2>/dev/null
+  find "$ROOT/skills" \( -path '*/references/*.md' -o -path '*/prompts/*.md' \) -type f 2>/dev/null
+  find "$ROOT/skills/_shared" -name '*.md' -type f 2>/dev/null
 }
 
 principles_headings() {
   grep -E '^#{1,6} ' "$ROOT/PRINCIPLES.md" | sed 's/^#\{1,6\} //'
 }
 
-test_principles_heading_citations_resolve() {
-  [ -f "$ROOT/PRINCIPLES.md" ] || { echo "PRINCIPLES.md missing" >&2; return 1; }
+# ---------------------------------------------------------------------------
+# 1. Relative markdown links resolve.
 
-  local headings
+# Strip fenced code blocks. Skill templates embed bash and jq, and a jq
+# interpolation like "[#\(.number)](\(.url))" is a perfect false positive for
+# the markdown-link pattern. Prose is what carries citations; code is not.
+prose_only() {
+  awk '/^[[:space:]]*```/ { infence = !infence; next } !infence' "$1"
+}
+
+test_relative_links_resolve() {
+  local broken="" doc target resolved
+  while IFS= read -r doc; do
+    [ -f "$doc" ] || continue
+    while IFS= read -r target; do
+      [ -n "$target" ] || continue
+      case "$target" in
+        http://*|https://*|mailto:*|'#'*|'$'*|*'\('*) continue ;;
+      esac
+      resolved="$(dirname "$doc")/${target%%#*}"
+      [ -e "$resolved" ] || broken="$broken\n  $doc -> $target"
+    done < <(prose_only "$doc" | grep -oE '\]\([^)]+\)' | sed 's/^](//; s/)$//')
+  done < <(doc_set)
+
+  [ -z "$broken" ] || { printf 'broken relative links:%b\n' "$broken" >&2; return 1; }
+}
+
+# ---------------------------------------------------------------------------
+# 2. Quoted citations name a real heading.
+#
+# The mention is usually a markdown link, so anchoring the arrow directly to
+# the filename misses the common form. Comparison is `grep -qxF`: exact
+# whole-line. A substring match reports green on any heading whose text was
+# extended rather than replaced, which is how v2 passed a renamed heading.
+
+cited_headings() {
+  grep -E 'PRINCIPLES\.md.*(->|→)[[:space:]]*"' "$1" 2>/dev/null \
+    | sed 's/.*\(->\|→\)[[:space:]]*"\([^"]*\)".*/\2/'
+}
+
+test_quoted_citations_resolve() {
+  local headings missing="" doc cited
   headings="$(principles_headings)"
-
-  local missing=""
-  local doc cited
   while IFS= read -r doc; do
     [ -f "$doc" ] || continue
     while IFS= read -r cited; do
       [ -n "$cited" ] || continue
-      printf '%s\n' "$headings" | grep -qF "$cited" \
+      printf '%s\n' "$headings" | grep -qxF "$cited" \
         || missing="$missing\n  $doc cites \"$cited\""
     done < <(cited_headings "$doc")
   done < <(doc_set)
 
-  if [ -n "$missing" ]; then
+  [ -z "$missing" ] || {
     printf 'citations to nonexistent PRINCIPLES.md headings:%b\n' "$missing" >&2
     return 1
-  fi
-  return 0
+  }
 }
 
 # ---------------------------------------------------------------------------
-# 3. Negative control: the checks fail when they should.
+# 3. Unquoted citations resolve too.
 #
-# A checker that cannot fail is worse than no checker, because it reports
-# green. Plant both defect shapes in a temp copy and assert each is caught.
+# The repo's dominant convention is unquoted and often abbreviated:
+# `PRINCIPLES.md -> Part 3` for the heading "Part 3 - Stamina", and chained
+# forms like `-> Contracts -> Goal modes`. An earlier version of this check
+# demanded the quoted form instead, which would have rewritten eleven call
+# sites to satisfy the checker rather than checking the convention actually in
+# use. Parse it instead.
+#
+# A citation resolves when some heading H is a prefix of the cited text, or the
+# cited text is a prefix of H. That accepts abbreviation ("Part 3" for "Part 3
+# - Stamina") and trailing sentence text ("Goal modes requires"), while still
+# rejecting a name no heading starts with.
 
-test_checks_catch_planted_defects() {
-  local tmp
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' RETURN
+unquoted_cited() {
+  prose_only "$1" 2>/dev/null \
+    | grep -oE 'PRINCIPLES\.md`?\)?[[:space:]]*(->|→)[[:space:]]*[^",.)]*' \
+    | sed 's/.*\(->\|→\)[[:space:]]*//' \
+    | sed 's/[[:space:]]*\(->\|→\)[[:space:]]*/\n/g' \
+    | sed 's/`//g; s/[[:space:]]*$//' \
+    | grep -v '^$'
+}
 
-  printf '# t\n\n[dead](./no-such-file.md)\n' > "$tmp/broken-link.md"
-  grep -oE '\]\([^)]+\)' "$tmp/broken-link.md" | grep -q 'no-such-file' || return 1
-  [ -e "$tmp/no-such-file.md" ] && return 1
+test_unquoted_citations_resolve() {
+  local headings missing="" doc cited
+  headings="$(principles_headings)"
+  while IFS= read -r doc; do
+    [ -f "$doc" ] || continue
+    while IFS= read -r cited; do
+      [ -n "$cited" ] || continue
+      printf '%s\n' "$headings" | grep -qF "$cited" && continue
+      # Cited text may carry trailing sentence words; accept if it starts with
+      # a real heading.
+      local ok=0 h
+      while IFS= read -r h; do
+        case "$cited" in "$h"*) ok=1; break ;; esac
+      done < <(printf '%s\n' "$headings")
+      [ "$ok" = 1 ] || missing="$missing\n  $doc cites \"$cited\""
+    done < <(unquoted_cited "$doc")
+  done < <(doc_set)
 
-  # Use the citation form that actually appears in the tree, a markdown link
-  # followed by the arrow, not the bare-filename form. The bare form is the
-  # one the first version of this check handled, which is why it passed while
-  # the real defect sat in AGENTS.md untouched.
-  printf '# t\n\nSee [`PRINCIPLES.md`](./PRINCIPLES.md) → "No Such Heading Anywhere".\n' \
-    > "$tmp/bad-cite.md"
-  local cited
-  cited="$(cited_headings "$tmp/bad-cite.md")"
-  [ "$cited" = "No Such Heading Anywhere" ] || {
-    echo "citation extractor missed the markdown-link form (got: '$cited')" >&2
+  [ -z "$missing" ] || {
+    printf 'unquoted citations naming no PRINCIPLES.md heading:%b\n' "$missing" >&2
     return 1
   }
-  principles_headings | grep -qF "$cited" && return 1
+}
 
-  # And the plain form still works.
-  printf '# t\n\nSee `PRINCIPLES.md` -> "Also Not A Heading".\n' > "$tmp/bad-cite2.md"
-  [ "$(cited_headings "$tmp/bad-cite2.md")" = "Also Not A Heading" ] || return 1
+# ---------------------------------------------------------------------------
+# 4. Controls. Each plants the real defect shape this checker has shipped.
+
+test_controls_catch_real_defect_shapes() {
+  local tmp; tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
+  local cited
+
+  # (a) The markdown-link form, which v1 missed.
+  printf '# t\n\nSee [`PRINCIPLES.md`](./PRINCIPLES.md) → "No Such Heading Anywhere".\n' \
+    > "$tmp/a.md"
+  cited="$(cited_headings "$tmp/a.md")"
+  [ "$cited" = "No Such Heading Anywhere" ] || {
+    echo "extractor missed the markdown-link form (got '$cited')" >&2; return 1; }
+
+  # (b) Substring vs exact, which v2 got wrong. A heading extended with a
+  # suffix must NOT satisfy a citation to the original.
+  if printf '%s\n' "Composing with gstack RENAMED" | grep -qxF "Composing with gstack"; then
+    echo "exact-match comparison regressed to substring" >&2; return 1
+  fi
+  printf '%s\n' "Composing with gstack RENAMED" | grep -qF "Composing with gstack" || {
+    echo "control no longer exercises the substring case" >&2; return 1; }
+
+  # (c) An unquoted citation naming no heading is extracted.
+  printf '# t\n\nPer PRINCIPLES.md → Durability, do the thing.\n' > "$tmp/c.md"
+  [ "$(unquoted_cited "$tmp/c.md")" = "Durability" ] || {
+    echo "unquoted extractor failed (got '$(unquoted_cited "$tmp/c.md")')" >&2; return 1; }
+
+  # (d) and (e) assert RESOLUTION, not extraction text. The extractor
+  # over-captures when a citation is not followed by punctuation ("Goal modes
+  # here"), and that is fine: the prefix rule resolves it against the real
+  # heading. Asserting the extracted string instead made these controls fail
+  # on inputs the checker handles correctly.
+  resolves() {  # $1 = cited text
+    printf '%s\n' "$(principles_headings)" | grep -qF "$1" && return 0
+    local h
+    while IFS= read -r h; do
+      case "$1" in "$h"*) return 0 ;; esac
+    done < <(principles_headings)
+    return 1
+  }
+
+  # Abbreviated citation, the repo's dominant form.
+  printf '# t\n\nThe table lives in `PRINCIPLES.md` → Part 3.\n' > "$tmp/d.md"
+  resolves "$(unquoted_cited "$tmp/d.md")" || {
+    echo "abbreviated citation did not resolve" >&2; return 1; }
+
+  # Chained citation, with and without trailing punctuation.
+  printf '# t\n\nSee `PRINCIPLES.md` → Contracts → Goal modes here.\n' > "$tmp/e.md"
+  resolves "$(unquoted_cited "$tmp/e.md" | tail -1)" || {
+    echo "chained citation did not resolve" >&2; return 1; }
+
+  # And a name no heading starts with must NOT resolve.
+  resolves "Durability" && {
+    echo "'Durability' resolved; the check would miss the real defect" >&2; return 1; }
+
+  # (f) Code fences are not scanned. A jq interpolation is a perfect false
+  # positive for the markdown-link pattern.
+  printf '# t\n\n```bash\necho "[#1](\\(.url))"\n```\n' > "$tmp/f.md"
+  [ -z "$(prose_only "$tmp/f.md" | grep -oE '\]\([^)]+\)')" ] || {
+    echo "code fence was scanned for links" >&2; return 1; }
 
   return 0
 }
 
-run_test "relative markdown links resolve to real paths"        test_relative_links_resolve
-run_test "PRINCIPLES.md heading citations name real headings"   test_principles_heading_citations_resolve
-run_test "both checks catch a planted defect"                   test_checks_catch_planted_defects
+run_test "relative markdown links resolve to real paths"         test_relative_links_resolve
+run_test "quoted PRINCIPLES.md citations name real headings"      test_quoted_citations_resolve
+run_test "unquoted PRINCIPLES.md citations resolve by prefix"      test_unquoted_citations_resolve
+run_test "controls catch the real defect shapes"                  test_controls_catch_real_defect_shapes
 
 report

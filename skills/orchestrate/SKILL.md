@@ -808,7 +808,7 @@ Three modes mirror gstack `/codex`. Invoke via the gstack `/codex` skill. Do NOT
 
 1. **Review mode (spec, architect upstream stages):** claude drafts; codex reviews the published artifact before `review → plan-approved`. Verdict: `approve` / `changes-requested` / `reject`. `changes-requested` routes back to the drafting modality as one revision round; `reject` escalates to the user with codex's reasoning. Opus stays the primary author. The SDS paper's independent-hypothesis claim motivates independent *evaluation*, not independent *generation*.
 2. **Supervisor mode (research):** per-round. Researcher output lands as a comment; codex reads and stamps `continue` / `hold` / `escalate` before the next round's dispatch. Breaks single-model groupthink on multi-round reasoning.
-3. **Diff review mode (implement-staff mandatory; implement-senior optional):** codex reads the PR diff, independent of `/safer:review-senior`. Verdict posted as a PR comment before the human review fires. Counts as one independent pass toward the stamina N budget (PRINCIPLES.md → Durability).
+3. **Diff review mode (implement-staff mandatory; implement-senior optional):** codex reads the PR diff, independent of `/safer:review-senior`. Verdict posted as a PR comment before the human review fires. Counts as one independent pass toward the stamina N budget (PRINCIPLES.md → "Durable records").
 
 **Budget.** One codex pass per artifact for spec/architect; one per research round for supervisor; one per staff PR for diff review. No over-calling. Over-calling defeats the cost model.
 
