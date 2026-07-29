@@ -17,7 +17,7 @@ It is not. This plugin recalibrates.
 /plugin install safer@safer-by-default
 ```
 
-> **`/safer:setup` works on any TypeScript + vitest repository.** As of v0.4.0 the living-spec codemod (`@chughtapan/safer-spec-development`) is published to npm, so setup installs it from the registry — the earlier dogfood-only halt is gone. On other projects, setup still runs the lint floor and LSP path and skips only the living-spec layer. See [Prerequisites](#prerequisites).
+> **`/safer:setup` works on any TypeScript + vitest repository.** As of v0.4.0 the living-spec codemod (`@chughtapan/safer-spec-development`) is published to npm, so setup installs it from the registry — the earlier dogfood-only halt is gone. On other projects, setup still runs the lint floor and skips only the living-spec layer. See [Prerequisites](#prerequisites).
 
 Skills load as `safer:<name>` (`/safer:requirements`, `/safer:architect`, …). The plugin's `bin/` is auto-prepended to `PATH`.
 
@@ -44,14 +44,9 @@ For dependency requirements, source-resolution detail, working from source, and 
 
 ## Editor diagnostics
 
-The plugin manifest registers one LSP entry that fans out to multiple upstream servers behind a Python proxy. Claude Code's LSP dispatch can't multiplex multiple servers claiming the same file extensions, so safer presents a single server and does the multiplexing internally.
+The ESLint syntax floor ships via CLI. `/safer:setup` writes an `eslint.config.js` that loads `eslint-plugin-agent-code-guard`'s rules; `/safer:verify` runs `eslint` against the project as part of the pre-merge acceptance loop, and any pre-commit or CI integration the project already has fires the same ruleset.
 
-- **TypeScript code intelligence** (`typescript-language-server`) — `documentSymbol`, `goToDefinition`, `findReferences`, `hover`, and other LSP queries available via Claude Code's `LSP` tool against any `.ts`/`.tsx` file.
-- **Architecture diagnostics** — a custom Effect-shaped analyzer (folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, cycles) runs as a diagnostic-only sidecar behind the proxy. File-header directives (`// @agent-code-guard/architecture-exception: <rule>`) provide per-file suppressions. Diagnostics fire in real time as files open and change, with `codeDescription.href` linking each finding to a `PRINCIPLES.md` heading.
-
-**ESLint syntax floor** is delivered via CLI, not LSP. `/safer:setup` writes an `eslint.config.js` that loads `eslint-plugin-agent-code-guard`'s rules; `/safer:verify` runs `eslint` against the project as part of the pre-merge acceptance loop, and any pre-commit / CI integration the project already has continues to fire the same ruleset.
-
-`/safer:setup` (Step 10c) fetches the upstream `lsp-proxy.py` ([techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`) into `~/.cache/safer-by-default/`, installs `typescript-language-server` globally if it is missing, and checks for `python3` and `bun` (printing the install command for those, since they are system-level). The skills and `bin/` helpers work without the LSP path.
+Architecture diagnostics — the folder dependency graph, public surface curation, vendor type leaks, cross-domain sibling imports, and cycle detection — live in a separate repository, [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp). This plugin ships no LSP server; install that one if you want those findings in-editor.
 
 ## Four parts
 
@@ -89,7 +84,7 @@ Read [PRINCIPLES.md](./PRINCIPLES.md) for the full doctrine. Read any skill's `S
 
 ## Prerequisites
 
-`/safer:setup` runs on any repository with a `package.json` or `tsconfig.json` and `gstack` installed. It wires the lint floor (`eslint-plugin-agent-code-guard` + strict `tsconfig` flags) and the LSP path on every run, using whichever package manager it detects (pnpm, npm, yarn, or bun).
+`/safer:setup` runs on any repository with a `package.json` or `tsconfig.json` and `gstack` installed. It wires the lint floor (`eslint-plugin-agent-code-guard` + strict `tsconfig` flags) on every run, using whichever package manager it detects (pnpm, npm, yarn, or bun).
 
 The **living-spec layer** (`@chughtapan/safer-spec-development`, installed from npm) is wired only on **TypeScript + vitest** projects, since it adds a vitest reporter and a per-folder `MODULE.md` gate. On other projects setup skips that one step with a note and the rest still applies. The layer is optional and never aborts setup.
 

@@ -10,7 +10,6 @@
   "license": "MIT",
   "files": [
     "bin",
-    "lsp",
     "skills",
     "vendor"
   ],
@@ -25,14 +24,5 @@
     "kysely",
     "zapbot",
     "living-spec"
-  ],
-  "lspServers": {
-    "safer-merged": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/lsp/proxy/run.sh",
-      "extensionToLanguage": {
-        ".ts": "typescript",
-        ".tsx": "typescriptreact"
-      }
-    }
-  }
+  ]
 }

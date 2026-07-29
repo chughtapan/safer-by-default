@@ -408,7 +408,7 @@ If A: `$PM add -D @playwright/test`. If B or C: record skipped.
 
 The living-spec layer is the per-folder `MODULE.md` + `.safer-spec/<slug>.json` sidecar codemod (`@chughtapan/safer-spec-development`), validated by `safer-spec validate`, whose typed exit codes route HOLD verdicts through `/safer:verify` (PRINCIPLES.md Part 2, "Living-spec is the ratchet's machine-readable surface"). As of v0.4.0 the codemod is published to npm, so this step installs it from the registry and applies to **any** TypeScript + vitest project. The v0.2.0/v0.3.0 dogfood-only pre-flight halt and the `link:`-protocol install against the vendored submodule are gone.
 
-**This step is optional and never aborts setup.** It applies only to TypeScript projects that test with vitest (the layer wires a vitest reporter and a per-folder `MODULE.md` gate). If the project is not TS+vitest, or the install fails, the step records a skip and the lint floor, strict flags, and LSP path from the other steps still stand. Nothing here exits the skill.
+**This step is optional and never aborts setup.** It applies only to TypeScript projects that test with vitest (the layer wires a vitest reporter and a per-folder `MODULE.md` gate). If the project is not TS+vitest, or the install fails, the step records a skip and the lint floor and strict flags from the other steps still stand. Nothing here exits the skill.
 
 **Applicability check (skip, never exit).**
 
@@ -422,7 +422,7 @@ elif [ ! -f vitest.config.ts ] && [ ! -f vitest.config.js ] && [ ! -f vitest.con
 fi
 if [ -n "$SPEC_LAYER_SKIP_REASON" ]; then
   echo "Step 4c: living-spec layer skipped — $SPEC_LAYER_SKIP_REASON."
-  echo "  (The lint floor, strict flags, and LSP path from the other steps still apply.)"
+  echo "  (The lint floor and strict flags from the other steps still apply.)"
   SPEC_LAYER_STATUS="skipped ($SPEC_LAYER_SKIP_REASON)"
 fi
 ```
@@ -772,69 +772,6 @@ The `awk` pattern matches the prefix `## Project structural choices (managed by 
 
 This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
 
-### Step 10c: Provision the LSP-side prerequisites (global)
-
-The architecture LSP and the TypeScript code-intelligence server run behind the upstream `lsp-proxy.py` (see `ARCHITECTURE.md` → LSP integration). This step provisions the global, not-project-local pieces: the three binaries the proxy execs, and the pinned proxy script itself. It is the last step before the receipt because it is independent of the project's lint/strict config.
-
-**Detect the three binaries.** `python3`, `typescript-language-server`, and `bun` must be on `PATH`. `typescript-language-server` is a node CLI — auto-install it globally when missing (a global tool, not a project dep, so it does not touch the repo lockfile). `python3` and `bun` are system-level and OS-specific, so for those print the exact install command and let the user run it.
-
-```bash
-LSP_MISSING=()
-command -v python3 >/dev/null 2>&1 || LSP_MISSING+=("python3 — system package (apt install python3 / brew install python3)")
-command -v bun >/dev/null 2>&1 || LSP_MISSING+=("bun — curl -fsSL https://bun.sh/install | bash")
-
-# typescript-language-server: auto-install globally when missing. Prefer npm -g (the universal
-# node global installer, present wherever node is); fall back to the detected PM's global form.
-if ! command -v typescript-language-server >/dev/null 2>&1; then
-  if   command -v npm >/dev/null 2>&1; then TLS_INSTALL="npm install -g typescript-language-server"
-  elif [ "${PM:-}" = "bun" ];          then TLS_INSTALL="bun add -g typescript-language-server"
-  elif [ "${PM:-}" = "pnpm" ];         then TLS_INSTALL="pnpm add -g typescript-language-server"
-  elif [ "${PM:-}" = "yarn" ];         then TLS_INSTALL="yarn global add typescript-language-server"
-  else                                      TLS_INSTALL=""
-  fi
-  if [ -n "$TLS_INSTALL" ]; then
-    echo "Installing typescript-language-server globally: $TLS_INSTALL"
-    if $TLS_INSTALL; then
-      echo "typescript-language-server: installed"
-    else
-      echo "WARN: '$TLS_INSTALL' failed — install typescript-language-server manually, then re-run /safer:setup"
-      LSP_MISSING+=("typescript-language-server — $TLS_INSTALL (auto-install failed)")
-    fi
-  else
-    LSP_MISSING+=("typescript-language-server — npm install -g typescript-language-server")
-  fi
-fi
-
-if [ ${#LSP_MISSING[@]} -gt 0 ]; then
-  echo "LSP binaries needing manual install — then re-run /safer:setup:"
-  printf '  - %s\n' "${LSP_MISSING[@]}"
-  LSP_BIN_STATUS="needs-manual: $(printf '%s; ' "${LSP_MISSING[@]%% —*}")"
-else
-  LSP_BIN_STATUS="ok"
-fi
-```
-
-**Fetch the pinned proxy.** `lsp-proxy.py` is the upstream [techee/lsp-proxy](https://github.com/techee/lsp-proxy) script pinned at `9b5a2a5`. It is GPL v2, so it lives only in the user's local cache, never the plugin tree (distribution stays MIT). The fetch is **fail-closed** (a partial download never lands — write to a temp file and `mv` only on success) and **idempotent** (re-running re-pins to the same commit):
-
-```bash
-LSP_PROXY="$HOME/.cache/safer-by-default/lsp-proxy.py"
-LSP_PROXY_URL="https://raw.githubusercontent.com/techee/lsp-proxy/9b5a2a5/lsp-proxy.py"
-mkdir -p "$(dirname "$LSP_PROXY")"
-if curl -fsSL "$LSP_PROXY_URL" -o "$LSP_PROXY.tmp"; then
-  mv "$LSP_PROXY.tmp" "$LSP_PROXY"
-  echo "lsp-proxy.py: fetched (techee/lsp-proxy@9b5a2a5) → $LSP_PROXY"
-  LSP_PROXY_STATUS="fetched (9b5a2a5)"
-else
-  rm -f "$LSP_PROXY.tmp"
-  echo "WARN: could not fetch lsp-proxy.py from $LSP_PROXY_URL"
-  echo "  The LSP path is not provisioned. Re-run /safer:setup once network is available."
-  echo "  (Setup's other outcomes stand; skills and bin/ helpers work without the LSP path.)"
-  LSP_PROXY_STATUS="fetch-failed (re-run setup)"
-fi
-```
-
-A fetch failure does not abort setup: the lint floor, strict flags, and managed `CLAUDE.md` from the prior steps are already in place, and `lsp/proxy/run.sh` degrades with a pointer when the proxy is absent. Record `LSP path: ${LSP_PROXY_STATUS}; binaries: ${LSP_BIN_STATUS}` for the Step 11 receipt; a fetch failure or missing binary is a `DONE_WITH_CONCERNS` for the LSP path only.
-
 ### Step 11: Print the completion summary
 
 End with a bordered block naming every decision and outcome. This is the user's receipt:
@@ -860,7 +797,6 @@ End with a bordered block naming every decision and outcome. This is the user's 
   Baseline decision:      A | B | C | D  (per Step 10)
   Baseline file:          .safer-baseline.json | not written
   CLAUDE.md:              created | updated  (managed section written)
-  LSP path:               proxy <fetched (9b5a2a5) | fetch-failed>; binaries <ok | missing: ...>
   Spec layer:             <installed | skipped (reason) | DONE_WITH_CONCERNS (reason)>
   Schema library:         <SCHEMA_LIB>
   Database access:        <DB_TOOL>

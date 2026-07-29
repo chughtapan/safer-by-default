@@ -20,7 +20,7 @@ Skills load as `safer:NAME` in both Claude Code and Codex (e.g. `/safer:requirem
 - `docs/contracts/` — four worked-example contract templates (invitation, bug-fix-end-to-end, scrum-master-backlog, architect-and-stop) plus a README explaining when to reach for each.
 - `scenarios/` — cc-judge calibration suite for evaluating doctrine adherence; see `scenarios/README.md`.
 - `bin/` — 14 standalone helpers (publish, telemetry, escalate, etc.), plus `_safer-zapbot-env.sh`, a shared shell module the helpers source. All are on `PATH` in any session that has the plugin enabled. See `ARCHITECTURE.md` → CLI helpers for the full list.
-- `lsp/` — one LSP entry declared in `.claude-plugin/plugin.json`'s `lspServers`, pointing at `lsp/proxy/run.sh`. The wrapper templates `${CLAUDE_PLUGIN_ROOT}` into a generated config and execs upstream `lsp-proxy.py` (fetched into `~/.cache/safer-by-default/` by `/safer:setup` Step 10c). The proxy fans out to `typescript-language-server` (primary, for code intelligence — `documentSymbol`, `goToDefinition`, `findReferences`, `hover`) and `lsp/architecture/server/index.ts` (sidecar, custom Effect-shaped analyzer that fires architecture diagnostics with `codeDescription.href` links to `PRINCIPLES.md`). ESLint syntax rules live on the CLI surface that `/safer:setup` wires into each project, gated by `/safer:verify`. See `ARCHITECTURE.md` → LSP integration.
+- The architecture analyzer and its LSP server are a separate repository, [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp); this plugin ships no LSP runtime.
 
 ## Skill routing
 

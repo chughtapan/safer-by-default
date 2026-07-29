@@ -44,9 +44,6 @@ safer-by-default/
 ├── vendor/                    ← floor-pinned sister-repo submodules
 │   └── safer-spec-development/ ← per-folder living-spec codemod (v0.2.0)
 ├── bin/                       ← 14 CLI helpers (+ _safer-zapbot-env.sh, sourced shared module); auto-PATH at session start (see "CLI helpers" below)
-├── lsp/                       ← single LSP entry declared in plugin.json (see "LSP integration" below)
-│   ├── proxy/                 ← run.sh wrapper; execs upstream lsp-proxy.py with a templated config
-│   └── architecture/          ← custom architecture analyzer + LSP server, runs via bun behind the proxy
 ├── docs/                      ← contracts/ (templates) + design/ (living-spec) + workflow-composition.md
 ├── scenarios/                 ← cc-judge calibration suite
 ├── tests/                     ← test-bin/, test-integration/
@@ -96,22 +93,11 @@ Each helper is a standalone bash script. The plugin marketplace install auto-pre
 
 Conventions: helpers exit non-zero on missing required args; skills wrap calls with `2>/dev/null || true` only when the helper is optional plumbing (telemetry, update-check), never when it's load-bearing. `safer-publish` routes through zapbot's bot-token broker when zapbot is detected on the host; absent zapbot, falls back to the user's `gh auth`.
 
-## LSP integration
+## Static analysis
 
-The plugin manifest (`.claude-plugin/plugin.json`) declares one `lspServers` entry: `lsp/proxy/run.sh`. The wrapper templates `${CLAUDE_PLUGIN_ROOT}` into a generated config and execs `python3 ~/.cache/safer-by-default/lsp-proxy.py` (the upstream [techee/lsp-proxy](https://github.com/techee/lsp-proxy) at `9b5a2a5`, fetched into the cache by `/safer:setup` Step 10c). The proxy spawns two children and multiplexes them onto Claude Code's single LSP connection:
+The ESLint syntax floor is `eslint-plugin-agent-code-guard`, delivered via the CLI surface that `/safer:setup` wires into each project (`eslint.config.js` with the plugin loaded). `/safer:verify`'s Phase 3 picks up the project's eslint config and runs `eslint .` as a ring-1 gate; any pre-commit or CI integration the project already has fires the same ruleset.
 
-| Child | Role | Runtime |
-|---|---|---|
-| `typescript-language-server` | Primary. Handles `documentSymbol`, `goToDefinition`, `findReferences`, `hover`, and the other code-intelligence operations Claude Code's `LSP` tool exposes. Also emits TS semantic diagnostics. | `typescript-language-server --stdio` (on `PATH`; `/safer:setup` Step 10c installs it globally if missing) |
-| Architecture LSP | Diagnostic-only sidecar. Custom Effect-shaped server backed by the architecture analyzer (folder graph, public surface, vendor type leaks, cycle detection). Reads file-header `// @agent-code-guard/architecture-exception: <rule>` directives for per-file suppressions. Diagnostics populate `codeDescription.href` linking to a `PRINCIPLES.md` heading. | `bun lsp/architecture/server/index.ts` (runs TypeScript source directly) |
-
-Why a proxy: Claude Code's LSP dispatcher errors out (`"internal error"` on every operation) when multiple servers claim the same file extensions. The proxy presents one server to Claude Code while internally fanning notifications to all children and merging their `publishDiagnostics` output upward.
-
-The ESLint syntax floor — `eslint-plugin-agent-code-guard` rules — is delivered via the CLI surface that `/safer:setup` wires into each project (`eslint.config.js` with the plugin loaded). `/safer:verify`'s Phase 3 picks up the project's eslint config and runs `eslint .` as a ring-1 gate; any pre-commit / CI integration the project already has continues to fire the same ruleset. ESLint is not part of the LSP path.
-
-The architecture analyzer also exports a thin shim at `lsp/architecture/check.ts` that CI can invoke (`node lsp/architecture/check.js` post-build, or `bun lsp/architecture/check.ts` from source) to exit non-zero on error-severity findings without needing the LSP protocol.
-
-LSP-path prerequisites (global, not project-local), provisioned by `/safer:setup` Step 10c: it fetches the pinned `lsp-proxy.py` into `~/.cache/safer-by-default/`, installs `typescript-language-server` globally if missing, and checks for `python3` and `bun` (printing install commands for those — user-installed).
+The architecture analyzer and its LSP server live in their own repository, [chughtapan/safer-architecture-lsp](https://github.com/chughtapan/safer-architecture-lsp). This plugin declares no `lspServers` entry and ships no LSP runtime; install and configure the analyzer from that repo if you want architecture diagnostics in-editor. Its diagnostics still link back to `PRINCIPLES.md` headings, which is why those headings are treated as a stable public surface.
 
 ## Install paths
 
