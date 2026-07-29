@@ -23,14 +23,16 @@ allowed-tools:
   - Bash
   - Read
   - Write
+  - Edit
   - AskUserQuestion
+  - SendMessage
 ---
 
 # /safer:implement-senior
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 
@@ -89,40 +91,9 @@ You do not invent new modules, add new public surface that the plan does not nam
 
 You are explicitly allowed to: consolidate private helpers that the plan scattered, rename internal-only identifiers for clarity, move a test closer to the code it tests, tighten an internal type the plan left loose. These are the powers of senior-tier discipline. They are not an invitation to smuggle architect work through.
 
-## MoltZap peer-channel preamble (when dispatched under a roster)
+## Peer channel (when dispatched under a roster)
 
-When invoked inside a MoltZap-capable AO session (`AO_SESSION`,
-`MOLTZAP_LOCAL_SENDER_ID`, and `AO_CALLER_TYPE` are set), you MAY emit
-peer-channel events to other roster members via `safer-peer-message`
-(SPEC r4.1 §5(d)). This is the ONLY transport
-primitive this skill may use for peer coordination. Do NOT import
-`@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
-`src/moltzap/*`; the grep-purity test
-`tests/test-bin/test-safer-peer-message-skill-purity.sh` enforces it.
-
-Typical invocation for this modality — publish the artifact URL back to
-the orchestrator after the artifact lands on GitHub:
-
-```bash
-PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
-  --to-role orchestrator \
-  --kind artifact-published \
-  --artifact-url "$ARTIFACT_URL" \
-  --correlation-id "$SESSION-1" \
-  --body-stdin) || case $? in
-    10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
-    21) safer-escalate --from implement-senior --to orchestrate --cause recipient-retired ;;
-    20|22) safer-escalate --from implement-senior --to orchestrate --cause peer-transport-invalid ;;
-    30|*) safer-escalate --from implement-senior --to orchestrate --cause peer-transport-failed ;;
-  esac
-```
-
-Peer messages reference durable artifacts via `--artifact-url`; they do
-NOT carry the artifact body (Invariant 8). Every design doc, spec, PR,
-and review verdict is published as a GitHub comment or PR body first;
-the peer message is the pointer. When the session is NOT MoltZap-capable
-(no env), skip peer emission and let the orchestrator reconcile from
-GitHub.
+Dispatched inside a MoltZap-capable AO session (`AO_SESSION`, `MOLTZAP_LOCAL_SENDER_ID`, `AO_CALLER_TYPE` all set)? Read `skills/_shared/peer-channel.md` at the plugin root before emitting peer events. Outside such a session there is nothing to do here.
 
 ## Inputs required
 
@@ -454,26 +425,14 @@ Post on the sub-issue; leave the branch in place; revert any speculative cross-m
 - [ ] Draft PR opened with title prefixed `[impl-senior]`.
 - [ ] Sub-issue label transitioned `implementing` → `review`.
 - [ ] `safer.skill_end` event emitted.
-- [ ] Status marker on the last line of your response.
 
-## Communication discipline
+## Handoff
 
-Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+Under orchestrate (`SAFER_PARENT_ISSUE` set), `SendMessage` the `team-lead` before your final reply, so the orchestrator gates on a push instead of polling. The message carries:
 
-```
-SendMessage({
-  to: "team-lead",
-  summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>."
-})
-```
+`STATUS: <marker>. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>.`
 
-The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
-
-Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
-
-If you were invoked outside an orchestrate context (no team), skip this step.
-
+`Process issues` is required and `none` is a valid value. Anything that made the run harder than the doctrine implies belongs there. Invoked standalone with no team, skip this.
 
 ## Voice (reminder)
 

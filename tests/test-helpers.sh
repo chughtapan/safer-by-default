@@ -68,6 +68,37 @@ assert_nonzero() {
   return 1
 }
 
+# A skill's full context surface: the generated SKILL.md plus every file the
+# skill reads on demand (references/, prompts/, and the shared _shared/ pool).
+# Rare-branch material moves between these, so any test that pins a rule must
+# look at all of them or it silently stops enforcing when the rule relocates.
+# Stated once here rather than re-derived per test.
+skill_surface() {
+  local name="$1"
+  local root="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/skills}"
+  local skill_md="$root/$name/SKILL.md"
+  [ -f "$skill_md" ] || return 0
+  printf '%s\n' "$skill_md"
+  # An on-demand file is part of the surface only when SKILL.md actually points
+  # at it. Globbing the directories instead would let a rule living in an
+  # orphaned file satisfy a test even though the running skill never reads it —
+  # the exact gap these tests exist to close.
+  local f
+  for f in "$root/$name"/references/*.md "$root/$name"/prompts/*.md "$root"/_shared/*.md; do
+    [ -f "$f" ] || continue
+    grep -qF "$(basename "$f")" "$skill_md" 2>/dev/null && printf '%s\n' "$f"
+  done
+}
+
+# grep across a skill's whole surface. Same argument shape as grep, minus files.
+skill_grep() {
+  local name="$1"; shift
+  local files=()
+  while IFS= read -r f; do files+=("$f"); done < <(skill_surface "$name")
+  [ ${#files[@]} -eq 0 ] && return 2
+  grep "$@" "${files[@]}"
+}
+
 run_test() {
   local name="$1"
   local fn="$2"

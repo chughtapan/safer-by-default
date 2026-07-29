@@ -2,16 +2,16 @@
 # test-orchestrate-auto-dispatch.sh — unit tests for the parsing logic
 # Phase 5d Step 6 (auto-dispatch work-queue scan) depends on.
 #
-# Step 6 lives inline in skills/orchestrate/SKILL.md as executable snippets
-# (no dedicated binary). Rather than mocking `gh` and `tmux` for an
+# Step 6 lives in skills/orchestrate/references/auto-monitor.md as executable
+# snippets (no dedicated binary). Rather than mocking `gh` and `tmux` for an
 # integration-shaped test, this suite exercises the three parse rules that
-# the inline snippets rely on:
+# those snippets rely on:
 #
 #   1. The label regex that selects dispatchable sub-issues.
 #   2. The idempotency marker comment format + extraction.
 #   3. The priority-tier sort defined in Step 6c.
 #
-# If any of these rules drift out of sync with SKILL.md, the loop either
+# If any of these rules drift out of sync with the skill, the loop either
 # re-dispatches already-in-flight work (breaks idempotency) or dispatches
 # the wrong modality (breaks the Ratchet). These tests pin the rules.
 set -uo pipefail
@@ -20,6 +20,25 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/../test-helpers.sh"
 
 SKILL_MD="$(cd "$HERE/../.." && pwd)/skills/orchestrate/SKILL.md"
+
+# Rare-branch procedure (the auto-monitor loop, the dispatch templates, the
+# backtrack table) lives in sibling files the skill reads on demand. Pin the
+# rules against orchestrate's whole context surface — read once, not per call —
+# so a rule that moves between the spine and a reference stays covered.
+ORCH_SURFACE=""
+while IFS= read -r _f; do ORCH_SURFACE+=$(cat "$_f")$'\n'; done < <(skill_surface orchestrate)
+
+orch_grep() {
+  local mode="$1" pat="$2"
+  case "$mode" in
+    # substring anywhere in the surface
+    -qF) [[ "$ORCH_SURFACE" == *"$pat"* ]] ;;
+    # whole-line match; bash's =~ anchors to the string, not the line, so
+    # line-exactness is expressed by fencing the pattern in newlines
+    -qL) [[ $'\n'"$ORCH_SURFACE"$'\n' == *$'\n'"$pat"$'\n'* ]] ;;
+    *)   echo "orch_grep: unsupported mode $mode" >&2; return 2 ;;
+  esac
+}
 
 # The label regex from SKILL.md Step 6a.
 MODALITY_REGEX='^safer:(implement-(junior|senior|staff)|verify|spike|research|requirements)$'
@@ -74,7 +93,7 @@ test_skill_md_step6a_jq_uses_same_regex() {
   # The regex string in SKILL.md Step 6a must match the MODALITY_REGEX constant
   # above verbatim. If it drifts, the loop filters a different label set than
   # this test pins.
-  grep -qF "$MODALITY_REGEX" "$SKILL_MD"
+  orch_grep -qF "$MODALITY_REGEX"
 }
 
 test_idempotency_marker_matches_canonical_format() {
@@ -228,17 +247,17 @@ test_per_tick_cap_limits_dispatch() {
 
 test_skill_md_pins_per_tick_cap_to_three() {
   # If the documented cap changes, the loop test above is lying. Pin it.
-  grep -qF "per_tick_cap=3" "$SKILL_MD"
+  orch_grep -qF "per_tick_cap=3"
 }
 
 test_skill_md_pins_pane_ceiling_to_twenty() {
-  grep -qF "pane_ceiling=20" "$SKILL_MD"
+  orch_grep -qF "pane_ceiling=20"
 }
 
 test_skill_md_has_all_seven_templates() {
   # One section per dispatchable modality.
   for modality in implement-junior implement-senior implement-staff verify spike research requirements; do
-    grep -qE "^#### ${modality}$" "$SKILL_MD" || { echo "missing template: $modality"; return 1; }
+    orch_grep -qL "## ${modality}" || { echo "missing template: $modality"; return 1; }
   done
   return 0
 }
@@ -256,29 +275,29 @@ test_epic_body_template_includes_linear_project_line() {
 
 # sbd#129: Step 5c.0 read-reviewer-body gate must be present.
 test_skill_md_has_step_5c0_read_reviewer_body() {
-  grep -qF "Step 5c.0 — Read reviewer body before merging" "$SKILL_MD"
+  orch_grep -qF "Step 5c.0 — Read reviewer body before merging"
 }
 
 test_skill_md_step5c0_has_gh_pr_view_command() {
-  grep -qF 'gh pr view <N> --repo <R> --json reviews --jq' "$SKILL_MD"
+  orch_grep -qF 'gh pr view <N> --repo <R> --json reviews --jq'
 }
 
 # sbd#130: Phase 5e pane stall check must be present.
 test_skill_md_has_pane_stall_check() {
-  grep -qF "Waiting for team lead approval" "$SKILL_MD"
+  orch_grep -qF "Waiting for team lead approval"
 }
 
 test_skill_md_has_phase_5e_protocol() {
-  grep -qF "Phase 5e — permission_request response protocol" "$SKILL_MD"
+  orch_grep -qF "Phase 5e — permission_request response protocol"
 }
 
 # sbd#129+130: forbidden list entries must be present.
 test_skill_md_forbidden_read_reviewer_body() {
-  grep -qF "without reading the reviewer body on GitHub via the Step 5c.0 procedure" "$SKILL_MD"
+  orch_grep -qF "without reading the reviewer body on GitHub via the Step 5c.0 procedure"
 }
 
 test_skill_md_forbidden_permission_request_stall() {
-  grep -qF "Letting a teammate \`permission_request\` sit unanswered past one sweep tick" "$SKILL_MD"
+  orch_grep -qF "Letting a teammate \`permission_request\` sit unanswered past one sweep tick"
 }
 
 # ---------------------------------------------------------------------------

@@ -20,13 +20,14 @@ allowed-tools:
   - Read
   - Grep
   - Glob
+  - SendMessage
 ---
 
 # /safer:review-senior
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 
@@ -394,24 +395,14 @@ Every invocation ends with exactly one status marker on the last line:
       issue comment).
 - [ ] Label transitioned (when orchestrated).
 - [ ] `safer.skill_end` event emitted.
-- [ ] Status marker on the last line.
 
-## Communication discipline
+## Handoff
 
-Before you post a status marker or close your turn, **SendMessage to
-`team-lead` immediately** with a one-line summary and the artifact URL:
+Under orchestrate (`SAFER_PARENT_ISSUE` set), `SendMessage` the `team-lead` before your final reply, so the orchestrator gates on a push instead of polling. The message carries:
 
-```
-SendMessage({
-  to: "team-lead",
-  summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Aggregate verdict: <X>. Process issues: <none | one-line list>."
-})
-```
+`STATUS: <marker>. Artifact: <URL>. Aggregate verdict: <APPROVE|REQUEST-CHANGES|HOLD>. Process issues: <none | one-line list>.`
 
-The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
-
-If invoked outside an orchestrate context (no team), skip this step.
+`Process issues` is required and `none` is a valid value. Anything that made the run harder than the doctrine implies belongs there. Invoked standalone with no team, skip this.
 
 ## Voice (reminder)
 

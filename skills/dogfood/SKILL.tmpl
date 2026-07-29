@@ -23,15 +23,17 @@ triggers:
 allowed-tools:
   - Bash
   - Read
-  - Agent
+  - Write
   - AskUserQuestion
+  - Agent
+  - SendMessage
 ---
 
 # /safer:dogfood
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 
@@ -475,28 +477,16 @@ Nothing dogfood produces lives outside GitHub unless the input is a local file a
 - [ ] Confidence is `LOW`, `MED`, or `HIGH`.
 - [ ] Report published to the correct destination per the publication map.
 - [ ] `safer.skill_end` event emitted.
-- [ ] Status marker on the last line of the reply.
 
 If any box is unchecked, the status is not final; reopen the phase.
 
-## Communication discipline
+## Handoff
 
-Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+Under orchestrate (`SAFER_PARENT_ISSUE` set), `SendMessage` the `team-lead` before your final reply, so the orchestrator gates on a push instead of polling. The message carries:
 
-```
-SendMessage({
-  to: "team-lead",
-  summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>."
-})
-```
+`STATUS: <marker>. Artifact: <URL>. Verdict: <SHIP|REVISE|REJECT>. Process issues: <none | one-line list>.`
 
-The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
-
-Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
-
-If you were invoked outside an orchestrate context (no team), skip this step.
-
+`Process issues` is required and `none` is a valid value. Anything that made the run harder than the doctrine implies belongs there. Invoked standalone with no team, skip this.
 
 ## Voice (reminder)
 

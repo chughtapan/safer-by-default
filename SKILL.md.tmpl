@@ -3,8 +3,8 @@
 
   Copy to skills/<modality>/SKILL.tmpl (NOT SKILL.md — SKILL.md is the
   generated artifact). Anchor placeholders are written as {{LIKE_THIS}};
-  replace each before shipping. The {{> principles}} marker is preserved
-  verbatim — bin/safer-gen-skills replaces it with PRINCIPLES.md content
+  replace each before shipping. The {{> principles-core}} marker is preserved
+  verbatim — bin/safer-gen-skills replaces it with PRINCIPLES.core.md content
   at render time.
 
   After editing, run:
@@ -23,8 +23,18 @@
     by /safer:orchestrate (SAFER_PARENT_ISSUE / SAFER_SUBISSUE set) skip the
     gate; user-initiated runs halt with PRECONDITION_FAIL until upgrade.
   - Every published artifact goes through safer-publish. No "trust me" outputs.
-  - PRINCIPLES.md is inlined verbatim via {{> principles}}; the projection
-    section names which Parts/principles this modality leans on.
+  - PRINCIPLES.core.md is inlined verbatim via {{> principles-core}}; the
+    projection section names which Parts/principles this modality leans on.
+    The full PRINCIPLES.md is NOT inlined — skills reference it by path at
+    the plugin root when a call is close or the artifact is high-blast-radius.
+  - Keep the body to what this modality alone needs. Material that applies
+    only in a rare branch belongs in skills/<name>/references/<topic>.md, which
+    the skill reads on demand; content shared across skills goes in
+    skills/_shared/<topic>.md. Leave a stub in its place shaped as
+    imperative + trigger condition + path, e.g. "Dispatching more than one
+    teammate? Read `skills/orchestrate/references/auto-monitor.md` and install
+    the loop before the first dispatch." A stub written as a bare noun phrase
+    reads as a citation, and the model treats it as optional.
 -->
 ---
 name: {{NAME}}
@@ -50,7 +60,7 @@ allowed-tools:
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 

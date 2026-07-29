@@ -11,44 +11,48 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/../test-helpers.sh"
 
+# Pinned against each skill's whole context surface, not just SKILL.md: these
+# rules stop being enforceable the moment one moves into a references/ file.
 REVIEW_SENIOR_MD="$(cd "$HERE/../.." && pwd)/skills/review-senior/SKILL.md"
 VERIFY_MD="$(cd "$HERE/../.." && pwd)/skills/verify/SKILL.md"
+rs_grep() { skill_grep review-senior "$@"; }
+vf_grep() { skill_grep verify "$@"; }
 
 # ---------------------------------------------------------------------------
 # sbd#131: review-senior Forbidden verdicts section
 
 test_review_senior_has_forbidden_verdicts_section() {
-  grep -qF "## Forbidden verdicts" "$REVIEW_SENIOR_MD"
+  rs_grep -qF "## Forbidden verdicts"
 }
 
 test_review_senior_forbidden_approve_with_deferred_measurement() {
-  grep -qF "Returning APPROVE with a deferred measurement condition the reviewer cannot confirm" "$REVIEW_SENIOR_MD"
+  rs_grep -qF "Returning APPROVE with a deferred measurement condition the reviewer cannot confirm"
 }
 
 test_review_senior_has_hold_verdict() {
-  grep -qF "HOLD" "$REVIEW_SENIOR_MD"
+  rs_grep -qF "HOLD"
 }
 
 test_review_senior_has_hold_vs_request_changes_subsection() {
-  grep -qF "### HOLD vs REQUEST-CHANGES" "$REVIEW_SENIOR_MD"
+  rs_grep -qF "### HOLD vs REQUEST-CHANGES"
 }
 
 test_review_senior_completion_status_includes_hold() {
-  grep -qF "\`HOLD\` review posted with" "$REVIEW_SENIOR_MD"
+  rs_grep -qF "\`HOLD\` review posted with"
 }
 
 # sbd#131: verify "Verify is the merge gate" section
 
 test_verify_has_merge_gate_section() {
-  grep -qF "## Verify is the merge gate" "$VERIFY_MD"
+  vf_grep -qF "## Verify is the merge gate"
 }
 
 test_verify_merge_gate_names_hold_artifact() {
-  grep -qF "verify's published comment is the artifact that turns HOLD" "$VERIFY_MD"
+  vf_grep -qF "verify's published comment is the artifact that turns HOLD"
 }
 
 test_verify_antipattern_author_claim_not_measurement() {
-  grep -qF "The author's PR body claims 85% mutation; that's enough" "$VERIFY_MD"
+  vf_grep -qF "The author's PR body claims 85% mutation; that's enough"
 }
 
 # ---------------------------------------------------------------------------

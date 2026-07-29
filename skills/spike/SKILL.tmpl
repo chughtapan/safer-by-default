@@ -7,7 +7,7 @@ description: |
   library actually do what it claims?". The output is a written verdict with
   evidence, not production code. Do NOT use when the question is open-ended
   (route to /safer:research) or when the implementation path is already known
-  (go straight to contract + architect + implement).
+  (go straight to spec + architect + implement).
 triggers:
   - can we do this
   - is this feasible
@@ -21,13 +21,14 @@ allowed-tools:
   - Write
   - Edit
   - AskUserQuestion
+  - SendMessage
 ---
 
 # /safer:spike
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 
@@ -35,11 +36,11 @@ allowed-tools:
 - **Principle 5 (Discipline over capability) still applies.** You answer the question you were given. You do not answer a neighboring question because the code is right there.
 - **Principle 6 (Budget Gate) still applies.** Time box is a budget. If the box runs out before the verdict, the absence of a verdict is itself the verdict.
 - **Principle 7 (Brake) still applies.** When the iron rule below fires, stop. Do not "clean up" the spike into something shippable.
-- **Principle 8 (Ratchet) still applies.** If the spike is green, escalate to `architect` or `contract`. Never graduate the spike code itself into `implement-*`.
+- **Principle 8 (Ratchet) still applies.** If the spike is green, escalate to `architect` or `requirements`. Never graduate the spike code itself into `implement-*`.
 
 ## Iron rule
 
-> **Spike code is throwaway. The moment it starts looking shippable, your stop rule has fired. If the spike is green, escalate to architect or contract. Never to implement.**
+> **Spike code is throwaway. The moment it starts looking shippable, your stop rule has fired. If the spike is green, escalate to architect or requirements. Never to implement.**
 
 Shippable-looking spike code is worse than bad spike code. Shippable-looking code invites reuse. Reuse of spike code imports every corner the spike cut. The whole value of the modality is that the suspension of craft is paid back by not shipping the code. Ship the verdict, delete the code.
 
@@ -202,7 +203,7 @@ A HIGH verdict on a NO-GO is just as valuable as a HIGH verdict on a GO. "We pro
 If GO: name the next modality and scope.
 
 ```
-Next modality: contract  (because the architecture question is now open)
+Next modality: requirements  (because the architecture question is now open)
 Scope:         define acceptance criteria for production insert path
 Salvageable:   the benchmark script can become the integration-test smoke check
 Discardable:   everything else in spike/<slug>/
@@ -245,7 +246,7 @@ cat > "$TMP" <<EOF
 <GO | NO-GO | MIXED> ; Confidence: <LOW | MED | HIGH>
 
 ## Graduation plan
-- Next modality: <contract | architect | research | none>
+- Next modality: <requirements | architect | research | none>
 - Salvageable from this branch: <named files or "nothing">
 - Discardable: <branch may be deleted>
 
@@ -362,27 +363,16 @@ The branch is not a PR. Do not open a PR. PRs signal intent to merge; spike bran
 
 If any box is unchecked, the status is not `DONE`.
 
-## Communication discipline
+## Handoff
 
-Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+Under orchestrate (`SAFER_PARENT_ISSUE` set), `SendMessage` the `team-lead` before your final reply, so the orchestrator gates on a push instead of polling. The message carries:
 
-```
-SendMessage({
-  to: "team-lead",
-  summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>."
-})
-```
+`STATUS: <marker>. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>.`
 
-The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
-
-Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
-
-If you were invoked outside an orchestrate context (no team), skip this step.
-
+`Process issues` is required and `none` is a valid value. Anything that made the run harder than the doctrine implies belongs there. Invoked standalone with no team, skip this.
 
 ## Voice (reminder)
 
-The verdict is terse. Numbers over adjectives. The evidence block speaks for the code. No AI filler. End with the status marker.
+The verdict is terse; the evidence block speaks for the code.
 
 The next agent reading the spike issue is deciding whether to act on the graduation plan. Write for that reader. They will not read the code. They will read the verdict.
