@@ -23,21 +23,20 @@ allowed-tools:
   - Bash
   - Read
   - Write
+  - Edit
   - AskUserQuestion
+  - SendMessage
 ---
 
 # /safer:implement-junior
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 
-- **Principle 1 (Types beat tests)** — you are not shipping a unit test when a branded type or discriminated union would make the bug unrepresentable. Check each constraint: does it belong in the type system? The decision table below names the most common forks.
-- **Principle 2 (Validate at every boundary)** — inside the module, trust your types. At the boundary (disk, env, network, another package), decode with a schema.
-- **Principle 3 (Errors are typed, not thrown)** — tagged errors or discriminated results. No raw `throw new Error("bad")`. No `catch {}`. `Promise<T>` on a failing path is a bug by you.
-- **Principle 4 (Exhaustiveness over optionality)** — every switch ends in `default: return absurd(x)`. Every `Option`/`Either`/`Result.match` handles both branches.
+- **Principles 1–4 (Craft)** — they apply at full intensity inside the module body you own, which is where every fork in the decision table below lives. The module's boundary is where Principle 2 bites; everything inside it is yours to make unrepresentable.
 - **Principle 5 (Discipline over capability)** — you do one module. The instinct "while I'm here" is the stop rule.
 - **Principle 6 (Budget Gate)** — shape of change is the budget, not volume. 500 LOC in one module is fine. 2 LOC across two modules is not.
 
@@ -69,9 +68,9 @@ The compression math: each full version costs seconds more to type inside the mo
 
 The second file is always the first warning. The instinct "it is one line, it is basically the same module, the test lives here anyway" is exactly the debt pattern Principle 6 exists to stop. Cross-module reach is a shape change. Escalate; do not rationalize.
 
-## Before and after examples
+## Before and after example
 
-Two Principle 1–4 forks from the decision table expanded to full before/after.
+A Principle 1–4 fork from the decision table expanded to full before/after. The exhaustive-switch fork is in the doctrine core above.
 
 **Parsing an HTTP response.**
 
@@ -101,36 +100,6 @@ const getUser = (id: UserId): Effect.Effect<User, FetchError | DecodeError> =>
 
 The before has one `async`, one cast, and zero error types. The after has three typed errors, one schema boundary, and a cancellable `fetch`. Cost: eight extra lines for an agent; hours of debugging saved.
 
-**Exhaustive switch over a union.**
-
-Before:
-```ts
-type Status = "pending" | "active" | "done";
-function icon(s: Status): string {
-  switch (s) {
-    case "pending": return "pending";
-    case "active":  return "active";
-    case "done":    return "done";
-  }
-}
-```
-
-After:
-```ts
-type Status = "pending" | "active" | "done";
-const absurd = (x: never): never => { throw new Error(`unreachable: ${x}`); };
-function icon(s: Status): string {
-  switch (s) {
-    case "pending": return "pending";
-    case "active":  return "active";
-    case "done":    return "done";
-    default:        return absurd(s);
-  }
-}
-```
-
-Add a fourth value to `Status` and the after version turns `absurd(s)` into a compile error at this call site. The before version silently returns `undefined`.
-
 ## Forbidden paths
 
 > **Edits to paths under the harness plugin cache (`.claude/skills/` or `.claude/plugins/`) are forbidden.**
@@ -149,40 +118,9 @@ You change internal helpers, internal types, internal control flow, and tests th
 
 You do not change exported signatures, add exported types the architect did not name, cross into another module, add a new dep, or revise the plan. If any of those are needed, you stop and escalate.
 
-## MoltZap peer-channel preamble (when dispatched under a roster)
+## Peer channel (when dispatched under a roster)
 
-When invoked inside a MoltZap-capable AO session (`AO_SESSION`,
-`MOLTZAP_LOCAL_SENDER_ID`, and `AO_CALLER_TYPE` are set), you MAY emit
-peer-channel events to other roster members via `safer-peer-message`
-(SPEC r4.1 §5(d)). This is the ONLY transport
-primitive this skill may use for peer coordination. Do NOT import
-`@moltzap/app-sdk`, `@modelcontextprotocol/sdk`, `src/bridge.ts`, or
-`src/moltzap/*`; the grep-purity test
-`tests/test-bin/test-safer-peer-message-skill-purity.sh` enforces it.
-
-Typical invocation for this modality — publish the artifact URL back to
-the orchestrator after the artifact lands on GitHub:
-
-```bash
-PEER_OUT=$(printf '%s' "$BODY" | safer-peer-message \
-  --to-role orchestrator \
-  --kind artifact-published \
-  --artifact-url "$ARTIFACT_URL" \
-  --correlation-id "$SESSION-1" \
-  --body-stdin) || case $? in
-    10) echo "$PEER_OUT" >&2 ;;   # ReroutedToOrchestrator (recipient retired)
-    21) safer-escalate --from implement-junior --to orchestrate --cause recipient-retired ;;
-    20|22) safer-escalate --from implement-junior --to orchestrate --cause peer-transport-invalid ;;
-    30|*) safer-escalate --from implement-junior --to orchestrate --cause peer-transport-failed ;;
-  esac
-```
-
-Peer messages reference durable artifacts via `--artifact-url`; they do
-NOT carry the artifact body (Invariant 8). Every design doc, spec, PR,
-and review verdict is published as a GitHub comment or PR body first;
-the peer message is the pointer. When the session is NOT MoltZap-capable
-(no env), skip peer emission and let the orchestrator reconcile from
-GitHub.
+Dispatched inside a MoltZap-capable AO session (`AO_SESSION`, `MOLTZAP_LOCAL_SENDER_ID`, `AO_CALLER_TYPE` all set)? Read `skills/_shared/peer-channel.md` at the plugin root before emitting peer events. Outside such a session there is nothing to do here.
 
 ## Inputs required
 
@@ -485,36 +423,21 @@ Post on the sub-issue; leave the branch in place with no cross-module edits comm
 - [ ] No exported signature changed.
 - [ ] No new exported types.
 - [ ] No `package.json` or lockfile changes.
-- [ ] Every switch over a union uses `absurd` on the default.
-- [ ] Every error path is tagged; no raw `throw new Error("bad")`.
-- [ ] Every boundary decode uses a schema.
-- [ ] No `any`, `as T`, or `Record<string, unknown>` in the diff.
-- [ ] Every comment inserted in the diff is a WHY-comment; no narrative present/future-tense comments, no restatements of what the code does.
+- [ ] Principles 1–4 hold across the diff, and each decision-table fork you hit took the agent-era side.
+- [ ] Every comment inserted in the diff explains a hidden constraint, not what the code already shows.
 - [ ] Tests cover the success branch and each named error tag.
 - [ ] Lint, typecheck, and tests pass locally.
 - [ ] Draft PR opened with title prefixed `[impl-junior]`.
 - [ ] Sub-issue label transitioned `implementing` → `review`.
 - [ ] `safer.skill_end` event emitted.
-- [ ] Status marker on the last line of your response.
 
-## Communication discipline
+## Handoff
 
-Before you post a status marker or close your turn, **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification. Do not make the team-lead poll.
+Under orchestrate (`SAFER_PARENT_ISSUE` set), `SendMessage` the `team-lead` before your final reply, so the orchestrator gates on a push instead of polling. The message carries:
 
-```
-SendMessage({
-  to: "team-lead",
-  summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>."
-})
-```
+`STATUS: <marker>. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>.`
 
-The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
-
-Emit the `SendMessage` before your final-reply output. The final reply is for the harness; the `SendMessage` is for the team-lead who dispatched you.
-
-If you were invoked outside an orchestrate context (no team), skip this step.
-
+`Process issues` is required and `none` is a valid value. Anything that made the run harder than the doctrine implies belongs there. Invoked standalone with no team, skip this.
 
 ## Voice (reminder)
 

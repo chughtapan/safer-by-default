@@ -29,7 +29,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-<!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
+<!-- AUTO-GENERATED from this directory's SKILL.tmpl + PRINCIPLES.core.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->
 
 # /safer:spec-migrate
 

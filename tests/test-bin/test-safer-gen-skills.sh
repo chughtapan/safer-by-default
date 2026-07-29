@@ -7,20 +7,9 @@ source "$HERE/../test-helpers.sh"
 PLUGIN_DIR="$(cd "$HERE/../.." && pwd)"
 BIN="$PLUGIN_DIR/bin/safer-gen-skills"
 
-# Local helpers (the shared test-helpers.sh has assert_equal but not assert_ne).
-assert_eq() {
-  local actual="$1" expected="$2" label="${3:-equal}"
-  if [ "$actual" = "$expected" ]; then return 0; fi
-  echo "    FAIL ($label): expected '$expected', got '$actual'"; return 1
-}
-assert_ne() {
-  local actual="$1" not_expected="$2" label="${3:-not-equal}"
-  if [ "$actual" != "$not_expected" ]; then return 0; fi
-  echo "    FAIL ($label): both values are '$actual'"; return 1
-}
-
 # Build a self-contained fixture tree at $tmp that mirrors the real layout:
-#   $tmp/PRINCIPLES.md
+#   $tmp/PRINCIPLES.md                  (full doctrine; referenced by path)
+#   $tmp/PRINCIPLES.core.md             (compressed floor; inlined by the renderer)
 #   $tmp/bin/safer-gen-skills           (copy of the real binary)
 #   $tmp/skills/<name>/SKILL.tmpl
 #   $tmp/vendor/safer-spec-skills/<slug>/SKILL.md
@@ -31,6 +20,9 @@ build_fixture() {
 # PRINCIPLES — fixture
 
 Body of the fixture's PRINCIPLES.md goes here.
+EOF
+  cat > "$tmp/PRINCIPLES.core.md" <<'EOF'
+Body of the fixture's PRINCIPLES.core.md goes here.
 EOF
   cp "$BIN" "$tmp/bin/safer-gen-skills"
   chmod +x "$tmp/bin/safer-gen-skills"
@@ -96,6 +88,37 @@ test_vendor_directive_inlines_body_and_demotes_h1() {
   rm -rf "$tmp"
 }
 
+# Doctrine reaches a skill in two layers: the core is inlined, the full
+# PRINCIPLES.md is referenced by path. A renderer that inlined the full file
+# would silently restore the ~8.4k lines of duplication this split removed.
+test_principles_core_directive_inlines_core_only() {
+  local tmp; tmp=$(mktemp -d)
+  build_fixture "$tmp"
+  mkdir -p "$tmp/skills/example"
+  printf -- '---\nname: example\ndescription: fixture\n---\n\n# /safer:example\n\n{{> principles-core}}\n' > "$tmp/skills/example/SKILL.tmpl"
+  (cd "$tmp" && ./bin/safer-gen-skills >/dev/null 2>&1) || { rm -rf "$tmp"; echo "    FAIL: generator exited non-zero"; return 1; }
+  local out="$tmp/skills/example/SKILL.md"
+  assert_file_exists "$out" "generated SKILL.md exists" || { rm -rf "$tmp"; return 1; }
+  local body; body=$(cat "$out"); rm -rf "$tmp"
+  assert_contains "$body" "Body of the fixture's PRINCIPLES.core.md goes here." "core body inlined" || return 1
+  case "$body" in
+    *"Body of the fixture's PRINCIPLES.md goes here."*) echo "    FAIL: full PRINCIPLES.md was inlined"; return 1 ;;
+    *'{{> principles-core}}'*) echo "    FAIL: directive survived into output"; return 1 ;;
+  esac
+}
+
+test_legacy_principles_directive_refused() {
+  local tmp; tmp=$(mktemp -d)
+  build_fixture "$tmp"
+  mkdir -p "$tmp/skills/example"
+  printf -- '---\nname: example\ndescription: fixture\n---\n\n# /safer:example\n\n{{> principles}}\n' > "$tmp/skills/example/SKILL.tmpl"
+  local rc out
+  out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
+  rm -rf "$tmp"
+  assert_nonzero "$rc" "renderer refuses the retired {{> principles}} directive" || return 1
+  assert_contains "$out" "principles-core" "stderr names the successor directive" || return 1
+}
+
 test_check_release_passes_on_clean_tree() {
   local tmp; tmp=$(mktemp -d)
   build_fixture "$tmp"
@@ -106,7 +129,7 @@ test_check_release_passes_on_clean_tree() {
   local rc
   (cd "$tmp" && ./bin/safer-gen-skills --check --release >/dev/null 2>&1); rc=$?
   rm -rf "$tmp"
-  assert_eq "$rc" "0" "release-mode check exits 0 on clean tree" || return 1
+  assert_zero "$rc" "release-mode check exits 0 on clean tree" || return 1
 }
 
 test_check_release_fails_on_sentinel_in_tmpl() {
@@ -125,7 +148,7 @@ EOF
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills --check --release 2>&1); rc=$?
   rm -rf "$tmp"
-  assert_ne "$rc" "0" "release-mode check exits non-zero when sentinel is in tmpl" || return 1
+  assert_nonzero "$rc" "release-mode check exits non-zero when sentinel is in tmpl" || return 1
   assert_contains "$out" "__SAFER_SPEC_VERSION__" "stderr names the sentinel" || return 1
 }
 
@@ -153,7 +176,7 @@ EOF
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills --check --release 2>&1); rc=$?
   rm -rf "$tmp"
-  assert_ne "$rc" "0" "release-mode check exits non-zero when sentinel inlines via vendor" || return 1
+  assert_nonzero "$rc" "release-mode check exits non-zero when sentinel inlines via vendor" || return 1
   assert_contains "$out" "__SAFER_SPEC_VERSION__" "stderr names the vendor-sourced sentinel" || return 1
 }
 
@@ -172,7 +195,7 @@ test_vendor_skill_symlink_refused() {
   local rc
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
-  assert_ne "$rc" "0" "renderer refuses symlinked vendor SKILL.md" || { rm -rf "$tmp"; return 1; }
+  assert_nonzero "$rc" "renderer refuses symlinked vendor SKILL.md" || { rm -rf "$tmp"; return 1; }
   assert_contains "$out" "refusing to inline" "stderr names the refusal" || { rm -rf "$tmp"; return 1; }
   # The host-private contents must NOT have been inlined.
   if [ -f "$tmp/skills/example/SKILL.md" ]; then
@@ -212,7 +235,7 @@ EOF
   local rc
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
-  assert_ne "$rc" "0" "renderer refuses directory-symlink in vendor tree" || { rm -rf "$tmp"; return 1; }
+  assert_nonzero "$rc" "renderer refuses directory-symlink in vendor tree" || { rm -rf "$tmp"; return 1; }
   assert_contains "$out" "refusing to inline" "stderr names the directory-symlink refusal" || { rm -rf "$tmp"; return 1; }
   if [ -f "$tmp/skills/example/SKILL.md" ]; then
     ! grep -qF "SECRET-CONTENT-VIA-DIR-SYMLINK-9999" "$tmp/skills/example/SKILL.md" \
@@ -249,7 +272,7 @@ EOF
   local rc
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
-  assert_ne "$rc" "0" "renderer refuses in-root directory-symlink" || { rm -rf "$tmp"; return 1; }
+  assert_nonzero "$rc" "renderer refuses in-root directory-symlink" || { rm -rf "$tmp"; return 1; }
   assert_contains "$out" "refusing to inline" "stderr names the in-root symlink refusal" || { rm -rf "$tmp"; return 1; }
   if [ -f "$tmp/skills/example/SKILL.md" ]; then
     ! grep -qF "IN-ROOT-REDIRECT-TARGET" "$tmp/skills/example/SKILL.md" \
@@ -284,7 +307,7 @@ EOF
   local rc
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
-  assert_ne "$rc" "0" "renderer refuses canonical-path escape" || { rm -rf "$tmp"; return 1; }
+  assert_nonzero "$rc" "renderer refuses canonical-path escape" || { rm -rf "$tmp"; return 1; }
   if [ -f "$tmp/skills/example/SKILL.md" ]; then
     ! grep -qF "ESCAPE-TARGET-CONTENT" "$tmp/skills/example/SKILL.md" \
       || { rm -rf "$tmp"; echo "    FAIL: outside-root content was inlined"; return 1; }
@@ -302,10 +325,12 @@ test_vendor_directive_pre_validates_missing_slug() {
   local out
   out=$(cd "$tmp" && ./bin/safer-gen-skills 2>&1); rc=$?
   rm -rf "$tmp"
-  assert_ne "$rc" "0" "renderer fails when vendor slug is missing" || return 1
+  assert_nonzero "$rc" "renderer fails when vendor slug is missing" || return 1
   assert_contains "$out" "does-not-exist" "stderr names the missing slug" || return 1
 }
 
+run_test "principles-core directive inlines PRINCIPLES.core.md, not PRINCIPLES.md" test_principles_core_directive_inlines_core_only
+run_test "retired {{> principles}} directive fails loud and names the successor" test_legacy_principles_directive_refused
 run_test "vendor-skill directive inlines body, strips frontmatter, demotes H1" test_vendor_directive_inlines_body_and_demotes_h1
 run_test "--check --release passes on a clean tree" test_check_release_passes_on_clean_tree
 run_test "--check --release fails when sentinel is in SKILL.tmpl directly" test_check_release_fails_on_sentinel_in_tmpl

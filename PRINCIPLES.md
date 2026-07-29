@@ -2,6 +2,8 @@
 
 *This document is read by agents at session start; humans read it to understand the plugin's contract.*
 
+*`PRINCIPLES.core.md` is the compressed craft floor, inlined into every skill by `bin/safer-gen-skills` so it is always in context. This file is the full doctrine: the reasoning, the worked examples, and the anti-pattern catalogs behind each rule. Skills reference it by path and read it when a call is close, when the artifact is high-blast-radius, or when an agent is about to argue with one of the compressed rules. A change to a rule here needs the matching one-liner in the core updated too.*
+
 ## You are the new compiler.
 
 Humans once wrote assembly. Then compilers came. A compiler did not mimic human assembly. A compiler produced code that eliminated entire classes of error on day one — register clobbers, stack corruption, wrong-width arithmetic — by construction, for every program, forever. The compiler's output was *better* than human assembly precisely because it was not trying to look human.
@@ -302,9 +304,9 @@ Communication has four rules: contracts (the deal between user and orchestrator)
 
 Default state for the orchestrator and every dispatching skill is NOT autonomous. The user's instruction defines what may execute without further confirmation. Skills stay inside the granted scope; crossing the boundary requires explicit re-authorization.
 
-Every orchestration is governed by an **autonomy contract** recorded on the parent epic body under an `## Autonomy contract` heading — the deal between user and orchestrator, with five fields: Mode, Goal, Acceptance, Autonomy budget, Always-park (Mode is specified under Goal modes below). The orchestrator may take any action consistent with the contract; anything inconsistent parks for amendment.
+Every orchestration is governed by an **autonomy contract** recorded on the parent epic body under an `## Autonomy contract` heading — the deal between user and orchestrator, with five fields: Mode, Goal, Acceptance, Autonomy budget, Always-park (Mode is specified under Goal modes below). The orchestrator may take any action consistent with it; anything inconsistent parks for amendment.
 
-This is a different artifact from the requirements document `/safer:requirements` authors. The autonomy contract bounds *what the orchestrator may do without asking*; the requirements document bounds *what gets built*. Worked examples of the former live in `docs/contracts/`.
+This is a different artifact from the requirements document `/safer:requirements` authors. The autonomy contract bounds *what the orchestrator may do without asking*; the spec bounds *what gets built*. Worked examples of the former live in `docs/contracts/`.
 
 Two rules apply to every autonomy contract regardless of content:
 

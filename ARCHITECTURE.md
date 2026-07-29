@@ -41,8 +41,6 @@ safer-by-default/
 │   ├── docs-reader/
 │   ├── ux-audit/
 │   └── setup/
-├── vendor/                    ← floor-pinned sister-repo submodules
-│   └── safer-spec-development/ ← per-folder living-spec codemod (v0.2.0)
 ├── bin/                       ← 14 CLI helpers (+ _safer-zapbot-env.sh, sourced shared module); auto-PATH at session start (see "CLI helpers" below)
 ├── docs/                      ← contracts/ (templates) + design/ (living-spec) + workflow-composition.md
 ├── scenarios/                 ← cc-judge calibration suite
@@ -89,7 +87,7 @@ Each helper is a standalone bash script. The plugin marketplace install auto-pre
 | `safer-setup-labels` | Create the `safer:*` issue labels on a repo (idempotent) | `[--quiet]` |
 | `safer-vp` | VP-level dashboard (funnel + throughput + calibration + in-flight) | `[7d\|30d\|all] [--repo]` |
 | `safer-calibration` | Per-modality health dashboard from events.jsonl | `[7d\|30d\|all]` |
-| `safer-gen-skills` | Render `skills/<name>/SKILL.md` from `SKILL.tmpl + PRINCIPLES.md` | `[--check]` |
+| `safer-gen-skills` | Render `skills/<name>/SKILL.md` from `SKILL.tmpl + PRINCIPLES.core.md` | `[--check]` |
 
 Conventions: helpers exit non-zero on missing required args; skills wrap calls with `2>/dev/null || true` only when the helper is optional plumbing (telemetry, update-check), never when it's load-bearing. `safer-publish` routes through zapbot's bot-token broker when zapbot is detected on the host; absent zapbot, falls back to the user's `gh auth`.
 

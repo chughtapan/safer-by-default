@@ -2,8 +2,8 @@
 # safer-gen-skills — render skills/<name>/SKILL.md from skills/<name>/SKILL.tmpl
 #
 # The .tmpl is the human-edited source. It contains the YAML frontmatter and
-# modality-specific content. The generator inlines PRINCIPLES.md verbatim where
-# {{> principles}} appears, inlines a vendor skill body where
+# modality-specific content. The generator inlines PRINCIPLES.core.md verbatim
+# where {{> principles-core}} appears, inlines a vendor skill body where
 # {{> vendor-skill:<slug>}} appears (stripping the vendor file's leading YAML
 # frontmatter block), and stamps an AUTO-GENERATED marker right after the
 # wrapper frontmatter so CI / humans can detect manual edits to the rendered
@@ -24,12 +24,19 @@
 # `--check --release` is the release-mode form and fails if the sentinel
 # survived to the release branch. CI on release/* branches runs the latter.
 #
-# The generator is idempotent. Skills that don't yet have a .tmpl are skipped
-# (no SKILL.md is touched), so migration can land one skill at a time.
+# Doctrine reaches a running skill in two layers. PRINCIPLES.core.md is the
+# compressed craft floor, inlined into every skill so it is always in context.
+# PRINCIPLES.md is the full doctrine, read by path at the plugin root when a
+# call is close or the artifact is high-blast-radius. The older
+# {{> principles}} directive inlined the full doctrine into all 16 skills,
+# which cost ~8.4k duplicated lines; it is now a hard error naming this
+# migration rather than a silent no-op.
+#
+# The generator is idempotent.
 set -euo pipefail
 
 PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PRINCIPLES_FILE="$PLUGIN_DIR/PRINCIPLES.md"
+PRINCIPLES_CORE_FILE="$PLUGIN_DIR/PRINCIPLES.core.md"
 # Committed snapshots of the codemod's wrapper-skill bodies (see
 # vendor/safer-spec-skills/README.md for source pin + refresh steps). The
 # runtime codemod installs from npm; these snapshots are the build-time source
@@ -40,7 +47,7 @@ SENTINEL='__SAFER_SPEC_VERSION__'
 # shell-side pre-validator (grep) and the awk-side renderer match against
 # this so they cannot drift.
 VENDOR_DIRECTIVE_RE='^\{\{> vendor-skill:[a-z0-9-]+\}\}$'
-MARKER='<!-- AUTO-GENERATED from this directory'\''s SKILL.tmpl + PRINCIPLES.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->'
+MARKER='<!-- AUTO-GENERATED from this directory'\''s SKILL.tmpl + PRINCIPLES.core.md. Do not edit; edit the .tmpl and regenerate via bin/safer-gen-skills. -->'
 
 CHECK_ONLY=0
 RELEASE_MODE=0
@@ -50,7 +57,17 @@ while [ $# -gt 0 ]; do
     --check) CHECK_ONLY=1; shift ;;
     --release) RELEASE_MODE=1; shift ;;
     -h|--help)
-      sed -n '2,/^set/p' "$0" | sed 's/^# *//;s/^#//'
+      cat <<'EOF'
+safer-gen-skills — render skills/<name>/SKILL.md from skills/<name>/SKILL.tmpl
+
+  bin/safer-gen-skills                    render every skills/*/SKILL.tmpl
+  bin/safer-gen-skills --check            exit non-zero if any SKILL.md is stale
+  bin/safer-gen-skills --check --release  also fail on a surviving build sentinel
+
+The .tmpl is the human-edited source; SKILL.md is a generated artifact carrying
+an AUTO-GENERATED marker. {{> principles-core}} inlines PRINCIPLES.core.md.
+Rendering is idempotent.
+EOF
       exit 0
       ;;
     *) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
@@ -62,7 +79,17 @@ if [ "$RELEASE_MODE" -eq 1 ] && [ "$CHECK_ONLY" -eq 0 ]; then
   exit 1
 fi
 
-[ -f "$PRINCIPLES_FILE" ] || { echo "ERROR: $PRINCIPLES_FILE not found" >&2; exit 1; }
+[ -f "$PRINCIPLES_CORE_FILE" ] || { echo "ERROR: $PRINCIPLES_CORE_FILE not found" >&2; exit 1; }
+
+# The retired {{> principles}} directive inlined the full PRINCIPLES.md into
+# every skill. A template still carrying it would render the directive line as
+# literal text, so fail loud once, up front, and name the successor.
+if legacy=$(grep -lF '{{> principles}}' "$PLUGIN_DIR"/skills/*/SKILL.tmpl 2>/dev/null); then
+  echo "ERROR: retired {{> principles}} directive in:" >&2
+  printf '  %s\n' $legacy >&2
+  echo "Use {{> principles-core}} (inlines PRINCIPLES.core.md); reference PRINCIPLES.md by path for depth." >&2
+  exit 1
+fi
 
 # Pre-validate every {{> vendor-skill:<slug>}} directive in every template
 # against the actual vendor tree. awk's `getline` returns 0 on missing files,
@@ -126,7 +153,7 @@ validate_vendor_directives() {
 render_one() {
   local tmpl="$1"
   awk \
-    -v principles_file="$PRINCIPLES_FILE" \
+    -v principles_file="$PRINCIPLES_CORE_FILE" \
     -v vendor_root="$VENDOR_SKILLS_ROOT" \
     -v marker="$MARKER" \
     -v vendor_directive_re="$VENDOR_DIRECTIVE_RE" '
@@ -141,7 +168,7 @@ render_one() {
       }
       next
     }
-    /^\{\{> principles\}\}$/ {
+    /^\{\{> principles-core\}\}$/ {
       while ((getline line < principles_file) > 0) print line
       close(principles_file)
       next
@@ -185,14 +212,13 @@ render_one() {
 }
 
 STALE=0
-RENDERED=0
 TOTAL=0
 INVALID=0
 
 for tmpl in "$PLUGIN_DIR"/skills/*/SKILL.tmpl; do
   [ -f "$tmpl" ] || continue
   TOTAL=$((TOTAL + 1))
-  out="$(dirname "$tmpl")/SKILL.md"
+  out="${tmpl%/*}/SKILL.md"
   if ! validate_vendor_directives "$tmpl"; then
     INVALID=$((INVALID + 1))
     continue
@@ -200,22 +226,14 @@ for tmpl in "$PLUGIN_DIR"/skills/*/SKILL.tmpl; do
   rendered=$(render_one "$tmpl")
 
   if [ "$CHECK_ONLY" -eq 1 ]; then
-    if [ ! -f "$out" ] || ! diff -q <(printf '%s' "$rendered") "$out" >/dev/null 2>&1; then
+    # Byte-exact: compare against the same bytes the render path writes.
+    if [ ! -f "$out" ] || ! printf '%s' "$rendered" | cmp -s - "$out"; then
       echo "STALE: $out"
       STALE=$((STALE + 1))
     fi
   else
     printf '%s' "$rendered" > "$out"
-    RENDERED=$((RENDERED + 1))
   fi
-done
-
-# Skills without a .tmpl are flagged so we know how migration is progressing.
-PENDING=0
-for d in "$PLUGIN_DIR"/skills/*/; do
-  [ -f "$d/SKILL.md" ] || continue
-  [ -f "$d/SKILL.tmpl" ] && continue
-  PENDING=$((PENDING + 1))
 done
 
 SENTINEL_HITS=0
@@ -232,7 +250,6 @@ fi
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
   echo "checked: $TOTAL skills with .tmpl, $STALE stale"
-  echo "pending migration (no .tmpl yet): $PENDING"
   if [ "$INVALID" -gt 0 ]; then
     echo "invalid vendor-skill directives in $INVALID templates"
   fi
@@ -256,5 +273,4 @@ if [ "$INVALID" -gt 0 ]; then
   exit 1
 fi
 
-echo "rendered: $RENDERED of $TOTAL skills with .tmpl"
-echo "pending migration (no .tmpl yet): $PENDING"
+echo "rendered: $TOTAL skills"

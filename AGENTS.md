@@ -12,7 +12,7 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 | Modality | Skill | When to invoke |
 |---|---|---|
-| **Design** | `/safer:requirements` | Ambiguous intent → contract doc |
+| **Design** | `/safer:requirements` | Ambiguous intent → requirements doc (goals, non-goals, acceptance) |
 | | `/safer:spec-init` | Bootstrap living-spec for a new module (`MODULE.md` + sidecar) |
 | | `/safer:spec-migrate` | Port a module to a new `SPEC_FORMAT_VERSION` |
 | | `/safer:architect` | Approved contract → module layout + interface stubs |
@@ -56,7 +56,7 @@ Rules of engagement for any agent reading this repo. Read this *before* invoking
 
 ## The update gate
 
-User-initiated entry-point skills (`/safer:requirements`, `/safer:spec-init`, `/safer:spec-migrate`, `/safer:architect`, `/safer:diagnose`, `/safer:spike`, `/safer:research`, `/safer:setup`, `/safer:ux-audit`) halt at the preamble when `safer-update-check` reports an upgrade and `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. The user is told to run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` before re-running.
+User-initiated entry-point skills (`/safer:requirements`, `/safer:architect`, `/safer:diagnose`, `/safer:spike`, `/safer:research`, `/safer:setup`, `/safer:ux-audit`) halt at the preamble when `safer-update-check` reports an upgrade and `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. The user is told to run `/plugin marketplace update safer-by-default` and `/plugin install safer@safer-by-default` before re-running.
 
 `/safer:orchestrate` gates only on fresh-pipeline starts (no open `safer:parent` epic exists yet). Autonomous re-entry — cron-loop ticks, parent-epic polling — skips the gate so in-flight pipelines drain.
 
@@ -84,7 +84,7 @@ User-prompting gstack skills run hold-scope autonomous when invoked from inside 
 Skills are generated from `.tmpl` source files. Edit the template, run the generator, commit both.
 
 1. Copy [`SKILL.md.tmpl`](./SKILL.md.tmpl) to `skills/<name>/SKILL.tmpl` (note: `.tmpl` extension, not `.md`).
-2. Fill in the sections. The `{{> principles}}` marker is preserved verbatim — the generator inlines `PRINCIPLES.md` there at render time.
+2. Fill in the sections. The `{{> principles-core}}` marker is preserved verbatim — the generator inlines `PRINCIPLES.core.md` there at render time. Keep the body to what this modality alone needs; rare-branch material belongs in a sibling reference file the skill reads on demand.
 3. Run `bin/safer-gen-skills` to produce `skills/<name>/SKILL.md`. Both files are committed.
 4. Update `.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json` description if the skill count changes.
 5. Add a row to the table at the top of this file.
@@ -93,7 +93,7 @@ Skills are generated from `.tmpl` source files. Edit the template, run the gener
 
 **Editing an existing skill**: edit `skills/<name>/SKILL.tmpl`, then run `bin/safer-gen-skills`. The `SKILL.md` carries an `AUTO-GENERATED` marker — manual edits to it will be overwritten on the next render.
 
-**Updating doctrine**: edit `PRINCIPLES.md`, then run `bin/safer-gen-skills` to propagate changes to all skill bodies. CI should fail if `bin/safer-gen-skills --check` finds any stale `SKILL.md`.
+**Updating doctrine**: doctrine lives in two layers. `PRINCIPLES.core.md` is the compressed craft floor inlined into every skill body; `PRINCIPLES.md` is the full doctrine skills read by path at the plugin root. Changing a rule means updating both, then running `bin/safer-gen-skills` to propagate the core. CI should fail if `bin/safer-gen-skills --check` finds any stale `SKILL.md`.
 
 ## When in doubt
 

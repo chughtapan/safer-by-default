@@ -34,7 +34,7 @@ allowed-tools:
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 
@@ -406,82 +406,7 @@ If A: `$PM add -D @playwright/test`. If B or C: record skipped.
 
 ### Step 4c: Wire the living-spec layer (optional)
 
-The living-spec layer is the per-folder `MODULE.md` + `.safer-spec/<slug>.json` sidecar codemod (`@chughtapan/safer-spec-development`), validated by `safer-spec validate`, whose typed exit codes route HOLD verdicts through `/safer:verify` (PRINCIPLES.md Part 2, "Living-spec is the ratchet's machine-readable surface"). As of v0.4.0 the codemod is published to npm, so this step installs it from the registry and applies to **any** TypeScript + vitest project. The v0.2.0/v0.3.0 dogfood-only pre-flight halt and the `link:`-protocol install against the vendored submodule are gone.
-
-**This step is optional and never aborts setup.** It applies only to TypeScript projects that test with vitest (the layer wires a vitest reporter and a per-folder `MODULE.md` gate). If the project is not TS+vitest, or the install fails, the step records a skip and the lint floor and strict flags from the other steps still stand. Nothing here exits the skill.
-
-**Applicability check (skip, never exit).**
-
-```bash
-SPEC_LAYER_STATUS=""
-SPEC_LAYER_SKIP_REASON=""
-if [ ! -f tsconfig.json ]; then
-  SPEC_LAYER_SKIP_REASON="not a TypeScript project (no tsconfig.json)"
-elif [ ! -f vitest.config.ts ] && [ ! -f vitest.config.js ] && [ ! -f vitest.config.mts ]; then
-  SPEC_LAYER_SKIP_REASON="the living-spec reporter targets vitest, and no vitest.config.{ts,js,mts} is present"
-fi
-if [ -n "$SPEC_LAYER_SKIP_REASON" ]; then
-  echo "Step 4c: living-spec layer skipped — $SPEC_LAYER_SKIP_REASON."
-  echo "  (The lint floor and strict flags from the other steps still apply.)"
-  SPEC_LAYER_STATUS="skipped ($SPEC_LAYER_SKIP_REASON)"
-fi
-```
-
-Run every block below **only when `$SPEC_LAYER_SKIP_REASON` is empty**. Each block re-checks the flag so a mid-step failure (install or doctor) cleanly skips the rest without aborting setup.
-
-**Install the codemod from npm.** Pinned to the `~0.2.0` tilde range (Spec Invariant 3: codemod and plugin version-lock in pairs). Uses the package manager detected in Step 1; idempotent — skips when the dependency is already declared.
-
-```bash
-if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
-  HAS_CODEMOD=$(node -e '
-    const pkg = require("./package.json");
-    const dep = (pkg.devDependencies && pkg.devDependencies["@chughtapan/safer-spec-development"])
-              || (pkg.dependencies && pkg.dependencies["@chughtapan/safer-spec-development"]) || "";
-    process.stdout.write(dep ? "1" : "0");
-  ' 2>/dev/null || echo "0")
-  if [ "$HAS_CODEMOD" = "0" ]; then
-    $PM add -D @chughtapan/safer-spec-development@~0.2.0 || {
-      echo "WARN: living-spec install failed; skipping the rest of Step 4c (lint floor stands)." >&2
-      SPEC_LAYER_SKIP_REASON="install failed"
-      SPEC_LAYER_STATUS="skipped (install failed)"
-    }
-  fi
-fi
-```
-
-**Probe the codemod (liveness).** Confirm the CLI installed and runs. A non-running CLI is a concern, not a skill-fatal error: it records the layer as wired-but-unhealthy and skips the rest of Step 4c. The `safer-spec` bin is invoked from `node_modules/.bin/` directly, which is package-manager-agnostic. (`safer-spec doctor` — the intended health + version-skew probe — is not implemented in the published codemod yet, so this uses `--version` for liveness; upgrade the probe to `doctor` once the sister package ships it.)
-
-```bash
-if [ -z "$SPEC_LAYER_SKIP_REASON" ]; then
-  if ./node_modules/.bin/safer-spec --version >/dev/null 2>&1; then
-    SPEC_LAYER_STATUS="installed"
-  else
-    echo "WARN: safer-spec installed but the CLI did not run; skipping the rest of Step 4c (lint floor stands)." >&2
-    SPEC_LAYER_STATUS="DONE_WITH_CONCERNS (CLI did not run)"
-    SPEC_LAYER_SKIP_REASON="CLI did not run"
-  fi
-fi
-```
-
-**Seed `safer-spec.config.json` (never overwrite).** Workspace monorepos repeat the seed per workspace package that carries a vitest config.
-
-```bash
-if [ -z "$SPEC_LAYER_SKIP_REASON" ] && [ ! -f "safer-spec.config.json" ]; then
-  ./node_modules/.bin/safer-spec init >/dev/null 2>&1 || true
-fi
-```
-
-**Wire the vitest reporter (sentinel-bounded; mirrors the Step 10b managed-`CLAUDE.md` section).** The patch detects `vitest.config.{ts,js,mts}` and `vitest.workspace.ts`, preserves existing reporters, and never double-applies the SAFER sentinel. Apply per workspace package when `vitest.workspace.ts` is present.
-
-```bash
-# The SAFER sentinel pair brackets the wired reporter block:
-#   // <SAFER:vitest-reporter:begin>  ...managed block...  // <SAFER:vitest-reporter:end>
-# Detect: if the block already exists, do not touch. Otherwise insert after the
-# `test:` (or `reporters:`) key, preserving every existing reporter entry.
-```
-
-**Record for the receipt.** `SPEC_LAYER_STATUS` is one of `installed`, `skipped (<reason>)`, or `DONE_WITH_CONCERNS (<reason>)`. Step 10b writes it into the managed `CLAUDE.md` section (the `Spec layer:` line) and Step 11 prints it in the receipt. A skip or concern affects only the living-spec layer; the rest of setup's verdict is independent.
-
+Project is TypeScript + vitest and the user wants the per-folder living-spec layer? Read `skills/setup/references/living-spec.md` and follow it. Otherwise skip the step; nothing downstream depends on it.
 
 ### Step 5: Plan the configuration shape
 
@@ -686,91 +611,7 @@ Some fixes change runtime behavior as well as type shape; rewriting `async` into
 
 ### Step 10b: Write the managed `CLAUDE.md` section
 
-Write a sentinel-bounded `## Project structural choices` block into the project's `CLAUDE.md`. Claude Code loads `CLAUDE.md` automatically at session start, so this block is the per-repo structural contract that complements `PRINCIPLES.md`. Reruns of `/safer:setup` replace the block in place; every other line of `CLAUDE.md` is untouched.
-
-Resolve the installed plugin version. Read the installed `package.json` directly (the plugin was installed in Step 2, so the path resolves); fall back to `$PM ls` only if the read fails:
-
-```bash
-PLUGIN_VERSION=$(node -p "require('eslint-plugin-agent-code-guard/package.json').version" 2>/dev/null)
-if [ -z "$PLUGIN_VERSION" ]; then
-  PLUGIN_VERSION=$($PM ls eslint-plugin-agent-code-guard --depth=0 --json 2>/dev/null \
-    | grep -oE '"version": *"[^"]+"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-fi
-[ -z "$PLUGIN_VERSION" ] && PLUGIN_VERSION="unknown"
-```
-
-Build the section in a temp file (avoids shell-quoting hazards in `awk`). Trap cleanup so a Ctrl-C between `mktemp` and the final `rm` does not leak:
-
-```bash
-SECTION_FILE=$(mktemp)
-trap 'rm -f "$SECTION_FILE"' EXIT INT TERM
-cat > "$SECTION_FILE" <<EOF
-## Project structural choices (managed by /safer:setup — do not edit manually; rerun the skill to change)
-
-- Schema library: ${SCHEMA_LIB}
-- Database access: ${DB_TOOL}
-- Integration tests: ${INTEGRATION_GLOB:-not set}
-- ESLint floor: eslint-plugin-agent-code-guard@${PLUGIN_VERSION}
-- Effect runtime: ${EFFECT_RUNTIME}
-- Env var access: ${ENV_VAR_ACCESS}
-- Spec layer: ${SPEC_LAYER_STATUS:-skipped}
-EOF
-```
-
-Apply the section. If `CLAUDE.md` does not exist, the section IS the file. Otherwise, hand the file to `awk`, which replaces only the sentinel-bounded region:
-
-```bash
-TARGET="CLAUDE.md"
-if [ ! -e "$TARGET" ]; then
-  cp "$SECTION_FILE" "$TARGET"
-  echo "CLAUDE.md: created"
-else
-  awk -v section_file="$SECTION_FILE" '
-    BEGIN {
-      while ((getline line < section_file) > 0) {
-        section = section sep line
-        sep = "\n"
-      }
-      close(section_file)
-      printed = 0
-      in_managed = 0
-    }
-    /^## Project structural choices \(managed by \/safer:setup/ {
-      print section
-      printed = 1
-      in_managed = 1
-      next
-    }
-    in_managed && /^## / {
-      in_managed = 0
-      print ""
-      print
-      next
-    }
-    in_managed { next }
-    { print }
-    END {
-      if (!printed) {
-        if (NR > 0) print ""
-        print section
-      }
-    }
-  ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
-  echo "CLAUDE.md: updated"
-fi
-```
-
-(The `trap` set after `mktemp` removes `$SECTION_FILE` on EXIT, INT, or TERM; no explicit `rm` is needed.)
-
-Idempotency contract:
-
-- No `CLAUDE.md` → file created containing only the managed section.
-- Existing `CLAUDE.md` with no sentinel heading → section appended at EOF; one blank line separates it from prior content.
-- Existing `CLAUDE.md` with the sentinel heading anywhere → content from the sentinel up to (but not including) the next `## ` heading or EOF is replaced; one blank line separates the new section from any following `## ` heading.
-
-The `awk` pattern matches the prefix `## Project structural choices (managed by /safer:setup` so the disclaimer wording can be revised in future versions without breaking idempotency on already-installed repos.
-
-This skill never `git add`s or commits `CLAUDE.md`. The user stages and commits.
+Read `skills/setup/references/managed-claude-md.md` and follow it to write the managed block. Reruns replace it in place and touch no other line of the project's `CLAUDE.md`.
 
 ### Step 11: Print the completion summary
 
@@ -878,7 +719,6 @@ This skill never commits. `git add` and `git commit` are the user's decision.
 - [ ] Managed `## Project structural choices` section written to `CLAUDE.md` (created or in-place replaced).
 - [ ] Completion summary block is printed.
 - [ ] `safer.skill_end` event emitted.
-- [ ] Status marker on the last line of the reply.
 
 If any box is unchecked, the status is not `DONE`.
 

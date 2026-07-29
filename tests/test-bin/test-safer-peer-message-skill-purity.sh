@@ -43,9 +43,24 @@ _scan_for_forbidden() {
   #   - Strip UTF-8 BOM so imports on the first line are still matched.
   #   - Normalize line-continuation so multi-line imports collapse to a
   #     single line before scanning.
+  #
+  # Scans every markdown file under skills/, not just SKILL.md. Rare-branch
+  # material lives in sibling reference files (skills/_shared/*.md,
+  # skills/<name>/references/*.md, skills/<name>/prompts/*.md) that a skill
+  # reads on demand; scanning only SKILL.md leaves those unguarded.
   local dir="$1"
   local any_error=0
-  while IFS= read -r -d '' f; do
+  # Prefilter: the normalisation below (BOM strip + import folding) exists only
+  # to defeat bypasses, and a bypass has to mention one of the target packages
+  # somewhere. One recursive grep names the candidate files; the per-file
+  # normalisation then runs on those alone instead of every markdown file under
+  # skills/ (30 files, ~150 process spawns, for zero real hits).
+  local candidates
+  candidates=$(grep -rlE '@moltzap/|@modelcontextprotocol/|src/bridge\.ts|src/moltzap/' \
+                 --include='*.md' "$dir" 2>/dev/null)
+  [ -z "$candidates" ] && return 0
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
     local normalised
     normalised=$(_normalise_skill_md "$f") || { any_error=1; continue; }
     local out
@@ -56,7 +71,7 @@ _scan_for_forbidden() {
     elif [ "$rc" -eq 0 ] && [ -n "$out" ]; then
       printf '%s\n' "$out"
     fi
-  done < <(find "$dir" -type f -name "SKILL.md" -print0)
+  done <<< "$candidates"
   if [ "$any_error" -ne 0 ]; then return 2; fi
   return 0
 }

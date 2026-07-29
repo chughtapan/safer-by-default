@@ -27,19 +27,20 @@ allowed-tools:
   - Grep
   - Glob
   - AskUserQuestion
+  - SendMessage
 ---
 
 # /safer:ux-audit
 
 ## Doctrine
 
-{{> principles}}
+{{> principles-core}}
 
 ## How this modality projects from the doctrine
 
-- **Principle 5 (Discipline over capability):** *"The question is not 'can I do this.' The question is 'is this mine to do.'"* The audit reads; redesign is a separate modality. Findings without recommendations are incomplete; recommendations without modality routing are out of scope.
-- **Principle 7 (The Brake):** *"When a stop rule fires, stop writing code. Produce the escalation artifact. Do not 'note it and keep going.'"* Every finding carries (finding, evidence, goal-link). The moment one is missing, drop the finding or stop the audit.
-- **Principle 8 (The Ratchet):** *"When blocked, hand the work back to the upstream modality. Never invent a local workaround that patches a structural problem downstream."* When the audit reveals the named goal is itself mis-named, route to `/safer:requirements` or `/plan-ceo-review`. Do not silently re-frame mid-audit.
+- **Principle 5 (Discipline over capability).** The audit reads; redesign is a separate modality. Findings without recommendations are incomplete; recommendations without modality routing are out of scope.
+- **Principle 7 (The Brake).** Every finding carries (finding, evidence, goal-link). The moment one is missing, drop the finding or stop the audit.
+- **Principle 8 (The Ratchet).** When the audit reveals the named goal is itself mis-named, route to `/safer:requirements` or `/plan-ceo-review`. Do not silently re-frame mid-audit.
 - **Part 4 → Durable records.** GitHub is the record (writeup published as a sub-issue or epic comment).
 - **Part 4 → Write for the cold-start reader.** The next agent reads with no session context.
 - **Confidence calibration:** **HIGH** = reproducible evidence, no ambiguity. **MED** = evidence supports the conclusion but alternatives remain. **LOW** = plausible but under-evidenced.
@@ -292,49 +293,13 @@ Severity:
 
 #### H5 — Form & microinteraction
 
-For every form in scope, `/browse` exercises three input states:
-
-1. **Empty submission** — does the form prevent submit, show errors, focus the first invalid field?
-2. **Invalid input** (wrong type, malformed email, out-of-range number) — does the form catch on blur or only on submit? Are error messages specific to the field?
-3. **Valid submission** — does the success state acknowledge submission, redirect cleanly, prevent double-submit?
-
-For every form, record:
-
-| Field | Type | Label placement | Required marked | Validation timing | Error message specificity | Autocomplete attribute |
-|---|---|---|---|---|---|---|
-
-Column definitions:
-
-- **Field** — input `name` attribute or visible label.
-- **Type** — value of the HTML `type` attribute (`text`, `email`, `password`, `number`, `tel`, etc.).
-- **Label placement** — one of `top`, `inline`, `placeholder-only` (anti-pattern), `floating`, `none` (anti-pattern).
-- **Required marked** — `yes`, `no`, or `implicit` (only revealed on validation error).
-- **Validation timing** — `on-blur`, `on-submit`, `on-input`, or `none`.
-- **Error message specificity** — `field-specific` (names what's wrong), `generic` ("invalid input"), or `none`.
-- **Autocomplete attribute** — record the literal value (`email`, `current-password`, `cc-number`, etc.); flag `off` or absent on fields that should accept autofill per the WHATWG autocomplete tokens.
-
-Microinteraction findings cover hover, focus, transitions, optimistic updates, double-click guards, empty states. Cite each finding by selector or screenshot.
-
-No `/qa` — same iron-rule reason as H2. `/qa-only` is allowed for the structured reporting shape.
+Applies when the surface in scope has forms. Exercises empty submission, invalid input, and in-flight states against each one.
 
 #### H6 — Stakeholder & artifact read
 
-Read what the team has already said:
+Applies when the invocation attached a ticket export or issue thread. Reads what the team has already said about the surface before the audit forms its own view.
 
-```bash
-ls docs/ design/ 2>/dev/null
-[ -f DESIGN.md ]    && echo "DESIGN.md exists; read it"
-[ -f docs/PRD.md ]  && echo "PRD exists; read it"
-
-gh issue list --label "ux,design,ux-bug,usability" --state all --limit 30
-gh pr list --search "<scope keyword>" --state all --limit 30
-```
-
-If the user attached a support-ticket export (CSV / JSON / pasted snippet), read it and extract complaint themes by frequency. Do not invent ticket data; if no export is attached, note "no ticket data attached" in the writeup and continue. H6 ticket attachments are optional — missing them does not block the audit.
-
-H6 output is one paragraph: "Team intended X. Recent complaints say Y. Z was tried (commit / PR ref). Open threads: A, B." This paragraph informs Phase 4's Relevance section.
-
-Optional one-shot composition: `/plan-ceo-review` to stress-test the named goal before the rest of the audit runs. Off by default; user opts in via `--challenge-goal`. Runs hold-scope autonomous; escalate to `/safer:orchestrate` if it would prompt the user.
+Read `skills/ux-audit/references/conditional-heuristics.md` for both protocols. Surfaces with no forms and no attached artifacts skip straight to H7.
 
 #### H7 — Information architecture
 
@@ -678,27 +643,16 @@ Nothing ux-audit produces lives outside GitHub.
 - [ ] Writeup published to GitHub (sub-issue or parent-epic comment).
 - [ ] Out-of-scope follow-up published if non-empty.
 - [ ] `safer.skill_end` event emitted.
-- [ ] Status marker on the last line of your reply.
 
 If any box is unchecked, you are not `DONE`.
 
-## Communication discipline
+## Handoff
 
-If `SAFER_PARENT_ISSUE` is set (the orchestrate-context signal — same one used in Phase 6 publication target), **SendMessage to `team-lead` immediately** with a one-line summary and the artifact URL before you post your status marker. The team-lead is coordinating other teammates and cannot gate your handoff until it receives a push notification.
+Under orchestrate (`SAFER_PARENT_ISSUE` set), `SendMessage` the `team-lead` before your final reply, so the orchestrator gates on a push instead of polling. The message carries:
 
-```
-SendMessage({
-  to: "team-lead",
-  summary: "<3-8 word summary>",
-  message: "STATUS: DONE. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>."
-})
-```
+`STATUS: <marker>. Artifact: <URL>. Next: <modality or handoff>. Process issues: <none | one-line list>.`
 
-If `SAFER_PARENT_ISSUE` is unset (standalone invocation), skip this step entirely.
-
-The `to: "team-lead"` address is resolved by the harness's team registry; the orchestrator injects it when it dispatches sub-tasks. Treat `team-lead` as a literal address inside an orchestrate context and a no-op outside.
-
-The `Process issues` field is mandatory. If the run hit no friction, write `Process issues: none`. If it hit any — a sandbox-blocked command, an ambiguous dispatch instruction, an unexpected tool output, a flaky idle notification, anything that made the work harder than the doctrine implies — list each one as a short clause. The orchestrator surfaces these to the user proactively.
+`Process issues` is required and `none` is a valid value. Anything that made the run harder than the doctrine implies belongs there. Invoked standalone with no team, skip this.
 
 ## Voice (reminder)
 
