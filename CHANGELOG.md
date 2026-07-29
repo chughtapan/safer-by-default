@@ -1,3 +1,13 @@
+## Unreleased
+
+### Changed
+
+- **Principle 2's boundary list is qualified.** "From any other package" read as a universal: a decode owed at every seam a value crosses, including seams inside one program where nothing about the data changed. That mandates re-decoding data the program already decoded at its edge, which spends time re-deriving a fact the program already holds. A boundary is now the point where the consumer becomes the first component holding the knowledge needed to check the shape, which for a program is where data of uncontrolled provenance enters it. Disk, network, environment variables, user input, and dynamic imports stay unconditional, every time. A package seam counts when the value reached it across a serialization, storage, or process edge, not because an import happened. Any other ingress (IPC, worker messages, subprocess stdio, browser storage, `postMessage`, FFI) is a boundary unless you can name the decode site.
+
+  The chain rule is scoped to what it means: A calls B, B calls C, one call stack in one process, decoded at A's ingress, and B and C do not re-decode **the same invariant**. Both bounds are load-bearing. Serialization, storage, or a hop to another process or deploy ends the chain, so a first-party facade over Redis is a boundary. And a module that owns an invariant the ingress decode never checked (`amount <= account.dailyLimit`) decodes for the first time rather than repeating a decode. `PRINCIPLES.core.md` item 2 carries the guard, the crossing test, the call-stack scope, and the invariant exception, at 395 characters against 249 before this change; the enumerated residual and the worked cases live in `PRINCIPLES.md`, which is read when the call is close.
+
+- **`PRINCIPLES.md` → Voice gains one line on blank-line grouping.** Use blank lines sparingly, as a grouping operator: they separate closely related chunks, analogous to paragraph breaks in prose, and a blank line where indentation already delineates the block is noise. Both clauses are the ones Google's C++ style guide kept in `google/styleguide@c6f57a9` (31 Jul 2025), the commit that deleted its screen-density rationale ("the more code that fits on one screen, the easier it is to follow"). Structural framing, and no claim about what code inherently reads like.
+
 ## 0.5.0 — 2026-07-29
 
 Two concepts shared the word "contract": the document authored by `/safer:contract`, and the user/orchestrator deal recorded on the parent epic. They are now `/safer:requirements` and the `## Autonomy contract` block. The doctrine that every skill inlined verbatim is replaced by a compressed core plus a reference read on demand, cutting what a skill loads per invocation roughly in half. The architecture LSP moves to its own repository.

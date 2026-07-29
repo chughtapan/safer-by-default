@@ -84,7 +84,11 @@ Every principle below cost humans hours or days to apply consistently. It costs 
 
 **Why.** Static types are an assertion about shape. Runtime data is a fact. Assertions that contradict facts produce the worst class of bug: runtime behavior that disagrees with the type system. The only way to make types truths is to validate at the boundary. Once validated, the rest of the code path can trust the type. ETHOS §2 "Search Before Building" names this pattern at the knowledge layer: know what is actually coming in before deciding what to do with it; boundary validation is the runtime expression of the same discipline.
 
-**The boundaries.** Data from disk. From the network. From environment variables. From user input. From dynamic imports. From any other package. Every one of those is a boundary. Pick a schema library once, Effect Schema, Zod, Valibot, and use it at all of them.
+**The boundaries.** A boundary is where the consumer becomes the first component holding the knowledge needed to check the shape, which for a program means the point where data of uncontrolled provenance enters it. Data from disk. From the network. From environment variables. From user input. From dynamic imports. Every one of those is a boundary, every time. A package seam is a boundary when the value reached it across a serialization, storage, or process edge, or when the data enters the system at that seam. A package seam is not a boundary merely because an import happened. Any other ingress (IPC and worker messages, subprocess stdio, browser storage, `postMessage`, FFI) is a boundary unless you can name the decode site: in this process, in this call stack, against the shape you need. Pick a schema library once, Effect Schema, Zod, Valibot, and use it at every boundary you have.
+
+**One decode per provenance change, not one per layer crossed.** A calls B, B calls C, one call stack in one process, and the value was decoded at A's ingress: B and C do not re-decode the same invariant. Inside that chain the value is already a truth, and a constraint both sides can see and the type system can express belongs in the type system (Principle 1) rather than in a second runtime decode. The chain ends at the next edge. Serialize the value, store it, or hand it to another process or another deploy, and whatever reads it back is at a new boundary, whatever the package graph says: a first-party facade over Redis hands you a shape that some other execution wrote, so you decode.
+
+Re-decode inside the chain for a reason you can state: a measured performance win, or a requirement the ingress decode does not serve, such as containment or an invariant this module owns and that decode never checked. `amount <= account.dailyLimit` is the second kind, and the handler that decoded the request body was not holding the account to check it against. "It came from another module" is not a reason. Both errors cost, which is why the scope is the whole rule: a redundant decode spends time re-deriving a fact the program already holds, and a missing one ships a privilege bug, because the caller that skips its own check on the belief that something upstream decoded is the caller whose upstream decode did not cover the field it reads.
 
 **Anti-patterns.**
 - `(await r.json()) as Record<string, unknown>`. The cast is a lie; the shape is unknown until decoded.
@@ -496,6 +500,8 @@ End with what to do. Every output names its status marker and, where applicable,
 When the output is code, the type system is the voice. A signature that encodes the constraint speaks louder than a comment that describes it. Prefer the signature.
 
 A comment explains a hidden constraint or a workaround, never the shape the reader can already see. *"This branch handles the legacy V1 envelope that pre-2024 clients still send"* is worth writing. *"This function parses JSON"* is not.
+
+Use blank lines sparingly, as a grouping operator: they separate closely related chunks, analogous to paragraph breaks in prose, and a blank line where indentation already delineates the block, at its start or end, is noise.
 
 The next agent touching the code is a junior. The type system is the document that junior reads first. Make it say the right thing.
 
