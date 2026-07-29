@@ -161,10 +161,18 @@ fi
 # as ~/.claude/skills/safer-*.
 log "Checking Claude Code plugin install..."
 CC_SKILLS="$HOME/.claude/skills"
-SETTINGS="$HOME/.claude/settings.json"
-if [ -f "$SETTINGS" ] && grep -q '"safer@safer-by-default"[[:space:]]*:[[:space:]]*true' "$SETTINGS"; then
-  log "  ✓ plugin enabled in $SETTINGS. Skills load as safer:<name>"
-elif [ -f "$SETTINGS" ] && grep -q '"safer-by-default@safer-by-default"[[:space:]]*:[[:space:]]*true' "$SETTINGS"; then
+# Both settings files count, matching gstack_present() above. A plugin enabled
+# only in settings.local.json is still enabled.
+SETTINGS_FILES="$HOME/.claude/settings.json $HOME/.claude/settings.local.json"
+_plugin_enabled() {  # $1 = install id
+  for s in $SETTINGS_FILES; do
+    [ -f "$s" ] && grep -q "\"$1\"[[:space:]]*:[[:space:]]*true" "$s" && return 0
+  done
+  return 1
+}
+if _plugin_enabled "safer@safer-by-default"; then
+  log "  ✓ plugin enabled. Skills load as safer:<name>"
+elif _plugin_enabled "safer-by-default@safer-by-default"; then
   # The slug was renamed. An install under the old ID still resolves skills,
   # so this is a rename prompt rather than a failure.
   log "  ○ plugin enabled under the retired ID safer-by-default@safer-by-default."

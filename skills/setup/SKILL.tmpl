@@ -99,9 +99,22 @@ fi
 # gstack is a hard dependency. safer skills call gstack tools (/simplify, /review,
 # /codex, /plan-eng-review, /plan-devex-review, /security-review, /ship,
 # /land-and-deploy) inline. If gstack is absent, those calls fail with no fallback.
-if [ ! -d "$HOME/.claude/skills/gstack" ]; then
+#
+# Two install shapes count, and this predicate must stay identical to the one in
+# ./setup at the repo root. A directory-only test rejects a marketplace plugin
+# install, so the two entry points would disagree about whether gstack is
+# present: the user passes one and fails the other with no way to tell why.
+_gstack_present() {
+  [ -d "$HOME/.claude/skills/gstack" ] && return 0
+  for s in "$HOME/.claude/settings.json" "$HOME/.claude/settings.local.json"; do
+    [ -f "$s" ] && grep -q '"gstack@[^"]*"[[:space:]]*:[[:space:]]*true' "$s" && return 0
+  done
+  return 1
+}
+if ! _gstack_present; then
   cat <<'EOF'
-ERROR: gstack is required but not installed at ~/.claude/skills/gstack/.
+ERROR: gstack is required but not found.
+Looked for: ~/.claude/skills/gstack/ and an enabled gstack plugin in settings.json.
 safer-by-default treats gstack as a hard dependency.
 
 Install via Claude Code's plugin system, then re-run this skill:

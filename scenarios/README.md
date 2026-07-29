@@ -76,9 +76,9 @@ cc-judge run 'scenarios/**/*.yaml' --runtime subprocess --bin $(which claude) \
   --judge claude-opus-4-7 --runs 3 --results scenarios/runs/full-$(date -u +%Y-%m-%dT%H%M%S)
 ```
 
-`--runs 3` triples the per-scenario invocations; a scenario that passes 3-for-3 or fails 3-for-3 every time is miscalibrated (see spec §7 acceptance criteria).
+`--runs 3` triples the per-scenario invocations; a scenario that passes 3-for-3 or fails 3-for-3 every time is miscalibrated.
 
-CI does **not** run these yet. v1 runs are on-demand and on `PRINCIPLES.md` edits. CI wiring is deferred (spec open question 3).
+CI does **not** run these yet. v1 runs are on-demand and on `PRINCIPLES.md` edits. CI wiring is deferred.
 
 ## v1 first batch (4 scenarios, one per axis)
 
@@ -87,7 +87,7 @@ CI does **not** run these yet. v1 runs are on-demand and on `PRINCIPLES.md` edit
 - `modality-routing/eleven-file-refactor.yaml`
 - `artifact-discipline/confidence-with-evidence.yaml`
 
-The 4th axis (`debt-multiplier`) is held for the next batch; its rubric is harder to write (judging "did the agent push back" is subtler than judging code shape) and benefits from going second once the first three calibrate rubric voice. Remaining 8 scenarios ship as junior follow-ups per spec §7.
+The 4th axis (`debt-multiplier`) is held for the next batch; its rubric is harder to write (judging "did the agent push back" is subtler than judging code shape) and benefits from going second once the first three calibrate rubric voice. Remaining 8 scenarios ship as junior follow-ups.
 
 ## Adding a scenario
 
@@ -96,4 +96,4 @@ The 4th axis (`debt-multiplier`) is held for the next batch; its rubric is harde
 3. Write `expectedBehavior` as prose the judge can read cold.
 4. Write `validationChecks` as a mix of pass bullets and explicit `ANTI-PATTERN (FAIL):` bullets. At least one anti-pattern must be principle-specific — "bare catch," "non-null assertion," "Promise erases the error channel," etc.
 5. Run the scenario three times against the current model (`--runs 3`). If it passes three-for-three or fails three-for-three, the rubric is miscalibrated; tune before landing.
-6. Every `PRINCIPLES.md` edit ships with or updates at least one scenario covering the change (spec open question 2).
+6. Every `PRINCIPLES.md` edit ships with or updates at least one scenario covering the change.

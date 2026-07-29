@@ -4,7 +4,7 @@ A Claude skill plugin that recalibrates your coding agent for type-safe, scope-d
 
 ## The Problem
 
-Your coding agent is miscalibrated. It was trained on human-written code. Decades of it ,  written under one constraint that does not apply to it: typing was expensive for humans. That is why its training corpus is saturated with `throw new Error("bad")`, `as Record<string, unknown>`, `try { ... } catch {}`, `Promise<T>` return types, `if`-else without a `never` default, and untyped `process.env.FOO!` reads. Those were the compromises humans made when keyboard time was scarce. For an agent, keyboard time is not scarce. The agent can produce code that *eliminates classes of error by construction*. The way a compiler eliminates register-allocation bugs ,  if it is calibrated to do so.
+Your coding agent is miscalibrated. It was trained on human-written code. Decades of it, written under one constraint that does not apply to it: typing was expensive for humans. That is why its training corpus is saturated with `throw new Error("bad")`, `as Record<string, unknown>`, `try { ... } catch {}`, `Promise<T>` return types, `if`-else without a `never` default, and untyped `process.env.FOO!` reads. Those were the compromises humans made when keyboard time was scarce. For an agent, keyboard time is not scarce. The agent can produce code that *eliminates classes of error by construction*. The way a compiler eliminates register-allocation bugs, if it is calibrated to do so.
 
 It is not. This plugin recalibrates.
 

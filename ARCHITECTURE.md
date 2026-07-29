@@ -137,7 +137,7 @@ It then symlinks `bin/safer-*` into `~/.local/bin/` and writes Codex skill wrapp
 
 `bin/safer-update-check` polls `https://raw.githubusercontent.com/chughtapan/safer-by-default/main/VERSION` once per hour, cache at `~/.safer/last-update-check`. On mismatch, prints `UPGRADE_AVAILABLE <local> <remote>` to stdout. Silent on network failure or when up to date.
 
-**Update gate**: user-facing entry skills (requirements, architect, diagnose, spike, research, setup, ux-audit, orchestrate) halt at the preamble if `_UPD` is non-empty AND `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. `spec-init` and `spec-migrate` do not carry the gate. Output: `PRECONDITION_FAIL` block telling the user to run the marketplace install commands. The model relays the message and waits for confirmation before doing any work.
+**Update gate**: user-facing entry skills (requirements, architect, diagnose, spike, research, setup, ux-audit) halt at the preamble if `_UPD` is non-empty AND `SAFER_PARENT_ISSUE` / `SAFER_SUBISSUE` are unset. `orchestrate` carries the gate too but with different semantics, described in the paragraph below. `spec-init` and `spec-migrate` do not carry it at all. Output: `PRECONDITION_FAIL` block telling the user to run the marketplace install commands. The model relays the message and waits for confirmation before doing any work.
 
 `/safer:orchestrate` uses a refined gate: halts only on fresh-pipeline starts (no open `safer:parent` epic exists). Autonomous re-entry, cron ticks, parent-epic polling, skips the gate so in-flight pipelines drain to completion.
 

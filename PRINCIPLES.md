@@ -246,7 +246,7 @@ The implement tier does not edit the sidecar JSON or `@spec.*` directives to cle
 
 ## Composing with gstack
 
-safer-by-default treats [`gstack`](https://github.com/garrytan/gstack) as a hard dependency. Skills call gstack tools inline at dispatch boundaries: `/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/plan-devex-review`, `/security-review`, `/ship`.
+safer-by-default treats [`gstack`](https://github.com/garrytan/gstack) as a hard dependency. Skills call gstack tools inline at dispatch boundaries: `/simplify`, `/review`, `/codex`, `/plan-eng-review`, `/qa`, and others. There is deliberately no complete list here. Each skill body names the calls it makes, at the point it makes them, so an agent invoking skill X reads only X. A central roster would be a second place to keep current, and it would rot the first time a skill added a call.
 
 **Precedence: safer wins on scope; gstack ETHOS wins on quality-within-scope.**
 
@@ -298,7 +298,7 @@ Ceiling **N=4.** Above 4 passes, the marginal signal is smaller than the cost an
 
 ## Execution: the fan-out may run as a Workflow, but the gates do not
 
-On Claude Code, the heterogeneous fan-out. Stamina's N reviewers, and orchestrate's per-wave modality dispatch ,  MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule ,  a pure reducer cannot form a first-party opinion the way a model turn might.
+On Claude Code, the heterogeneous fan-out. Stamina's N reviewers, and orchestrate's per-wave modality dispatch, MAY be executed by a pinned Workflow script (`skills/<skill>/*.workflow.js`) when the invoker is the main-loop agent and has opted in. This is an execution detail, not a doctrine change: the Workflow runs the skill's prose rulebook, and the consensus reduce is a deterministic function over the collected verdicts. That *strengthens* the reader-not-writer rule: a pure reducer cannot form a first-party opinion the way a model turn might.
 
 Two limits hold. The Workflow is not a second dispatcher (the rulebook is the dispatcher); it executes the rulebook, which stays authoritative and is the required path for dispatched teammates (which cannot invoke Workflow), for Codex (no Workflow tool), and for non-opted-in sessions. And no Workflow advances a human gate: the contract OK, ratchet-up-parks, the N budget, and every stop condition stay model- and human-driven. Between waves and passes, never inside the deterministic fan-out. See `docs/workflow-composition.md`.
 
